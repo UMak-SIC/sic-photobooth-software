@@ -34,12 +34,12 @@ pnpm --filter captive-website dev
 pnpm --filter public-website dev
 ```
 
-| Application         | URL                     | Purpose                                         |
-| ------------------- | ----------------------- | ----------------------------------------------- |
-| Fastify backend     | `http://127.0.0.1:3000` | Local API. Health check: `/health`.             |
-| Photobooth software | `http://127.0.0.1:5173` | Local booth interface.                          |
-| Captive website     | `http://127.0.0.1:5174` | Local guest retrieval site.                     |
-| Public website      | `http://127.0.0.1:3001` | Public retrieval site during local development. |
+| Application | URL | Purpose |
+| --- | --- | --- |
+| Fastify backend | `http://127.0.0.1:3000` | Local API. Health check: `/health`. |
+| Photobooth software | `http://127.0.0.1:5173` | Local booth interface. |
+| Captive website | `http://127.0.0.1:5174` | Local guest retrieval site. |
+| Public website | `http://127.0.0.1:3001` | Public retrieval site during local development. |
 
 The public Next.js app uses port `3001` so it can run alongside the backend on port `3000`.
 
@@ -61,7 +61,7 @@ curl http://127.0.0.1:3000/health
 Expected response:
 
 ```json
-{ "status": "ok" }
+{"status":"ok"}
 ```
 
 ## Shared Code

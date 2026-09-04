@@ -46,12 +46,10 @@
 ### Task 1: Scaffold The Four Application Runtimes
 
 **Files:**
-
 - Create: all runtime files listed in File Structure under `app/`
 - Delete: `app/*/.gitkeep`
 
 **Interfaces:**
-
 - Produces: independently runnable application manifests and lockfiles in each `app/*` directory.
 
 - [ ] **Step 1: Dispatch four installation subagents**
@@ -71,13 +69,13 @@ pnpm add -D typescript tsx @types/node
 Create `tsconfig.json` and `src/server.ts` with one health check:
 
 ```ts
-import Fastify from 'fastify';
+import Fastify from "fastify";
 
 const app = Fastify();
 
-app.get('/health', () => ({ status: 'ok' }));
+app.get("/health", () => ({ status: "ok" }));
 
-await app.listen({ host: '0.0.0.0', port: 3000 });
+await app.listen({ host: "0.0.0.0", port: 3000 });
 ```
 
 Use `module: "NodeNext"`, `moduleResolution: "NodeNext"`, and `outDir: "dist"` in `tsconfig.json`. Add `dev`, `build`, `start`, and `typecheck` scripts to `package.json` using `tsx watch src/server.ts`, `tsc`, `node dist/server.js`, and `tsc --noEmit` respectively.
@@ -95,29 +93,29 @@ pnpm add zustand
 Configure the generated Vite config with `@tailwindcss/vite`, create `src/global.css` containing exactly:
 
 ```css
-@import 'tailwindcss';
+@import "tailwindcss";
 ```
 
 Replace the generated stylesheet import in `src/main.tsx` with:
 
 ```ts
-import './global.css';
+import "./global.css";
 ```
 
 Set the Vite development server port to `5173` and configure the `@/` alias in `vite.config.ts`:
 
 ```ts
-import { fileURLToPath, URL } from 'node:url';
+import { fileURLToPath, URL } from "node:url";
 
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { defineConfig } from 'vite';
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
   server: {
@@ -138,7 +136,7 @@ Add the matching alias to `tsconfig.app.json`:
 Create the store's domain type in `src/types/session.ts`:
 
 ```ts
-export type SessionType = 'photo-strip' | 'flipbook';
+export type SessionType = "photo-strip" | "flipbook";
 
 export interface ActiveSession {
   id: string;
@@ -149,9 +147,9 @@ export interface ActiveSession {
 Create `src/store/session-store.ts` using a typed store, an initial-state constant, colocated actions, and atomic selectors at call sites:
 
 ```ts
-import { create } from 'zustand';
+import { create } from "zustand";
 
-import type { ActiveSession } from '@/types/session';
+import type { ActiveSession } from "@/types/session";
 
 interface SessionState {
   activeSession: ActiveSession | null;
@@ -190,7 +188,7 @@ pnpm add -D tailwindcss @tailwindcss/postcss postcss
 Replace the generated `src/app/globals.css` with `src/app/global.css`, containing:
 
 ```css
-@import 'tailwindcss';
+@import "tailwindcss";
 ```
 
 Create `postcss.config.mjs` at the app root:
@@ -198,7 +196,7 @@ Create `postcss.config.mjs` at the app root:
 ```js
 const config = {
   plugins: {
-    '@tailwindcss/postcss': {},
+    "@tailwindcss/postcss": {},
   },
 };
 
@@ -244,12 +242,10 @@ Expected: all commands exit `0`. For the Fastify server, also run it and request
 ### Task 2: Update The Agent Knowledge Base
 
 **Files:**
-
 - Modify: `agents/coding-preferences.md`
 - Modify: `agents/memory.md`
 
 **Interfaces:**
-
 - Consumes: the actual generated stacks and verified commands from Task 1.
 - Produces: durable setup conventions for future implementation work.
 
@@ -274,7 +270,6 @@ Do not modify `agents/sitemap.md` or `agents/component-breakdowns.md`: this task
 ### Task 3: Final Validation And Review Checkpoint
 
 **Files:**
-
 - Verify: all created `package.json`, lockfiles, configs, and global stylesheets.
 
 - [ ] **Step 1: Confirm dependency ownership**
