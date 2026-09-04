@@ -11,3 +11,9 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# Design-sheet exports
+*.png
+
+# Playwright MCP browser state
+.playwright-mcp/

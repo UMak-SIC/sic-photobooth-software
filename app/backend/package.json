@@ -5,9 +5,9 @@
   "main": "./dist/server.js",
   "types": "./dist/server.d.ts",
   "scripts": {
+    "dev": "tsx watch src/server.ts",
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "dev": "node --watch dist/server.js",
     "start": "node dist/server.js",
     "clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\""
   },
@@ -17,13 +17,14 @@
     "@fastify/rate-limit": "^10.2.2",
     "@photobooth/public-output": "workspace:*",
     "dotenv": "^16.4.7",
-    "fastify": "^5.2.1",
+    "fastify": "5.2.1",
     "pg": "^8.13.3",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
     "@types/pg": "^8.11.11",
+    "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
 }
