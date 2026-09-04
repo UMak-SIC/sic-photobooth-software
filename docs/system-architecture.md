@@ -301,14 +301,9 @@ Local photos should not be deleted until the cloud upload has been successfully 
 * Photo IDs should be random and difficult to guess.
 * Local photos should remain stored until cloud synchronization succeeds.
 
-## 10. Required Devices and Cross-Platform Infrastructure
+## 10. Required Devices and Linux Infrastructure
 
-The main photobooth computer must support:
-
-* **Arch Linux**
-* **Windows**
-
-OS-specific implementations may differ, but the photobooth application should expose the same behavior on both platforms.
+The main photobooth computer runs **Arch Linux**.
 
 ---
 
@@ -332,11 +327,7 @@ Main Computer
 Photobooth Application
 ```
 
-scrcpy itself supports both Linux and Windows.
-
-However, scrcpy's native V4L2 virtual-webcam output is **Linux-only**.
-
-Therefore:
+scrcpy provides the V4L2 virtual-webcam output used by the Linux photobooth setup:
 
 ```text
 Arch Linux
@@ -348,21 +339,6 @@ V4L2 Camera Device
 ↓
 Photobooth
 ```
-
-For Windows:
-
-```text
-Windows
-Android
-↓
-scrcpy
-↓
-Windows-compatible video/webcam bridge
-↓
-Photobooth
-```
-
-The Windows implementation may require a virtual-camera bridge if the photobooth application expects a normal webcam device.
 
 ---
 
@@ -394,10 +370,6 @@ The project supports:
 * Remote zoom
 * Lens switching
 * Local-network operation
-
-Its current documentation explicitly targets a **Linux PC**, so Windows compatibility must be treated as an implementation/testing requirement rather than assumed support.
-
-The backend itself is primarily Node.js, Express and WebSocket-based, which makes a Windows port reasonably feasible, but it should still be tested and maintained by the photobooth project.
 
 Target architecture:
 
@@ -437,8 +409,6 @@ Customers can:
 
 The tablet connects to the computer through VNC.
 
-### Arch Linux
-
 Use **WayVNC**.
 
 ```text
@@ -453,29 +423,11 @@ Dedicated Photobooth Display
 
 WayVNC is designed for wlroots-based Wayland compositors and explicitly provides Arch Linux build instructions.
 
-### Windows
-
-WayVNC cannot be used because it depends on Wayland.
-
-Windows therefore requires a Windows-compatible VNC server:
-
-```text
-Tablet
-↓
-Same VNC Client
-↓
-Windows VNC Server
-↓
-Dedicated Photobooth Display
-```
-
-From the tablet's perspective, the workflow remains the same.
-
 ---
 
-## 12. Platform Abstraction
+## 12. Linux Device Boundaries
 
-The photobooth software should avoid directly depending on a specific operating system implementation.
+The photobooth software uses Linux-supported camera and display infrastructure while keeping their integration behind browser-device selection and VNC.
 
 ```text
                  Photobooth Application
@@ -484,27 +436,25 @@ The photobooth software should avoid directly depending on a specific operating 
               │          │          │
            Camera      Display     Printer
            Adapter      Adapter     Adapter
-              │          │
-        ┌─────┴─────┐ ┌──┴───────────────┐
-        │           │ │                  │
-      scrcpy     iPhone   WayVNC      Windows
-                 Streamer              VNC
+               │          │
+         ┌─────┴─────┐    │
+         │           │  WayVNC
+       scrcpy     iPhone
+                  Streamer
 ```
 
-Target compatibility:
-
-| Component                | Arch Linux     | Windows                 |
-| ------------------------ | -------------- | ----------------------- |
-| Photobooth application   | Yes            | Yes                     |
-| Android / scrcpy         | Yes            | Yes                     |
-| Android virtual webcam   | V4L2           | Requires Windows bridge |
-| iPhone / iphone-streamer | Yes            | Port/test required      |
-| Tablet VNC               | WayVNC         | Windows VNC server      |
-| Local server             | Yes            | Yes                     |
-| Captive portal           | Yes            | Yes                     |
-| Photo storage            | Yes            | Yes                     |
-| Cloud synchronization    | Yes            | Yes                     |
-| Vercel web application   | OS independent | OS independent          |
+| Component | Linux support |
+| --- | --- |
+| Photobooth application | Yes |
+| Android / scrcpy | Yes |
+| Android virtual webcam | V4L2 |
+| iPhone / iphone-streamer | Yes |
+| Tablet VNC | WayVNC |
+| Local server | Yes |
+| Captive portal | Yes |
+| Photo storage | Yes |
+| Cloud synchronization | Yes |
+| Vercel web application | OS independent |
 
 ---
 
@@ -519,13 +469,9 @@ Target compatibility:
                             │
                          VNC
                             │
-                  ┌─────────┴─────────┐
-                  │                   │
-              Arch Linux           Windows
-                WayVNC            VNC Server
-                  │                   │
-                  └─────────┬─────────┘
-                            │
+                       Arch Linux
+                         WayVNC
+                             │
                      Main Computer
                             │
           ┌─────────────────┼─────────────────┐
@@ -545,7 +491,7 @@ Target compatibility:
 
 ### Core Requirement
 
-> The photobooth's features must remain identical on Windows and Arch Linux, while OS-specific adapters handle differences in camera streaming, virtual-camera devices, and remote display infrastructure.
+> The photobooth runs on Arch Linux, using Linux-compatible camera streaming, V4L2 camera devices, and WayVNC for the customer display.
 
 ---
 
