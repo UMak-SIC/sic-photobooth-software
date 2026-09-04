@@ -11,6 +11,7 @@
 - [Regression Log](regressions.md): confirmed regressions and their protection.
 - [Recovery Playbooks](recovery.md): what to do when expected failures occur.
 - [Agent Memory](memory.md): durable, confirmed project knowledge.
+- [Task Traceability Matrix](../docs/traceability-matrix.md): forward and reverse task matrix mapped to PRD requirements.
 
 ## How To Use This
 
