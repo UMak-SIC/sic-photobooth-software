@@ -1,0 +1,5 @@
+{
+  "name": "sic-photobooth-software",
+  "private": true,
+  "packageManager": "pnpm@11.3.0"
+}
