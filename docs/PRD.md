@@ -403,12 +403,13 @@ This section resolves implementation details established after the original user
 
 #### Template Editor Contract
 
-* A template is a fixed-size 4R canvas with a single transformable PNG, JPG, or SVG background asset. Foreground overlays are out of scope.
+* A template is a fixed-size 4R canvas with a single transformable PNG, JPG, or SVG background asset and one or more optional transformable overlay image assets.
 * The editor offers grid presets such as `2x1`, `2x2`, `3x1`, and `3x2` only as placement starting points. The saved model uses freeform placements.
 * Each placement has `captureIndex`, `x`, `y`, `width`, `height`, `rotation`, `borderRadius`, and `zIndex`.
+* Each overlay has a `label`, `x`, `y`, `width`, `height`, `rotation`, and `zIndex`.
 * Multiple placements may link to the same `captureIndex`, allowing one capture to appear in multiple printed positions. Moving or resizing linked placements updates every linked copy.
-* The editor shows numbered rectangles rather than live image previews.
-* The editor provides manual inputs for every placement field and for the background image transform: `x`, `y`, `width`, and `height`.
+* The editor shows numbered rectangles rather than live image previews. Overlays render as labeled dashed shapes above the placements by `zIndex`.
+* The editor provides manual inputs for every placement field, every overlay field, and for the background image transform: `x`, `y`, `width`, and `height`.
 * Administrators can create, edit, delete, activate, and deactivate templates. A session stores a snapshot of the selected template at selection time, so later edits never change that session’s result.
 
 #### Flipbook Contract
@@ -579,6 +580,7 @@ Templates will store:
 * Name
 * Type
 * Background asset
+* Overlay assets
 * Fixed 4R orientation and output dimensions
 * Active status
 * Required capture count

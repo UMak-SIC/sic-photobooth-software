@@ -1,1 +1,44 @@
 @import "tailwindcss";
+
+:root { font-family: Arial, Helvetica, sans-serif; }
+* { box-sizing: border-box; }
+button { cursor: pointer; }
+
+.sheet-viewport { height: 319px; overflow: hidden; background: #09251f; }
+.artboard { width: 1280px; height: 780px; transform: scale(.408); transform-origin: top left; }
+.visual-strip { background: linear-gradient(135deg, #b9fae4 0 34%, transparent 34%), radial-gradient(circle at 65% 35%, #f4fff9 0 9%, transparent 10%), linear-gradient(150deg, #278571, #0b4035); }
+.visual-flip { background: linear-gradient(140deg, #082c26 0 36%, transparent 37%), radial-gradient(ellipse at 60% 60%, #a7ead5 0 25%, #438d7b 26% 40%, transparent 41%), #176754; }
+.template-art { height: 175px; position: relative; overflow: hidden; border-radius: 12px; background: linear-gradient(145deg, #176754 0 35%, #d8f8ed 36% 55%, #0d4b3e 56%); }
+.template-art::before, .template-art::after { content: ""; position: absolute; left: 50%; width: 64px; height: 46px; border: 5px solid #fff; transform: translateX(-50%); background: linear-gradient(135deg, #d5a870, #4a8074); }
+.template-art::before { top: 30px; }
+.template-art::after { top: 96px; }
+.template-art span { position: absolute; z-index: 1; bottom: 12px; left: 13px; font-size: 12px; line-height: 11px; font-weight: 900; color: white; }
+.template-pioneers { box-shadow: inset 0 0 0 3px #21836d; }
+.camera-scene { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 30%, rgba(179, 238, 213, .6) 0 10%, transparent 11%), radial-gradient(ellipse at 55% 100%, #447a6d 0 20%, transparent 21%), linear-gradient(135deg, #12463d, #84bbae 52%, #1a5146); }
+.camera-scene::before { content: ""; position: absolute; left: 50%; bottom: 0; width: 205px; height: 460px; transform: translateX(-50%); border-radius: 120px 120px 22px 22px; background: linear-gradient(#183b35, #0c2521); box-shadow: -90px 160px 0 -72px #f2c39b, 90px 160px 0 -72px #f2c39b; }
+.camera-scene::after { content: ""; position: absolute; left: calc(50% - 61px); top: 150px; width: 122px; height: 122px; border-radius: 50%; background: #cc9a72; box-shadow: inset 0 -15px #ae7755; }
+.review-strip, .final-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; border-radius: 15px; background: #0f5547; }
+.review-image, .final-strip div { height: 275px; border: 5px solid white; background: linear-gradient(145deg, #c4e9d6, #336d62); }
+.review-image.b, .final-strip div:nth-child(2) { background: linear-gradient(145deg, #e7c58e, #446d63); }
+.review-image.c, .final-strip div:nth-child(3) { background: linear-gradient(145deg, #abded1, #23574d); }
+.review-image.retaking { position: relative; box-shadow: inset 0 0 0 6px #17745f; }
+.review-image.retaking::after { content: "RETAKE"; position: absolute; inset: 0; display: grid; place-items: center; background: rgba(13, 52, 44, .45); color: #e7fff7; font-size: 15px; font-weight: 900; letter-spacing: .14em; }
+.final-strip { width: 230px; grid-template-columns: 1fr; gap: 5px; background: #0e473d; }
+.final-strip div { height: 130px; border-width: 3px; }
+.qr-grid { width: 170px; height: 170px; background-color: white; background-image: linear-gradient(90deg, #0c362e 11%, transparent 11% 22%, #0c362e 22% 33%, transparent 33% 44%, #0c362e 44% 55%, transparent 55% 66%, #0c362e 66% 77%, transparent 77% 88%, #0c362e 88%), linear-gradient(#0c362e 11%, transparent 11% 22%, #0c362e 22% 33%, transparent 33% 44%, #0c362e 44% 55%, transparent 55% 66%, #0c362e 66% 77%, transparent 77% 88%, #0c362e 88%); background-size: 22px 22px; }
+.frame-art { height: 175px; display: grid; place-items: center; border: 14px solid #16705b; border-radius: 12px; background: linear-gradient(135deg, #bff4e2, #3c8d79); box-shadow: inset 0 0 0 4px #e9fff7; }
+.frame-art span { display: grid; place-items: center; width: 78px; height: 78px; border: 5px solid white; border-radius: 50%; color: white; font-size: 19px; font-weight: 900; }
+.pick-tile { height: 200px; width: 356px; display: grid; place-items: end start; padding: 15px; border-radius: 12px; background: linear-gradient(145deg, #c7e9dd, #4c8e7c); color: white; font-size: 12px; font-weight: 900; text-align: left; }
+.pick-tile.video { background: linear-gradient(145deg, #244d45, #6bb6a0); }
+.pick-tile.selected { outline: 4px solid #18745f; outline-offset: 3px; }
+.processing-orb { width: 176px; height: 176px; border-radius: 50%; animation: fill 2.2s ease-out forwards; background: conic-gradient( #17745e var(--p, 0%), #cedfd8 0 );
+}
+@property --p { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+.processing-orb::after { content: ""; position: absolute; inset: 16px; border-radius: 50%; background: #e2fff4; }
+@keyframes fill { to { --p: 68%; } }
+.editor-canvas { min-height: 550px; background: linear-gradient(140deg, #0c4b3e 0 33%, #d8f7ed 34% 59%, #176754 60%); }
+.placement { position: absolute; display: grid; place-items: center; border: 4px solid #a8f3dd; background: rgba(168, 243, 221, .13); color: white; font-size: 16px; font-weight: 900; }
+.placement.one { left: 22%; top: 15%; width: 48%; height: 19%; }.placement.two { left: 22%; top: 40%; width: 48%; height: 19%; }.placement.three { left: 22%; top: 65%; width: 48%; height: 19%; }
+@keyframes fill { from { --p: 0%; } to { --p: 68%; } }
+@media (prefers-reduced-motion: reduce) { .processing-orb { animation: none; } }
+@media (max-width: 640px) { .sheet-viewport { height: 202px; }.artboard { transform: scale(.258); } }
