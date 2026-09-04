@@ -2,10 +2,9 @@
 
 ## Overview
 
-This document provides a single source of truth for tracking project tasks against the product requirements in [`PRD.md`](PRD.md), architectural rules in [`system-architecture.md`](system-architecture.md), and repository standards in [`AGENTS.md`](../AGENTS.md).
+This document provides a single source of truth for tracking project tasks against the product requirements in [`PRD.md`](PRD.md), architectural rules in [`system-architecture.md`](system-architecture.md), and repository standards in [`../AGENTS.md`](../AGENTS.md).
 
 ### Status Legend
-
 - `[ ] Planned` — Not yet started
 - `[/] In Progress` — Currently active
 - `[x] Completed` — Implemented and verified
@@ -16,20 +15,18 @@ This document provides a single source of truth for tracking project tasks again
 ## Forward Traceability Matrix (By Epic)
 
 ### EPIC-01: Monorepo Foundation & Workspace Tooling
-
 **Owner**: Monorepo Root | **Scope**: Workspace configuration, dependency orchestration, testing harness, lint/format standards.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TSK-0101** | Define monorepo package manifests, root workspace configuration, and package inter-dependencies | Root, `app/*`, `packages/*` | Contract § Delivery Scope | Workspaces resolve cleanly without broken symlinks. | `[x] Completed` |
 | **TSK-0102** | Configure shared TypeScript base configs (`tsconfig.base.json`) and application-specific extensions | Root, all packages | Contract § Delivery Scope | `tsc --noEmit` passes across all packages. | `[x] Completed` |
-| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | [`agents/coding-preferences.md`](../agents/coding-preferences.md) | Linter runs without error and enforces repository standards. | `[x] Completed` |
-| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | [`agents/unit-tests.md`](../agents/unit-tests.md), [`agents/e2e-tests.md`](../agents/e2e-tests.md) | Test harness executes and passes sample smoke tests. | `[x] Completed` |
+| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | `agents/coding-preferences.md` | Linter runs without error and enforces repository standards. | `[x] Completed` |
+| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | `agents/unit-tests.md`, `agents/e2e-tests.md` | Test harness executes and passes sample smoke tests. | `[x] Completed` |
 
 ---
 
 ### EPIC-02: Shared Public Output Package
-
 **Owner**: `packages/public-output` | **Scope**: Public ID generation, regex/base-62 validation, URL parsing, and shared DTOs.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -41,7 +38,6 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-03: Shared UI Components Package
-
 **Owner**: `packages/ui` | **Scope**: Strictly shared, identical presentation components across retrieval portals.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -53,22 +49,20 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-04: Fastify Backend Core & PostgreSQL Foundation
-
 **Owner**: `app/backend` | **Scope**: Local source of truth, database schema migrations, session state machine, filesystem manager, security controls.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0401** | Implement PostgreSQL schema and migrations for events, sessions, captures, templates, outputs, and publications | `app/backend` | US-91, US-92, US-100, US-101, US-136 | DB migrations create tables with least-privilege DB role support. | `[ ] Planned` |
-| **TSK-0402** | Implement health check endpoint (`/health`) and backend lifecycle initialization | `app/backend` | US-104 | Returns 200 OK with DB and filesystem status. | `[ ] Planned` |
-| **TSK-0403** | Implement session lifecycle manager (creation, random session tokens, state persistence, cancellation) | `app/backend` | US-1, US-9..13, US-87..90, US-102, US-103, US-129, US-130 | Enforces session isolation; rejects actions on cancelled sessions. | `[ ] Planned` |
-| **TSK-0404** | Implement backend-controlled filesystem storage manager with isolated session folders | `app/backend` | US-78, US-79, US-80, US-93, US-94, US-97, US-135 | Files saved to generated paths only; strict path traversal prevention. | `[ ] Planned` |
-| **TSK-0405** | Implement server-side media validators (magic byte header checks, MIME, size limits, dimensions, video duration) | `app/backend` | US-54, US-55, US-95, US-96, US-98, US-133, US-134 | Rejects renamed malformed files, oversized uploads, and invalid video durations. | `[ ] Planned` |
-| **TSK-0406** | Implement network security controls, origin restriction, and API rate limiters | `app/backend` | US-99, US-114, US-131, US-140 | Enforces request limits and isolates privileged endpoints from guest network. | `[ ] Planned` |
+| **TSK-0401** | Implement PostgreSQL schema and migrations for events, sessions, captures, templates, outputs, and publications | `app/backend` | US-91, US-92, US-100, US-101, US-136 | DB migrations create tables with least-privilege DB role support. | `[x] Completed` |
+| **TSK-0402** | Implement health check endpoint (`/health`) and backend lifecycle initialization | `app/backend` | US-104 | Returns 200 OK with DB and filesystem status. | `[x] Completed` |
+| **TSK-0403** | Implement session lifecycle manager (creation, random session tokens, state persistence, cancellation) | `app/backend` | US-1, US-9..13, US-87..90, US-102, US-103, US-129, US-130 | Enforces session isolation; rejects actions on cancelled sessions. | `[x] Completed` |
+| **TSK-0404** | Implement backend-controlled filesystem storage manager with isolated session folders | `app/backend` | US-78, US-79, US-80, US-93, US-94, US-97, US-135 | Files saved to generated paths only; strict path traversal prevention. | `[x] Completed` |
+| **TSK-0405** | Implement server-side media validators (magic byte header checks, MIME, size limits, dimensions, video duration) | `app/backend` | US-54, US-55, US-95, US-96, US-98, US-133, US-134 | Rejects renamed malformed files, oversized uploads, and invalid video durations. | `[x] Completed` |
+| **TSK-0406** | Implement network security controls, origin restriction, and API rate limiters | `app/backend` | US-99, US-114, US-131, US-140 | Enforces request limits and isolates privileged endpoints from guest network. | `[x] Completed` |
 
 ---
 
 ### EPIC-05: Photo Strip Engine & Capture Flow
-
 **Owner**: `app/backend`, `app/photobooth-software` | **Scope**: Template engine, 4R canvas compositor (300 DPI PNG), countdown, capture pipeline, review, retake limit, CUPS printing tracking.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -86,7 +80,6 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-06: Flipbook Engine & Recording Flow
-
 **Owner**: `app/backend`, `app/photobooth-software` | **Scope**: Frame selection, instructions, 3 covers + 3 6s videos, 5-min review timeout, 21-frame GIF generator, 2-min timeout recovery.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -97,12 +90,11 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[ ] Planned` |
 | **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[ ] Planned` |
 | **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[ ] Planned` |
-| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, [`agents/recovery.md`](../agents/recovery.md) | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
+| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
 
 ---
 
 ### EPIC-07: Local Captive Guest Portal
-
 **Owner**: `app/captive-website` | **Scope**: Guest portal served at photobooth gateway (`192.168.4.1:80`), QR scanner, manual ID input, approved output retrieval.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -115,7 +107,6 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-08: Cloud Publishing & Public Website
-
 **Owner**: `app/backend` (Worker), `app/public-website` | **Scope**: Asynchronous cloud delivery, Cloudinary upload, Supabase metadata, public Vercel website, 2-month retention.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -131,7 +122,6 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-09: Admin Management & Recovery Systems
-
 **Owner**: `app/photobooth-software`, `app/backend` | **Scope**: Event setup, template/frame management, publication dashboard, dead-letter retries, error recovery toasts.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -140,25 +130,24 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0902** | Implement Photo Strip Template Editor with freeform placements, background transforms, and grid presets | `app/photobooth-software`, `app/backend` | US-61..72, Contract § Template Editor | Supports placement coordinates (`x, y, w, h, rotation, borderRadius, zIndex`) & linked placements. | `[ ] Planned` |
 | **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[ ] Planned` |
 | **TSK-0904** | Implement Publication Administration Dashboard with manual retry for dead-letter queue jobs | `app/photobooth-software`, `app/backend` | Contract § Publishing and Retrieval | Displays queued, in_progress, uploaded, failed jobs with retry action. | `[ ] Planned` |
-| **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, [`agents/recovery.md`](../agents/recovery.md) | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
+| **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, `agents/recovery.md` | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
 | **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when an active capture workflow is in progress. | `[ ] Planned` |
 
 ---
 
 ### EPIC-10: Verification, Security Hardening & E2E Testing
-
 **Owner**: All Workspaces | **Scope**: Integration tests, security boundary validation, offline workflow tests.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-1001** | Implement Photo Strip E2E workflow test (start -> capture -> retake -> confirm -> print -> local retrieve) | Test Suite | [`agents/e2e-tests.md`](../agents/e2e-tests.md) § Photo Strip | Verifies complete guest journey under automated test runner. | `[ ] Planned` |
-| **TSK-1002** | Implement Flipbook E2E workflow test (start -> 3 covers + 3 videos -> review selection -> GIF generation) | Test Suite | [`agents/e2e-tests.md`](../agents/e2e-tests.md) § Flipbook | Verifies complete flipbook flow including review auto-default. | `[ ] Planned` |
+| **TSK-1001** | Implement Photo Strip E2E workflow test (start -> capture -> retake -> confirm -> print -> local retrieve) | Test Suite | `agents/e2e-tests.md` § Photo Strip | Verifies complete guest journey under automated test runner. | `[ ] Planned` |
+| **TSK-1002** | Implement Flipbook E2E workflow test (start -> 3 covers + 3 videos -> review selection -> GIF generation) | Test Suite | `agents/e2e-tests.md` § Flipbook | Verifies complete flipbook flow including review auto-default. | `[ ] Planned` |
 | **TSK-1003** | Implement Offline Resilience test (booth workflow and local retrieval succeed without cloud connection) | Test Suite | US-75, US-106, Contract § Delivery Scope | Confirms full offline operation with asynchronous publishing queueing. | `[ ] Planned` |
-| **TSK-1004** | Implement Security Suite (cross-session isolation, path traversal, payload size limits, 5th retake rejection) | Test Suite | US-129..140, [`agents/unit-tests.md`](../agents/unit-tests.md) | All security penetration and boundary test cases pass. | `[ ] Planned` |
+| **TSK-1004** | Implement Security Suite (cross-session isolation, path traversal, payload size limits, 5th retake rejection) | Test Suite | US-129..140, `agents/unit-tests.md` | All security penetration and boundary test cases pass. | `[ ] Planned` |
 
 ---
 
-## Reverse Traceability Index (PRD User Story → Tasks)
+## Reverse Traceability Index (PRD User Story $\rightarrow$ Tasks)
 
 | PRD User Story ID | Category | Primary Mapped Task IDs |
 | :--- | :--- | :--- |

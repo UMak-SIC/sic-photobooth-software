@@ -4,3 +4,7 @@ build/
 .next/
 coverage/
 pnpm-lock.yaml
+.github/pull_request_template.md
+docs/PRD.md
+docs/system-architecture.md
+docs/traceability-matrix.md
