@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a single source of truth for tracking project tasks against the product requirements in [docs/PRD.md](PRD.md), architectural rules in [docs/system-architecture.md](system-architecture.md), and repository standards in [AGENTS.md](../AGENTS.md).
+This document provides a single source of truth for tracking project tasks against the product requirements in [`PRD.md`](PRD.md), architectural rules in [`system-architecture.md`](system-architecture.md), and repository standards in [`AGENTS.md`](../AGENTS.md).
 
 ### Status Legend
 
@@ -46,9 +46,9 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0301** | Implement shared photo/flipbook media preview component with mobile-responsive viewport | `packages/ui` | US-108, US-119, US-120 | Renders high-resolution image / looping GIF cleanly across mobile and desktop. | `[ ] Planned` |
-| **TSK-0302** | Implement unified download button with asset trigger and loading state | `packages/ui` | US-108, US-120 | Downloads binary asset to client device without page redirect. | `[ ] Planned` |
-| **TSK-0303** | Implement unavailable / expired / processing status alert banners adhering to recovery UX specs | `packages/ui` | US-109, US-110, US-121, Contract § Events/Errors | Displays exact user messages defined in Authoritative Contract. | `[ ] Planned` |
+| **TSK-0301** | Implement shared photo/flipbook media preview component with mobile-responsive viewport | `packages/ui` | US-108, US-119, US-120 | Renders high-resolution image / looping GIF cleanly across mobile and desktop. | `[x] Completed` |
+| **TSK-0302** | Implement unified download button with asset trigger and loading state | `packages/ui` | US-108, US-120 | Downloads binary asset to client device without page redirect. | `[x] Completed` |
+| **TSK-0303** | Implement unavailable / expired / processing status alert banners adhering to recovery UX specs | `packages/ui` | US-109, US-110, US-121, Contract § Events/Errors | Displays exact user messages defined in Authoritative Contract. | `[x] Completed` |
 
 ---
 
