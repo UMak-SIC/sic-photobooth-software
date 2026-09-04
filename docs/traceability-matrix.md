@@ -2,9 +2,10 @@
 
 ## Overview
 
-This document provides a single source of truth for tracking project tasks against the product requirements in [`docs/PRD.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/docs/PRD.md), architectural rules in [`docs/system-architecture.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/docs/system-architecture.md), and repository standards in [`AGENTS.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/AGENTS.md).
+This document provides a single source of truth for tracking project tasks against the product requirements in [docs/PRD.md](PRD.md), architectural rules in [docs/system-architecture.md](system-architecture.md), and repository standards in [AGENTS.md](../AGENTS.md).
 
 ### Status Legend
+
 - `[ ] Planned` — Not yet started
 - `[/] In Progress` — Currently active
 - `[x] Completed` — Implemented and verified
@@ -15,29 +16,32 @@ This document provides a single source of truth for tracking project tasks again
 ## Forward Traceability Matrix (By Epic)
 
 ### EPIC-01: Monorepo Foundation & Workspace Tooling
+
 **Owner**: Monorepo Root | **Scope**: Workspace configuration, dependency orchestration, testing harness, lint/format standards.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0101** | Define monorepo package manifests, root workspace configuration, and package inter-dependencies | Root, `app/*`, `packages/*` | Contract § Delivery Scope | Workspaces resolve cleanly without broken symlinks. | `[ ] Planned` |
-| **TSK-0102** | Configure shared TypeScript base configs (`tsconfig.base.json`) and application-specific extensions | Root, all packages | Contract § Delivery Scope | `tsc --noEmit` passes across all packages. | `[ ] Planned` |
-| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | `agents/coding-preferences.md` | Linter runs without error and enforces repository standards. | `[ ] Planned` |
-| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | `agents/unit-tests.md`, `agents/e2e-tests.md` | Test harness executes and passes sample smoke tests. | `[ ] Planned` |
+| **TSK-0101** | Define monorepo package manifests, root workspace configuration, and package inter-dependencies | Root, `app/*`, `packages/*` | Contract § Delivery Scope | Workspaces resolve cleanly without broken symlinks. | `[x] Completed` |
+| **TSK-0102** | Configure shared TypeScript base configs (`tsconfig.base.json`) and application-specific extensions | Root, all packages | Contract § Delivery Scope | `tsc --noEmit` passes across all packages. | `[x] Completed` |
+| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | [`agents/coding-preferences.md`](../agents/coding-preferences.md) | Linter runs without error and enforces repository standards. | `[x] Completed` |
+| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | [`agents/unit-tests.md`](../agents/unit-tests.md), [`agents/e2e-tests.md`](../agents/e2e-tests.md) | Test harness executes and passes sample smoke tests. | `[x] Completed` |
 
 ---
 
 ### EPIC-02: Shared Public Output Package
+
 **Owner**: `packages/public-output` | **Scope**: Public ID generation, regex/base-62 validation, URL parsing, and shared DTOs.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0201** | Implement cryptographically random 7-character base-62 (`[A-Za-z0-9]`) ID generator | `packages/public-output` | US-12, US-125, US-132, US-138, Contract § Assisted Booth | Generator produces 7-char alphanumeric strings; zero sequential predictability. | `[ ] Planned` |
-| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://myphotobooth.com/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[ ] Planned` |
-| **TSK-0203** | Define shared TypeScript types and schemas for public output metadata and API responses | `packages/public-output` | US-108, US-119, Contract § Publishing and Retrieval | Shared types imported in backend, captive website, and public website. | `[ ] Planned` |
+| **TSK-0201** | Implement cryptographically random 7-character base-62 (`[A-Za-z0-9]`) ID generator | `packages/public-output` | US-12, US-125, US-132, US-138, Contract § Assisted Booth | Generator produces 7-char alphanumeric strings; zero sequential predictability. | `[x] Completed` |
+| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://myphotobooth.com/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[x] Completed` |
+| **TSK-0203** | Define shared TypeScript types and schemas for public output metadata and API responses | `packages/public-output` | US-108, US-119, Contract § Publishing and Retrieval | Shared types imported in backend, captive website, and public website. | `[x] Completed` |
 
 ---
 
 ### EPIC-03: Shared UI Components Package
+
 **Owner**: `packages/ui` | **Scope**: Strictly shared, identical presentation components across retrieval portals.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -49,6 +53,7 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-04: Fastify Backend Core & PostgreSQL Foundation
+
 **Owner**: `app/backend` | **Scope**: Local source of truth, database schema migrations, session state machine, filesystem manager, security controls.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -63,6 +68,7 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-05: Photo Strip Engine & Capture Flow
+
 **Owner**: `app/backend`, `app/photobooth-software` | **Scope**: Template engine, 4R canvas compositor (300 DPI PNG), countdown, capture pipeline, review, retake limit, CUPS printing tracking.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -80,6 +86,7 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-06: Flipbook Engine & Recording Flow
+
 **Owner**: `app/backend`, `app/photobooth-software` | **Scope**: Frame selection, instructions, 3 covers + 3 6s videos, 5-min review timeout, 21-frame GIF generator, 2-min timeout recovery.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -90,11 +97,12 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[ ] Planned` |
 | **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[ ] Planned` |
 | **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[ ] Planned` |
-| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
+| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, [`agents/recovery.md`](../agents/recovery.md) | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
 
 ---
 
 ### EPIC-07: Local Captive Guest Portal
+
 **Owner**: `app/captive-website` | **Scope**: Guest portal served at photobooth gateway (`192.168.4.1:80`), QR scanner, manual ID input, approved output retrieval.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -107,6 +115,7 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-08: Cloud Publishing & Public Website
+
 **Owner**: `app/backend` (Worker), `app/public-website` | **Scope**: Asynchronous cloud delivery, Cloudinary upload, Supabase metadata, public Vercel website, 2-month retention.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -122,6 +131,7 @@ This document provides a single source of truth for tracking project tasks again
 ---
 
 ### EPIC-09: Admin Management & Recovery Systems
+
 **Owner**: `app/photobooth-software`, `app/backend` | **Scope**: Event setup, template/frame management, publication dashboard, dead-letter retries, error recovery toasts.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
@@ -130,24 +140,25 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0902** | Implement Photo Strip Template Editor with freeform placements, background transforms, and grid presets | `app/photobooth-software`, `app/backend` | US-61..72, Contract § Template Editor | Supports placement coordinates (`x, y, w, h, rotation, borderRadius, zIndex`) & linked placements. | `[ ] Planned` |
 | **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[ ] Planned` |
 | **TSK-0904** | Implement Publication Administration Dashboard with manual retry for dead-letter queue jobs | `app/photobooth-software`, `app/backend` | Contract § Publishing and Retrieval | Displays queued, in_progress, uploaded, failed jobs with retry action. | `[ ] Planned` |
-| **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, `agents/recovery.md` | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
+| **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, [`agents/recovery.md`](../agents/recovery.md) | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
 | **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when an active capture workflow is in progress. | `[ ] Planned` |
 
 ---
 
 ### EPIC-10: Verification, Security Hardening & E2E Testing
+
 **Owner**: All Workspaces | **Scope**: Integration tests, security boundary validation, offline workflow tests.
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-1001** | Implement Photo Strip E2E workflow test (start -> capture -> retake -> confirm -> print -> local retrieve) | Test Suite | `agents/e2e-tests.md` § Photo Strip | Verifies complete guest journey under automated test runner. | `[ ] Planned` |
-| **TSK-1002** | Implement Flipbook E2E workflow test (start -> 3 covers + 3 videos -> review selection -> GIF generation) | Test Suite | `agents/e2e-tests.md` § Flipbook | Verifies complete flipbook flow including review auto-default. | `[ ] Planned` |
+| **TSK-1001** | Implement Photo Strip E2E workflow test (start -> capture -> retake -> confirm -> print -> local retrieve) | Test Suite | [`agents/e2e-tests.md`](../agents/e2e-tests.md) § Photo Strip | Verifies complete guest journey under automated test runner. | `[ ] Planned` |
+| **TSK-1002** | Implement Flipbook E2E workflow test (start -> 3 covers + 3 videos -> review selection -> GIF generation) | Test Suite | [`agents/e2e-tests.md`](../agents/e2e-tests.md) § Flipbook | Verifies complete flipbook flow including review auto-default. | `[ ] Planned` |
 | **TSK-1003** | Implement Offline Resilience test (booth workflow and local retrieval succeed without cloud connection) | Test Suite | US-75, US-106, Contract § Delivery Scope | Confirms full offline operation with asynchronous publishing queueing. | `[ ] Planned` |
-| **TSK-1004** | Implement Security Suite (cross-session isolation, path traversal, payload size limits, 5th retake rejection) | Test Suite | US-129..140, `agents/unit-tests.md` | All security penetration and boundary test cases pass. | `[ ] Planned` |
+| **TSK-1004** | Implement Security Suite (cross-session isolation, path traversal, payload size limits, 5th retake rejection) | Test Suite | US-129..140, [`agents/unit-tests.md`](../agents/unit-tests.md) | All security penetration and boundary test cases pass. | `[ ] Planned` |
 
 ---
 
-## Reverse Traceability Index (PRD User Story $\rightarrow$ Tasks)
+## Reverse Traceability Index (PRD User Story → Tasks)
 
 | PRD User Story ID | Category | Primary Mapped Task IDs |
 | :--- | :--- | :--- |
