@@ -161,7 +161,8 @@ export function TemplateEditor({
     }
   };
 
-  const backgroundSource = backgroundPreview ?? assetUrl(initialTemplate?.backgroundPath ?? null);
+  const backgroundSource =
+    backgroundPreview ?? assetUrl(initialTemplate?.backgroundPath ?? null, initialTemplate?.updatedAt);
 
   const onPointerMove = (event: React.PointerEvent) => {
     if (!drag.current || !canvasRef.current) return;
@@ -502,7 +503,8 @@ export function TemplateEditor({
                 .sort((a, b) => a.zIndex - b.zIndex)
                 .map((overlay, index) => {
                   const actualIndex = draft.overlays.indexOf(overlay);
-                  const source = overlayPreviews[actualIndex] ?? assetUrl(overlay.path ?? null);
+                  const source =
+                    overlayPreviews[actualIndex] ?? assetUrl(overlay.path ?? null, initialTemplate?.updatedAt);
                   const isSelected = selected.type === 'overlay' && selected.index === actualIndex;
                   return (
                     <div
@@ -752,7 +754,8 @@ export function TemplateEditor({
                   <div className="overlays-list">
                     {draft.overlays.map((overlay, index) => {
                       const isSelected = selected.type === 'overlay' && selected.index === index;
-                      const source = overlayPreviews[index] ?? assetUrl(overlay.path ?? null);
+                      const source =
+                        overlayPreviews[index] ?? assetUrl(overlay.path ?? null, initialTemplate?.updatedAt);
                       const isStaged = Boolean(overlayFiles[index]);
                       const hasImage = Boolean(source);
 
@@ -1133,7 +1136,8 @@ export function TemplateEditor({
                 </span>
               ))}
               {draft.overlays.map((overlay, index) => {
-                const source = overlayPreviews[index] ?? assetUrl(overlay.path ?? null);
+                const source =
+                  overlayPreviews[index] ?? assetUrl(overlay.path ?? null, initialTemplate?.updatedAt);
                 return (
                   <i
                     key={overlay.id ?? `${overlay.label}-${index}`}

@@ -2,13 +2,20 @@ import type { Template, TemplateDraft } from './types';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
-export const assetUrl = (relativeUrl: string | null) =>
-  relativeUrl ? new URL(relativeUrl, API_URL).toString() : null;
+export const assetUrl = (relativeUrl: string | null, version?: string) => {
+  if (!relativeUrl) return null;
+  const url = new URL(relativeUrl, API_URL);
+  if (version) url.searchParams.set('v', version);
+  return url.toString();
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: {
+      ...(init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.headers ?? {}),
+    },
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as {
@@ -29,6 +36,8 @@ const stripPaths = (draft: TemplateDraft): TemplateDraft => ({
 export const templateApi = {
   list: () => request<Template[]>('/templates'),
   get: (id: string) => request<Template>(`/templates/${id}`),
+  duplicate: (id: string) =>
+    request<Template>(`/templates/${id}/duplicate`, { method: 'POST' }),
   create: (draft: TemplateDraft) =>
     request<Template>('/templates', { method: 'POST', body: JSON.stringify(stripPaths(draft)) }),
   update: (id: string, draft: TemplateDraft) =>

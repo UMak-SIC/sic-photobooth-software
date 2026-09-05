@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
 import { validateTemplateDraft, type Template } from '../src/templates/types.js';
-import { toTemplateDto } from '../src/templates/routes.js';
+import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
 import { zip } from '../src/templates/zip.js';
 import { parseZip, parseManifest, assetExtension } from '../src/templates/import.js';
 
@@ -17,6 +17,10 @@ const placement = {
 };
 
 describe('template persistence boundaries', () => {
+  it('generates the next available duplicate name', () => {
+    expect(duplicateName('Party', ['Party', 'Party_(1)', 'Party_(2)'])).toBe('Party_(3)');
+  });
+
   it('writes a portable ZIP with every entry intact', async () => {
     async function* entries() {
       yield { name: 'manifest.json', content: Buffer.from('{"version":1}') };

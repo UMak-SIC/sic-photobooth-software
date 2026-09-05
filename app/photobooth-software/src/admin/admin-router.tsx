@@ -65,6 +65,14 @@ export function AdminRouter() {
               setError(cause instanceof Error ? cause.message : String(cause));
             }
           }}
+          onDuplicate={async (template) => {
+            try {
+              await templateApi.duplicate(template.id);
+              setTemplates(await templateApi.list());
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause));
+            }
+          }}
           onDelete={async (template) => {
             if (!window.confirm(`Delete “${template.name}”?`)) return;
             try {

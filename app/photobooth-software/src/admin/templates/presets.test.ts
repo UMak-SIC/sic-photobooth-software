@@ -12,6 +12,6 @@ describe('template layouts', () => {
   });
 
   it('provides the eight-slot 2x2 strip grid', () => {
-    expect(layoutPlacements('M').map((placement) => placement.captureIndex)).toEqual([1, 1, 2, 2, 1, 1, 2, 2]);
+    expect(layoutPlacements('I').map((placement) => placement.captureIndex)).toEqual([1, 1, 2, 2, 1, 1, 2, 2]);
   });
 });

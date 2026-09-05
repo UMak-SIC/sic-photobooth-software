@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { Readable } from 'node:stream';
 import path from 'node:path';
-import { validateTemplateDraft, type Template, type TemplateDto } from './types.js';
+import { validateTemplateDraft, type Template, type TemplateDraft, type TemplateDto } from './types.js';
 import { z } from 'zod';
 import { templateRepository } from './repository.js';
 import { templateStorage } from './storage.js';
@@ -29,6 +29,13 @@ export function toTemplateDto(template: Template): TemplateDto {
 
 function imageExtension(format: string): 'png' | 'jpg' | 'svg' {
   return format === 'jpeg' ? 'jpg' : (format as 'png' | 'svg');
+}
+
+export function duplicateName(name: string, existingNames: Iterable<string>): string {
+  const names = new Set(existingNames);
+  let suffix = 1;
+  while (names.has(`${name}_(${suffix})`)) suffix++;
+  return `${name}_(${suffix})`;
 }
 
 export const templateRoutes: FastifyPluginAsync = async (fastify) => {
@@ -91,6 +98,62 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       .header('Content-Disposition', 'attachment; filename="photobooth-templates.zip"')
       .type('application/zip')
       .send(Readable.from(zip(entries())));
+  });
+
+  fastify.post<{ Params: { id: string } }>('/templates/:id/duplicate', async (request, reply) => {
+    const source = await templateRepository.get(request.params.id);
+    if (!source) return errorResponse(reply, 'TEMPLATE_NOT_FOUND', 'Template does not exist', 404);
+
+    const draft: TemplateDraft = {
+      name: duplicateName(source.name, (await templateRepository.list()).map((item) => item.name)),
+      orientation: source.orientation,
+      background: source.background,
+      placements: source.placements.map(({ id: _id, ...placement }) => placement),
+      overlays: source.overlays.map(({ id: _id, path: _path, ...overlay }) => overlay),
+    };
+
+    let duplicate: Template | null = null;
+    try {
+      duplicate = await templateRepository.create(draft);
+      if (!source.active)
+        duplicate = (await templateRepository.setActive(duplicate.id, false)) ?? duplicate;
+
+      if (source.backgroundPath) {
+        const backgroundPath = await templateStorage.copyAsset(
+          source.id,
+          source.backgroundPath,
+          duplicate.id,
+          'background',
+        );
+        duplicate = (await templateRepository.setBackgroundPath(duplicate.id, backgroundPath)) ?? duplicate;
+      }
+      for (const [index, overlay] of source.overlays.entries()) {
+        if (!overlay.path || !duplicate.overlays[index]?.id) continue;
+        const overlayPath = await templateStorage.copyAsset(
+          source.id,
+          overlay.path,
+          duplicate.id,
+          'overlay',
+        );
+        duplicate = (await templateRepository.addOverlayPath(
+          duplicate.id,
+          duplicate.overlays[index].id!,
+          overlayPath,
+        )) ?? duplicate;
+      }
+      return reply.status(201).send({ success: true, data: toTemplateDto(duplicate) });
+    } catch (error: unknown) {
+      if (duplicate) {
+        await templateRepository.delete(duplicate.id);
+        await templateStorage.removeTemplate(duplicate.id);
+      }
+      return errorResponse(
+        reply,
+        'DUPLICATE_FAILED',
+        error instanceof Error ? error.message : String(error),
+        500,
+      );
+    }
   });
 
   fastify.post('/templates/import', async (request, reply) => {

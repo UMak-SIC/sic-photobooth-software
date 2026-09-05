@@ -340,6 +340,7 @@ button {
 .status.active { background: #ddf7ee; color: #21745f; }
 .template-actions { display: flex; gap: 14px; padding: 10px 16px 16px; }
 .template-actions button { padding: 0; background: none; color: #176a56; font-size: 11px; font-weight: 800; }
+.template-actions .sort-button { font-size: 18px; line-height: 1; }
 .template-actions .danger-link { color: #b64d47; }
 .editor-header { align-items: flex-end; }
 .editor-header-actions { display: flex; gap: 10px; }
@@ -367,7 +368,7 @@ button {
 .canvas-background, .preview-background { position: absolute; object-fit: fill; pointer-events: none; z-index: 0; }
 
 .canvas-placement { position: absolute; display: grid; place-items: center; cursor: move; font: inherit; font-size: clamp(14px, 2vw, 22px); font-weight: 900; z-index: 2; border: 2px solid #2d3748; background: rgba(22, 27, 34, 0.85); color: white; transition: outline 0.1s; }
-.canvas-placement.selected { border-color: #9ef0dc; outline: 3px solid #146a56; outline-offset: 1px; }
+.canvas-placement.selected { border: 0; outline: 0; background: #000; }
 .placement-number { pointer-events: none; }
 
 .canvas-badge { position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); background: #0c332ccc; color: white; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 800; white-space: nowrap; pointer-events: none; backdrop-filter: blur(4px); z-index: 30; box-shadow: 0 2px 6px rgba(0,0,0,0.2); }

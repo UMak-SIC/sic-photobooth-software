@@ -45,6 +45,21 @@ export class TemplateStorage {
     return fs.promises.readFile(resolved);
   }
 
+  public async copyAsset(
+    sourceTemplateId: string,
+    sourcePath: string,
+    targetTemplateId: string,
+    kind: 'background' | 'overlay',
+  ): Promise<string> {
+    const ext = path.extname(sourcePath).toLowerCase();
+    return this.saveAsset(
+      targetTemplateId,
+      kind,
+      ext,
+      await this.readAsset(sourceTemplateId, sourcePath),
+    );
+  }
+
   public async removeTemplate(templateId: string): Promise<void> {
     await fs.promises.rm(this.templateDir(templateId), { recursive: true, force: true });
   }

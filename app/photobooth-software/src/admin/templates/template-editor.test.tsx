@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TemplateEditor } from './template-editor';
-import type { TemplateDraft } from './types';
+import type { Template, TemplateDraft } from './types';
 
 const mockDraft: TemplateDraft = {
   name: 'Test Template',
@@ -181,5 +181,44 @@ describe('TemplateEditor', () => {
     const bgTab = screen.getByRole('tab', { name: /Background/i });
     fireEvent.click(bgTab);
     expect(screen.getByText(/BACKGROUND IMAGE/i)).toBeDefined();
+  });
+
+  it('reloads the background asset after a saved template update', () => {
+    const template = {
+      ...mockDraft,
+      id: 'template-1',
+      width: 1200,
+      height: 1800,
+      active: true,
+      requiredCaptureCount: 1,
+      backgroundPath: '/templates/template-1/background',
+      sortOrder: null,
+      createdAt: '2026-09-05T00:00:00.000Z',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    } satisfies Template;
+    const props = {
+      draft: mockDraft,
+      setDraft: vi.fn(),
+      onBack: vi.fn(),
+      onSaved: vi.fn(),
+      onLoad: vi.fn(),
+      templateId: template.id,
+    };
+    const { rerender } = render(<TemplateEditor {...props} initialTemplate={template} />);
+
+    expect(screen.getByAltText('Background preview').getAttribute('src')).toContain(
+      'v=2026-09-05T00%3A00%3A00.000Z',
+    );
+
+    rerender(
+      <TemplateEditor
+        {...props}
+        initialTemplate={{ ...template, updatedAt: '2026-09-05T00:00:01.000Z' }}
+      />,
+    );
+
+    expect(screen.getByAltText('Background preview').getAttribute('src')).toContain(
+      'v=2026-09-05T00%3A00%3A01.000Z',
+    );
   });
 });
