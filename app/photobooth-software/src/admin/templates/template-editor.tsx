@@ -37,6 +37,7 @@ export function TemplateEditor({
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [overlayFiles, setOverlayFiles] = useState<Record<number, File>>({});
   const [overlayPreviews, setOverlayPreviews] = useState<Record<number, string>>({});
+  const [savedDraft, setSavedDraft] = useState(() => JSON.stringify(draft));
   const canvasRef = useRef<HTMLDivElement>(null);
   const allOverlaysFileInputRef = useRef<HTMLInputElement>(null);
   const drag = useRef<
@@ -48,7 +49,10 @@ export function TemplateEditor({
   useEffect(() => {
     if (templateId && (!initialTemplate || initialTemplate.id !== templateId))
       onLoad(templateId)
-        .then(setDraft)
+        .then((loaded) => {
+          setSavedDraft(JSON.stringify(loaded));
+          setDraft(loaded);
+        })
         .catch((cause: Error) => setError(cause.message));
   }, [initialTemplate, onLoad, setDraft, templateId]);
 
@@ -59,6 +63,19 @@ export function TemplateEditor({
 
   const dimensions = dimensionsFor(draft.orientation);
   const update = (next: Partial<TemplateDraft>) => setDraft({ ...draft, ...next });
+  const hasStagedAssets =
+    backgroundFile !== null || coverFile !== null || Object.keys(overlayFiles).length > 0;
+  const hasUnsavedEdits = Boolean(templateId) && (savedDraft !== JSON.stringify(draft) || hasStagedAssets);
+
+  useEffect(() => {
+    if (!hasUnsavedEdits) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnBeforeUnload);
+    return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+  }, [hasUnsavedEdits]);
 
   const updatePlacement = (index: number, changes: Partial<TemplatePlacement>) => {
     const placements = draft.placements.map((item, itemIndex) =>
@@ -160,6 +177,7 @@ export function TemplateEditor({
       setCoverPreview(null);
       setOverlayFiles({});
       setOverlayPreviews({});
+      setSavedDraft(JSON.stringify(draft));
       onSaved(template);
       setMessage('Template Saved');
     } catch (cause) {
