@@ -40,3 +40,17 @@ When adding a real boundary, record it as:
 - Does not own: ...
 - Collaborators: ...
 ```
+
+### FlipbookWorkflow
+
+- Location: `app/photobooth-software/src/components/flipbook/`
+- Owns: 8-step client flipbook capture workflow (instructions, 3x cover photos, 3x video clips, cover/video review selectors, frame selector, processing spinner, and QR completion screen).
+- Does not own: Backend video validation, frame extraction, or GIF encoding.
+- Collaborators: `app/photobooth-software/src/store/flipbook-store.ts`, `app/photobooth-software/src/hooks/useCamera.ts`, `app/photobooth-software/src/services/api.ts`.
+
+### GifRenderer
+
+- Location: `app/backend/src/services/gif-renderer.ts`
+- Owns: Extraction of video motion frames via ffmpeg, sharp compositing with front cover holds (3.0s) and overlay PNG frames, gifenc palette quantization, and looping animated GIF generation.
+- Does not own: Session authorization, route handling, or storage cleanup.
+- Collaborators: `app/backend/src/config.ts`, `app/backend/src/services/storage.ts`.

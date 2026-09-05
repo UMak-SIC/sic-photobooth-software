@@ -20,6 +20,8 @@ Confirmed, durable knowledge that helps future agents make correct changes. Do n
 - Session authorization uses a 64-character cryptographic hex token passed via `X-Session-Token` header for state-modifying requests.
 - Local session assets are stored in isolated subdirectories `storage/sessions/:sessionId/{originals,videos,intermediate,outputs}` with strict path traversal rejection.
 - Fastify server exposes `/health`, `/api/sessions`, and `/photos/:id` with rate limiting and CORS origin controls.
+- 2026-09-05: Flipbook workflow uses Instance A timing parameters (5.0s video recording, 20 extracted motion frames at 250ms frame delay = 4.0 fps, 3.0s front cover hold, 8.0s total GIF loop), centrally defined in `app/backend/src/config.ts` (`flipbookConfig`) and `app/photobooth-software/src/config/flipbook.ts` (`FLIPBOOK_CONFIG`). Source: `app/backend/src/config.ts`, `app/photobooth-software/src/config/flipbook.ts`.
+- 2026-09-05: WebM `MediaRecorder` video streams lack segment duration headers; video duration is validated in `app/backend/src/services/media-validator.ts` by inspecting Cluster `Timecode` (`0xE7`) tags in cluster headers. Source: `app/backend/src/services/media-validator.ts`.
 
 ## Update Template
 
