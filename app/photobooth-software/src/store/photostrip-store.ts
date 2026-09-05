@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { ReviewTemplate } from '../components/PhotoStripReview';
+import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
-export type PhotoStripStep = 'template_select' | 'capturing' | 'review' | 'complete';
+export type PhotoStripStep = 'setup' | 'template_select' | 'capturing' | 'review' | 'complete';
 
 export interface PhotoCaptureItem {
   captureIndex: number;
@@ -9,10 +9,18 @@ export interface PhotoCaptureItem {
   blob: Blob;
 }
 
+export interface PhotoStripEvent {
+  id?: string;
+  name: string;
+  date: string;
+  operatorName: string;
+}
+
 export interface PhotoStripState {
   currentStep: PhotoStripStep;
   sessionId: string | null;
   sessionToken: string | null;
+  selectedEvent: PhotoStripEvent | null;
   selectedTemplate: ReviewTemplate | null;
   captures: PhotoCaptureItem[];
   retakeCount: number;
@@ -27,6 +35,7 @@ export interface PhotoStripState {
   errorMessage: string | null;
 
   setSession: (sessionId: string, token: string) => void;
+  setSelectedEvent: (event: PhotoStripEvent | null) => void;
   setStep: (step: PhotoStripStep) => void;
   setTemplate: (template: ReviewTemplate) => void;
   startCountdown: () => void;
@@ -40,9 +49,10 @@ export interface PhotoStripState {
 }
 
 const initialState = {
-  currentStep: 'template_select' as PhotoStripStep,
+  currentStep: 'setup' as PhotoStripStep,
   sessionId: null,
   sessionToken: null,
+  selectedEvent: null,
   selectedTemplate: null,
   captures: [] as PhotoCaptureItem[],
   retakeCount: 0,
@@ -59,6 +69,8 @@ const initialState = {
 
 export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
   ...initialState,
+
+  setSelectedEvent: (selectedEvent) => set({ selectedEvent }),
 
   setSession: (sessionId, sessionToken) => set({ sessionId, sessionToken }),
 
