@@ -4,6 +4,7 @@ import { validateTemplateDraft, type Template } from '../src/templates/types.js'
 import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
 import { zip } from '../src/templates/zip.js';
 import { parseZip, parseManifest, assetExtension } from '../src/templates/import.js';
+import { TemplateStorage } from '../src/templates/storage.js';
 
 const placement = {
   captureIndex: 1,
@@ -17,6 +18,15 @@ const placement = {
 };
 
 describe('template persistence boundaries', () => {
+  it('accepts relative database asset paths when removing assets', async () => {
+    const storage = new TemplateStorage();
+
+    await expect(storage.removeAsset('templates/classic-portrait.png')).resolves.toBeUndefined();
+    await expect(storage.removeAsset('../outside.png')).rejects.toThrow(
+      'Invalid template asset path',
+    );
+  });
+
   it('generates the next available duplicate name', () => {
     expect(duplicateName('Party', ['Party', 'Party_(1)', 'Party_(2)'])).toBe('Party_(3)');
   });

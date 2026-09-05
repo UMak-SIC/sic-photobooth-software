@@ -22,3 +22,9 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 - Symptom: Re-saving a loaded template rejected placement geometry as strings and placement IDs as unknown fields.
 - Root cause: PostgreSQL numeric values were returned unnormalized, and frontend drafts retained server-only placement IDs.
 - Prevention: `app/backend/test/templates.test.ts` and `app/photobooth-software/src/admin/templates/template-store.test.ts`
+
+### 2026-09-05: Template Asset Replacement Rejects Seeded Paths
+
+- Symptom: Uploading a replacement background returned HTTP 500 while removing the seeded asset path.
+- Root cause: Seeded database asset paths are relative, but template storage validated them as process-relative filesystem paths.
+- Prevention: `app/backend/test/templates.test.ts`
