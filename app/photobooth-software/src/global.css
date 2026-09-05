@@ -72,35 +72,7 @@ button {
 .camera-scene {
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse at 50% 30%, rgba(179, 238, 213, 0.6) 0 10%, transparent 11%),
-    radial-gradient(ellipse at 55% 100%, #447a6d 0 20%, transparent 21%),
-    linear-gradient(135deg, #12463d, #84bbae 52%, #1a5146);
-}
-.camera-scene::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  width: 205px;
-  height: 460px;
-  transform: translateX(-50%);
-  border-radius: 120px 120px 22px 22px;
-  background: linear-gradient(#183b35, #0c2521);
-  box-shadow:
-    -90px 160px 0 -72px #f2c39b,
-    90px 160px 0 -72px #f2c39b;
-}
-.camera-scene::after {
-  content: '';
-  position: absolute;
-  left: calc(50% - 61px);
-  top: 150px;
-  width: 122px;
-  height: 122px;
-  border-radius: 50%;
-  background: #cc9a72;
-  box-shadow: inset 0 -15px #ae7755;
+  background: #071d1a;
 }
 .review-strip,
 .final-strip {
@@ -542,24 +514,30 @@ button {
   .name-input { width: 100%; }
 }
 
-@page {
-  size: 4in 6in;
-  margin: 0;
-}
-
+/* ==========================================================================
+   Photo Strip & Flipbook 4R Print Styles (300 DPI PNG & PDF Handoff)
+   ========================================================================== */
 @media screen {
+  .print-only-target,
   #flipbook-print-portal {
     display: none !important;
   }
 }
 
 @media print {
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+
   *, *::before, *::after {
     box-sizing: border-box !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  html, body {
+
+  html,
+  body {
     width: 4in !important;
     height: 6in !important;
     margin: 0 !important;
@@ -567,9 +545,46 @@ button {
     background: #ffffff !important;
     overflow: visible !important;
   }
-  #root {
-    display: none !important;
+
+  body * {
+    visibility: hidden;
   }
+
+  .print-only-target,
+  .print-only-target *,
+  #flipbook-print-portal,
+  #flipbook-print-portal * {
+    visibility: visible;
+  }
+
+  .print-only-target {
+    position: fixed;
+    inset: 0;
+    width: 4in;
+    height: 6in;
+    margin: 0;
+    padding: 0;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff !important;
+    z-index: 9999999;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-only-target img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
   #flipbook-print-portal {
     display: block !important;
     position: static !important;
@@ -577,6 +592,7 @@ button {
     margin: 0 !important;
     padding: 0 !important;
   }
+
   .print-sheet-4r {
     display: block !important;
     width: 4in !important;
@@ -596,9 +612,19 @@ button {
     box-sizing: border-box !important;
     background-color: #ffffff !important;
   }
+
   .print-sheet-4r:last-child {
     page-break-after: auto !important;
     break-after: auto !important;
+  }
+
+  .no-print,
+  header,
+  nav,
+  aside,
+  button,
+  .artboard {
+    display: none !important;
   }
 }
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { ReviewTemplate } from '../components/PhotoStripReview';
+import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
-export type PhotoStripStep = 'template_select' | 'capturing' | 'review' | 'complete';
+export type PhotoStripStep = 'setup' | 'template_select' | 'capturing' | 'review' | 'complete';
 
 export interface PhotoCaptureItem {
   captureIndex: number;
@@ -9,10 +9,18 @@ export interface PhotoCaptureItem {
   blob: Blob;
 }
 
+export interface PhotoStripEvent {
+  id?: string;
+  name: string;
+  date: string;
+  operatorName: string;
+}
+
 export interface PhotoStripState {
   currentStep: PhotoStripStep;
   sessionId: string | null;
   sessionToken: string | null;
+  selectedEvent: PhotoStripEvent | null;
   selectedTemplate: ReviewTemplate | null;
   captures: PhotoCaptureItem[];
   retakeCount: number;
@@ -25,8 +33,11 @@ export interface PhotoStripState {
   outputImageUrl: string | null;
   isConfirming: boolean;
   errorMessage: string | null;
+  isPrinted: boolean;
+  copiesPrinted: number;
 
   setSession: (sessionId: string, token: string) => void;
+  setSelectedEvent: (event: PhotoStripEvent | null) => void;
   setStep: (step: PhotoStripStep) => void;
   setTemplate: (template: ReviewTemplate) => void;
   startCountdown: () => void;
@@ -36,13 +47,15 @@ export interface PhotoStripState {
   setConfirmedOutput: (publicId: string, qrUrl: string, outputImageUrl: string) => void;
   setIsConfirming: (isConfirming: boolean) => void;
   setError: (error: string | null) => void;
+  recordPrintSuccess: (copies: number) => void;
   resetPhotoStrip: () => void;
 }
 
 const initialState = {
-  currentStep: 'template_select' as PhotoStripStep,
+  currentStep: 'setup' as PhotoStripStep,
   sessionId: null,
   sessionToken: null,
+  selectedEvent: null,
   selectedTemplate: null,
   captures: [] as PhotoCaptureItem[],
   retakeCount: 0,
@@ -55,10 +68,20 @@ const initialState = {
   outputImageUrl: null,
   isConfirming: false,
   errorMessage: null,
+  isPrinted: false,
+  copiesPrinted: 0,
 };
 
 export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
   ...initialState,
+
+  recordPrintSuccess: (copies: number) =>
+    set((state) => ({
+      isPrinted: true,
+      copiesPrinted: state.copiesPrinted + copies,
+    })),
+
+  setSelectedEvent: (selectedEvent) => set({ selectedEvent }),
 
   setSession: (sessionId, sessionToken) => set({ sessionId, sessionToken }),
 
@@ -105,7 +128,10 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       return;
     }
 
-    const totalNeeded = state.selectedTemplate?.placements.length || 3;
+    const totalNeeded = state.selectedTemplate
+      ? (state.selectedTemplate.requiredCaptureCount ??
+         new Set(state.selectedTemplate.placements.map((p) => p.captureIndex)).size)
+      : 3;
     if (targetSlot < totalNeeded) {
       set({
         captures: updatedCaptures,

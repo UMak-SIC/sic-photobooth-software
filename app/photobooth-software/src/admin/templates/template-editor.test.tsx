@@ -195,6 +195,54 @@ describe('TemplateEditor', () => {
     expect(screen.getByText(/BACKGROUND IMAGE/i)).toBeDefined();
   });
 
+  it.each(['photo_strip', 'flipbook'] as const)(
+    'warns before unloading an edited %s template',
+    (type) => {
+      const savedTemplate = {
+        ...mockDraft,
+        type,
+        id: 'template-1',
+        width: 1200,
+        height: 1800,
+        active: true,
+        requiredCaptureCount: 1,
+        backgroundPath: null,
+        sortOrder: null,
+        createdAt: '2026-09-05T00:00:00.000Z',
+        updatedAt: '2026-09-05T00:00:00.000Z',
+      } satisfies Template;
+      const { rerender } = render(
+        <TemplateEditor
+          draft={{ ...mockDraft, type }}
+          setDraft={vi.fn()}
+          initialTemplate={savedTemplate}
+          onBack={vi.fn()}
+          onSaved={vi.fn()}
+          onLoad={vi.fn()}
+          templateId="template-1"
+        />,
+      );
+      const unchanged = new Event('beforeunload', { cancelable: true });
+      fireEvent(window, unchanged);
+      expect(unchanged.defaultPrevented).toBe(false);
+
+      rerender(
+        <TemplateEditor
+          draft={{ ...mockDraft, type, name: 'Changed template' }}
+          setDraft={vi.fn()}
+          initialTemplate={savedTemplate}
+          onBack={vi.fn()}
+          onSaved={vi.fn()}
+          onLoad={vi.fn()}
+          templateId="template-1"
+        />,
+      );
+      const changed = new Event('beforeunload', { cancelable: true });
+      fireEvent(window, changed);
+      expect(changed.defaultPrevented).toBe(true);
+    },
+  );
+
   it('reloads the background asset after a saved template update', () => {
     const template = {
       ...mockDraft,

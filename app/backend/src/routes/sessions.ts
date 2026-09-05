@@ -10,8 +10,10 @@ import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
 import { config, flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
-import { templateRepository } from '../templates/repository.js';
+import { printerService } from '../services/printer.js';
 import type { SessionType } from '@photobooth/public-output';
+import { templateRepository } from '../templates/repository.js';
+import { toTemplateDto } from '../templates/routes.js';
 
 const createSessionSchema = z.object({
   eventName: z.string().min(1),
@@ -39,6 +41,7 @@ const selectFlipbookSchema = z.object({
 
 const printSessionSchema = z.object({
   copies: z.number().int().min(1).default(1),
+  recordOnly: z.boolean().optional(),
 });
 
 function isSessionAuthorized(
@@ -99,115 +102,19 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // 0b. List active templates for Photo Strip
+  // 0b. List active templates for Photo Strip (unifies with canonical templateRepository)
   fastify.get('/api/templates', async (_request, reply) => {
     try {
-      let templates = await dbRepository.listActiveTemplates();
-      // Seed default templates if none exist
-      if (templates.length === 0) {
-        await dbRepository.createTemplate(
-          'Classic Portrait Strip',
-          'portrait',
-          1200,
-          1800,
-          'templates/classic-portrait.png',
-          3,
-          5,
-          [
-            {
-              captureIndex: 1,
-              x: 100,
-              y: 120,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 2,
-              x: 100,
-              y: 600,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 3,
-              x: 100,
-              y: 1080,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-          ],
-        );
-        await dbRepository.createTemplate(
-          'Grid 2x2 Landscape',
-          'landscape',
-          1800,
-          1200,
-          'templates/grid-landscape.png',
-          4,
-          5,
-          [
-            {
-              captureIndex: 1,
-              x: 120,
-              y: 120,
-              width: 720,
-              height: 450,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 2,
-              x: 960,
-              y: 120,
-              width: 720,
-              height: 450,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 3,
-              x: 120,
-              y: 630,
-              width: 720,
-              height: 450,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 4,
-              x: 960,
-              y: 630,
-              width: 720,
-              height: 450,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-          ],
-        );
-        templates = await dbRepository.listActiveTemplates();
-      }
+      const all = await templateRepository.list();
       return reply.send({
         success: true,
-        data: templates,
+        data: all.filter((t) => t.active).map(toTemplateDto),
       });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
+    } catch {
+      const fallback = await dbRepository.listActiveTemplates();
+      return reply.send({
+        success: true,
+        data: fallback,
       });
     }
   });
@@ -573,27 +480,17 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           return undefined;
         };
 
-        const isRetake = data.fields?.isRetake
-          ? getFieldValue(data.fields.isRetake) === 'true' || session.state === 'review'
-          : session.state === 'review';
-
-        if (isRetake && session.retakeCount >= 4) {
-          return reply.status(400).send({
-            success: false,
-            error: {
-              code: 'LIMIT_EXCEEDED',
-              message: 'Maximum retake limit of 4 reached for this session',
-            },
-          });
-        }
-
+        const query = request.query as { captureIndex?: string; isRetake?: string } | undefined;
         const snapshot = session.templateSnapshot as Record<string, unknown> | null;
         const targetCount =
           typeof snapshot?.requiredCaptureCount === 'number'
             ? (snapshot.requiredCaptureCount as number)
             : 3;
 
-        const rawIndexStr = getFieldValue(data.fields?.captureIndex);
+        const queryIndex = query?.captureIndex;
+        const fieldIndex = getFieldValue(data.fields?.captureIndex);
+        const filenameIndex = data.filename?.match(/photo_(\d+)/)?.[1];
+        const rawIndexStr = queryIndex || fieldIndex || filenameIndex;
         const rawIndex = rawIndexStr ? parseInt(rawIndexStr, 10) : 1;
         if (!Number.isInteger(rawIndex) || rawIndex < 1 || rawIndex > targetCount) {
           return reply.status(400).send({
@@ -605,6 +502,23 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
         const captureIndex = rawIndex;
+
+        const existingCaptures = await dbRepository.getPhotoCaptures(id);
+        const slotAlreadyCaptured = existingCaptures.some((c) => c.captureIndex === captureIndex);
+        const isRetake =
+          query?.isRetake === 'true' ||
+          (data.fields?.isRetake && getFieldValue(data.fields.isRetake) === 'true') ||
+          (session.state === 'review' && slotAlreadyCaptured);
+
+        if (isRetake && session.retakeCount >= 4) {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'LIMIT_EXCEEDED',
+              message: 'Maximum retake limit of 4 reached for this session',
+            },
+          });
+        }
 
         const buffer = await data.toBuffer();
         const validation = mediaValidator.validateImage(buffer);
@@ -1272,12 +1186,14 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // 10c. Print Recording (Firefox/CUPS handoff)
+  // 10c. Print Recording (Direct CUPS printing / manual record)
   fastify.post<{ Params: { id: string } }>('/api/sessions/:id/print', async (request, reply) => {
     const { id } = request.params;
     const sessionToken = request.headers['x-session-token'];
 
     const parseResult = printSessionSchema.safeParse(request.body || {});
     const copies = parseResult.success ? parseResult.data.copies : 1;
+    const recordOnly = parseResult.success ? !!parseResult.data.recordOnly : false;
 
     try {
       const session = await dbRepository.getSessionById(id);
@@ -1307,11 +1223,35 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       sessionStateMachine.assertValidTransition(session.type, session.state, 'printed');
 
+      let printJobId: string | undefined;
+
+      if (!recordOnly) {
+        const output = await dbRepository.getLatestOutputForSession(id);
+        if (output && output.filePath) {
+          const printResult = await printerService.printImage(output.filePath, copies);
+          if (!printResult.success) {
+            return reply.status(502).send({
+              success: false,
+              error: {
+                code: 'PRINT_FAILED',
+                message:
+                  'Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.',
+                details: printResult.error,
+              },
+            });
+          }
+          printJobId = printResult.jobId;
+        }
+      }
+
       const updated = await dbRepository.recordPrintStatus(id, copies);
 
       return reply.send({
         success: true,
-        data: stripToken(updated),
+        data: {
+          ...stripToken(updated),
+          jobId: printJobId,
+        },
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

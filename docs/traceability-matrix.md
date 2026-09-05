@@ -111,13 +111,13 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0801** | Implement local background publishing worker polling `PUBLIC_APP_URL` and processing queued jobs | `app/backend` | US-14, US-38, US-60, Contract § Publishing | Polls every 5s; attempts uploads only when cloud connectivity is detected. | `[ ] Planned` |
-| **TSK-0802** | Implement Cloudinary delivery asset uploader with server-side credentials isolation | `app/backend` | US-122, US-124, US-127, US-137 | Finalized PNG/GIF uploaded to Cloudinary; API secrets never exposed to clients. | `[ ] Planned` |
-| **TSK-0803** | Implement Supabase public delivery record registration and cloud finalization timestamping | `app/backend` | US-125, US-126, Contract § Publishing | Saves public ID, asset link, event info, and expiry timestamp in Supabase. | `[ ] Planned` |
-| **TSK-0804** | Implement bounded retry queue with exponential backoff, jitter, and dead-letter queue (max 5 retries) | `app/backend` | US-85, Contract § Publishing | Failed jobs retry up to 5 times before transitioning to dead-letter state. | `[ ] Planned` |
-| **TSK-0805** | Implement Vercel-hosted public retrieval website resolving `/:id` via Supabase & Cloudinary | `app/public-website` | US-116..121, US-123, US-128 | Resolves public ID directly against cloud services without contacting local backend. | `[ ] Planned` |
-| **TSK-0806** | Implement public 404 unavailable page for unpublished, expired, or deleted output IDs | `app/public-website` | US-121, Contract § Events/Errors | Displays "This photo has not been published or is no longer available." | `[ ] Planned` |
-| **TSK-0807** | Implement automated 2-month retention cleanup cron on Supabase | Supabase / Script | US-126, US-139, Contract § Publishing | Deletes Cloudinary media and Supabase metadata 2 months after cloud finalization. | `[ ] Planned` |
+| **TSK-0801** | Implement local background publishing worker polling `PUBLIC_APP_URL` and processing queued jobs | `app/backend` | US-14, US-38, US-60, Contract § Publishing | Polls every 5s; attempts uploads only when cloud connectivity is detected. | `[x] Completed` |
+| **TSK-0802** | Implement Cloudinary delivery asset uploader with server-side credentials isolation | `app/backend` | US-122, US-124, US-127, US-137 | Finalized PNG/GIF uploaded to Cloudinary; API secrets never exposed to clients. | `[x] Completed` |
+| **TSK-0803** | Implement Supabase public delivery record registration and cloud finalization timestamping | `app/backend` | US-125, US-126, Contract § Publishing | Saves public ID, asset link, event info, and expiry timestamp in Supabase. | `[x] Completed` |
+| **TSK-0804** | Implement bounded retry queue with exponential backoff, jitter, and dead-letter queue (max 5 retries) | `app/backend` | US-85, Contract § Publishing | Failed jobs retry up to 5 times before transitioning to dead-letter state. | `[x] Completed` |
+| **TSK-0805** | Implement Vercel-hosted public retrieval website resolving `/:id` via Supabase & Cloudinary | `app/public-website` | US-116..121, US-123, US-128 | Resolves public ID directly against cloud services without contacting local backend. | `[x] Completed` |
+| **TSK-0806** | Implement public 404 unavailable page for unpublished, expired, or deleted output IDs | `app/public-website` | US-121, Contract § Events/Errors | Displays "This photo has not been published or is no longer available." | `[x] Completed` |
+| **TSK-0807** | Implement automated 2-month retention cleanup cron on Supabase | Supabase / Script | US-126, US-139, Contract § Publishing | Deletes Cloudinary media and Supabase metadata 2 months after cloud finalization. | `[x] Completed` |
 
 ---
 
@@ -128,10 +128,10 @@ This document provides a single source of truth for tracking project tasks again
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TSK-0901** | Implement Event Setup screen with unique (event_name + event_date) constraint enforcement | `app/photobooth-software`, `app/backend` | Contract § Events and Errors | Records event name, date, ID, operator name; prevents duplicate name+date. | `[x] Completed` |
 | **TSK-0902** | Implement Photo Strip Template Editor with freeform placements, background transforms, and grid presets | `app/photobooth-software`, `app/backend` | US-61..72, Contract § Template Editor | Verified vertical slice: local `/admin/templates`, `/admin/templates/new`, and `/admin/templates/:id` routes provide template listing/creation/editing, activation/deactivation, deletion, complete draft saving, fixed 4R portrait/landscape dimensions, independently movable/resizable freeform placements and background/overlay transforms, layouts A, C, E, G, I, J, K, L, and M, PNG/JPG/SVG asset uploads, numbered placeholder preview, backend validation, and generated asset paths. Session snapshots and final composition remain outside this task. | `[x] Completed` |
-| **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[ ] Planned` |
+| **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[x] Completed` |
 | **TSK-0904** | Implement Publication Administration Dashboard with manual retry for dead-letter queue jobs | `app/photobooth-software`, `app/backend` | Contract § Publishing and Retrieval | Displays queued, in_progress, uploaded, failed jobs with retry action. | `[x] Completed` |
 | **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, `agents/recovery.md` | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
-| **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when an active capture workflow is in progress. | `[ ] Planned` |
+| **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when unsaved Photo Strip layout or Flipbook frame edits are in progress. | `[x] Completed` |
 
 ---
 

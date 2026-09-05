@@ -1,1 +1,74 @@
 @import 'tailwindcss';
+
+:root {
+  background: #10231f;
+  color: #f4f1e7;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1d5045, #10231f 56%);
+  font-family: Arial, sans-serif;
+}
+
+.public-output-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.5rem;
+}
+
+.public-output-card {
+  width: min(100%, 44rem);
+  border: 1px solid #78d0b1;
+  background: #f4f1e7;
+  color: #10231f;
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  text-align: center;
+}
+
+.public-output-kicker {
+  color: #17624f;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.public-output-card h1 {
+  margin: 0.5rem 0;
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  letter-spacing: -0.08em;
+}
+
+.public-output-meta {
+  margin-bottom: 1.5rem;
+  color: #5c625e;
+}
+
+.public-output-media {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  margin: 0 auto;
+}
+
+.public-output-download {
+  display: inline-block;
+  margin-top: 1.5rem;
+  padding: 0.8rem 1.1rem;
+  background: #10231f;
+  color: #f4f1e7;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.public-output-download:focus-visible {
+  outline: 3px solid #e7a548;
+  outline-offset: 3px;
+}
+
+.public-output-unavailable {
+  max-width: 34rem;
+}

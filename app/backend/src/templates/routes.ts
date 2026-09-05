@@ -19,6 +19,8 @@ const errorResponse = (
 export function toTemplateDto(template: Template): TemplateDto {
   return {
     ...template,
+    outputWidth: template.width,
+    outputHeight: template.height,
     backgroundPath: template.backgroundPath ? `/templates/${template.id}/background` : null,
     coverPath: template.coverPath ? `/templates/${template.id}/cover` : null,
     overlays: template.overlays.map((overlay) => ({
@@ -40,8 +42,13 @@ export function duplicateName(name: string, existingNames: Iterable<string>): st
 }
 
 export const templateRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get<{ Querystring: { type?: 'photo_strip' | 'flipbook' } }>('/templates', async (request, reply) =>
-    reply.send({ success: true, data: (await templateRepository.list(request.query.type)).map(toTemplateDto) }),
+  fastify.get<{ Querystring: { type?: 'photo_strip' | 'flipbook'; active?: string } }>(
+    '/templates',
+    async (request, reply) => {
+      const list = await templateRepository.list(request.query?.type);
+      const filtered = request.query?.active === 'true' ? list.filter((t) => t.active) : list;
+      return reply.send({ success: true, data: filtered.map(toTemplateDto) });
+    },
   );
 
   fastify.patch<{ Body: { orderedIds?: string[] } }>('/templates/order', async (request, reply) => {

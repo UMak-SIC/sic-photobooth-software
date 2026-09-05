@@ -30,7 +30,9 @@ export interface TemplatePlacement {
 }
 
 export interface TemplateOverlay {
+  id?: string;
   label: string;
+  assetPath?: string;
   x: number;
   y: number;
   width: number;
@@ -90,14 +92,28 @@ export interface OutputItem {
 
 export type PublicationStatus = 'queued' | 'in_progress' | 'uploaded' | 'failed';
 
+export interface QueuedPublication {
+  id: string;
+  publicId: string;
+  filePath: string;
+  mediaType: string;
+  eventName: string;
+  eventDate: string;
+  retryCount: number;
+}
+
 export interface PublicationRecord {
   id: string;
   publicId: string;
   status: PublicationStatus;
   retryCount: number;
   lastAttemptAt: Date | null;
+  nextAttemptAt: Date | null;
   lastError: string | null;
   cloudFinalizedAt: Date | null;
+  cloudinaryUrl: string | null;
+  cloudinaryPublicId: string | null;
+  expiresAt: Date | null;
   createdAt: Date;
   mediaType: string;
   eventName: string;
@@ -217,6 +233,7 @@ export class DatabaseRepository {
             zIndex: 1,
           },
         ],
+        overlays: [],
       },
     ],
     [
@@ -273,6 +290,7 @@ export class DatabaseRepository {
             zIndex: 1,
           },
         ],
+        overlays: [],
       },
     ],
   ]);
@@ -687,12 +705,20 @@ export class DatabaseRepository {
             throw new Error('Maximum retake limit of 4 reached for this session');
           }
 
-          await client.query(
+          const updCapRes = await client.query(
             `UPDATE session_captures
              SET file_path = $3, created_at = CURRENT_TIMESTAMP
              WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
             [sessionId, captureIndex, filePath],
           );
+
+          if (updCapRes.rowCount === 0) {
+            await client.query(
+              `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
+               VALUES ($1, $2, $3, false, true)`,
+              [sessionId, captureIndex, filePath],
+            );
+          }
 
           const capRes = await client.query(
             `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
@@ -937,9 +963,10 @@ export class DatabaseRepository {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(`DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`, [
-          sessionId,
-        ]);
+        await client.query(
+          `DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`,
+          [sessionId],
+        );
         await client.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
         await client.query(
           `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -1035,8 +1062,12 @@ export class DatabaseRepository {
         status: 'queued',
         retryCount: 0,
         lastAttemptAt: null,
+        nextAttemptAt: new Date(),
         lastError: null,
         cloudFinalizedAt: null,
+        cloudinaryUrl: null,
+        cloudinaryPublicId: null,
+        expiresAt: null,
         createdAt: new Date(),
         mediaType,
         eventName: output.eventName,
@@ -1085,8 +1116,10 @@ export class DatabaseRepository {
     try {
       const result = await pool.query(`
         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
-          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
-          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
         FROM publication_records p
         JOIN generated_outputs o ON o.id = p.output_id
@@ -1110,13 +1143,16 @@ export class DatabaseRepository {
       const result = await pool.query(
         `WITH requeued AS (
           UPDATE publication_records
-          SET status = 'queued', retry_count = 0, last_attempt_at = NULL, last_error = NULL
+          SET status = 'queued', retry_count = 0, last_attempt_at = NULL,
+            next_attempt_at = CURRENT_TIMESTAMP, last_error = NULL
           WHERE id = $1 AND status = 'failed'
           RETURNING *
         )
         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
-          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
-          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
         FROM requeued p
         JOIN generated_outputs o ON o.id = p.output_id
@@ -1134,9 +1170,278 @@ export class DatabaseRepository {
     publication.status = 'queued';
     publication.retryCount = 0;
     publication.lastAttemptAt = null;
+    publication.nextAttemptAt = new Date();
     publication.lastError = null;
     return publication;
   }
+
+  /**
+   * Atomically claims up to `limit` queued publications for upload, marking them in_progress.
+   */
+  public async claimQueuedPublications(
+    limit: number,
+    now: Date = new Date(),
+  ): Promise<QueuedPublication[]> {
+    let pgClaimed: QueuedPublication[] = [];
+    try {
+      const claim = await pool.query(
+        `UPDATE publication_records p
+         SET status = 'in_progress', last_attempt_at = CURRENT_TIMESTAMP
+         WHERE p.id IN (
+           SELECT q.id
+           FROM publication_records q
+           JOIN generated_outputs o ON o.id = q.output_id
+           WHERE q.status = 'queued' AND q.next_attempt_at <= $2
+           ORDER BY q.created_at
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id`,
+        [limit, now],
+      );
+      if (claim.rows.length > 0) {
+        const details = await pool.query(
+          `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
+             e.name AS "eventName", e.date::text AS "eventDate", p.retry_count AS "retryCount"
+           FROM publication_records p
+           JOIN generated_outputs o ON o.id = p.output_id
+           JOIN sessions s ON s.id = o.session_id
+           JOIN events e ON e.id = s.event_id
+           WHERE p.id = ANY($1::uuid[])
+           ORDER BY p.created_at`,
+          [claim.rows.map((r) => r.id)],
+        );
+        pgClaimed = details.rows;
+      }
+    } catch {
+      pgClaimed = [];
+    }
+    const remaining = limit - pgClaimed.length;
+    if (remaining <= 0) return pgClaimed;
+    return [...pgClaimed, ...this.claimQueuedInMemory(remaining, now)];
+  }
+
+  /**
+   * Claims queued publications from the in-memory mirror (degraded / hybrid operation).
+   */
+  private claimQueuedInMemory(limit: number, now: Date): QueuedPublication[] {
+    return Array.from(this.inMemoryPublications.entries())
+      .filter(
+        ([, p]) => p.status === 'queued' && p.nextAttemptAt !== null && p.nextAttemptAt <= now,
+      )
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime())
+      .slice(0, limit)
+      .map(([id, p]) => {
+        const output = this.inMemoryOutputs.get(p.publicId);
+        if (!output) return null;
+        p.status = 'in_progress';
+        p.lastAttemptAt = now;
+        this.inMemoryPublications.set(id, p);
+        return {
+          id,
+          publicId: p.publicId,
+          filePath: output.filePath,
+          mediaType: output.mediaType,
+          eventName: output.eventName,
+          eventDate: output.eventDate,
+          retryCount: p.retryCount,
+        };
+      })
+      .filter((q): q is QueuedPublication => q !== null);
+  }
+
+  /**
+   * Marks a publication successfully uploaded to Cloudinary.
+   */
+  public async markPublicationUploaded(
+    id: string,
+    cloudinaryUrl: string,
+    cloudinaryPublicId: string,
+    cloudFinalizedAt: Date,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = 'uploaded', cloudinary_url = $2, cloudinary_public_id = $3,
+           cloud_finalized_at = $4, expires_at = $5, next_attempt_at = NULL, last_error = NULL
+         WHERE id = $1`,
+        [id, cloudinaryUrl, cloudinaryPublicId, cloudFinalizedAt, expiresAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return true;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return false;
+    pub.status = 'uploaded';
+    pub.cloudinaryUrl = cloudinaryUrl;
+    pub.cloudinaryPublicId = cloudinaryPublicId;
+    pub.cloudFinalizedAt = cloudFinalizedAt;
+    pub.expiresAt = expiresAt;
+    pub.nextAttemptAt = null;
+    pub.lastError = null;
+    return true;
+  }
+
+  /**
+   * Records a failed upload attempt. A null nextAttemptAt is a dead-letter job.
+   */
+  public async markPublicationFailed(
+    id: string,
+    error: string,
+    nextAttemptAt: Date | null,
+  ): Promise<void> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = CASE WHEN $3 IS NULL THEN 'failed' ELSE 'queued' END,
+           retry_count = retry_count + 1,
+           last_attempt_at = CURRENT_TIMESTAMP,
+           next_attempt_at = $3,
+           last_error = $2
+         WHERE id = $1`,
+        [id, error, nextAttemptAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return;
+    pub.retryCount += 1;
+    pub.lastAttemptAt = new Date();
+    pub.nextAttemptAt = nextAttemptAt;
+    pub.lastError = error;
+    pub.status = nextAttemptAt === null ? 'failed' : 'queued';
+  }
+
+  /** Requeues interrupted work and counts the interrupted attempt toward the dead-letter limit. */
+  public async recoverStalledPublications(staleBefore: Date, maxAttempts: number): Promise<void> {
+    try {
+      await pool.query(
+        `UPDATE publication_records
+         SET retry_count = retry_count + 1,
+           status = CASE WHEN retry_count + 1 >= $2 THEN 'failed' ELSE 'queued' END,
+           next_attempt_at = CASE WHEN retry_count + 1 >= $2 THEN NULL ELSE CURRENT_TIMESTAMP END,
+           last_error = 'Upload worker interrupted; job requeued.'
+         WHERE status = 'in_progress' AND last_attempt_at < $1`,
+        [staleBefore, maxAttempts],
+      );
+    } catch {
+      // The in-memory mirror below keeps degraded mode recoverable too.
+    }
+    for (const publication of this.inMemoryPublications.values()) {
+      if (
+        publication.status === 'in_progress' &&
+        publication.lastAttemptAt !== null &&
+        publication.lastAttemptAt < staleBefore
+      ) {
+        publication.retryCount += 1;
+        publication.status = publication.retryCount >= maxAttempts ? 'failed' : 'queued';
+        publication.nextAttemptAt = publication.status === 'failed' ? null : new Date();
+        publication.lastError = 'Upload worker interrupted; job requeued.';
+      }
+    }
+  }
+
+  /**
+   * Retrieves the latest generated output for a session.
+   */
+  public async getLatestOutputForSession(sessionId: string): Promise<OutputItem | null> {
+    try {
+      const query = `
+        SELECT
+          o.id,
+          o.session_id AS "sessionId",
+          o.public_id AS "publicId",
+          o.media_type AS "mediaType",
+          o.file_path AS "filePath",
+          o.width,
+          o.height,
+          o.created_at AS "createdAt",
+          e.name AS "eventName",
+          e.date::text AS "eventDate"
+        FROM generated_outputs o
+        JOIN sessions s ON o.session_id = s.id
+        JOIN events e ON s.event_id = e.id
+        WHERE o.session_id = $1
+        ORDER BY o.created_at DESC
+        LIMIT 1
+      `;
+      const res = await pool.query(query, [sessionId]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    for (const output of this.inMemoryOutputs.values()) {
+      if (output.sessionId === sessionId) {
+        return output;
+      }
+    }
+    return null;
+  }
+
+  private readonly templateSelectFields = `
+    SELECT
+      t.id,
+      t.name,
+      t.orientation,
+      t.output_width AS "outputWidth",
+      t.output_height AS "outputHeight",
+      t.background_path AS "backgroundPath",
+      t.is_active AS "isActive",
+      t.required_capture_count AS "requiredCaptureCount",
+      t.countdown_seconds AS "countdownSeconds",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', p.id,
+              'captureIndex', p.capture_index,
+              'x', p.x,
+              'y', p.y,
+              'width', p.width,
+              'height', p.height,
+              'rotation', p.rotation,
+              'borderRadius', p.border_radius,
+              'zIndex', p.z_index
+            ) ORDER BY p.z_index ASC, p.capture_index ASC
+          )
+          FROM template_placements p
+          WHERE p.template_id = t.id
+        ),
+        '[]'::json
+      ) AS placements,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', o.id,
+              'label', o.label,
+              'assetPath', o.asset_path,
+              'x', o.x,
+              'y', o.y,
+              'width', o.width,
+              'height', o.height,
+              'rotation', o.rotation,
+              'zIndex', o.z_index
+            ) ORDER BY o.z_index ASC
+          )
+          FROM template_overlays o
+          WHERE o.template_id = t.id
+        ),
+        '[]'::json
+      ) AS overlays,
+      t.created_at AS "createdAt",
+      t.updated_at AS "updatedAt"
+    FROM templates t
+  `;
 
   /**
    * Lists all active templates for Photo Strip sessions.
@@ -1144,22 +1449,9 @@ export class DatabaseRepository {
   public async listActiveTemplates(): Promise<TemplateItem[]> {
     try {
       const query = `
-        SELECT
-          id,
-          name,
-          orientation,
-          output_width AS "outputWidth",
-          output_height AS "outputHeight",
-          background_path AS "backgroundPath",
-          is_active AS "isActive",
-          required_capture_count AS "requiredCaptureCount",
-          countdown_seconds AS "countdownSeconds",
-          placements,
-          created_at AS "createdAt",
-          updated_at AS "updatedAt"
-        FROM templates
-        WHERE is_active = true
-        ORDER BY created_at ASC
+        ${this.templateSelectFields}
+        WHERE t.is_active = true
+        ORDER BY t.created_at ASC
       `;
       const res = await pool.query(query);
       if (res.rows && res.rows.length > 0) {
@@ -1181,21 +1473,8 @@ export class DatabaseRepository {
     if (isUuid) {
       try {
         const query = `
-          SELECT
-            id,
-            name,
-            orientation,
-            output_width AS "outputWidth",
-            output_height AS "outputHeight",
-            background_path AS "backgroundPath",
-            is_active AS "isActive",
-            required_capture_count AS "requiredCaptureCount",
-            countdown_seconds AS "countdownSeconds",
-            placements,
-            created_at AS "createdAt",
-            updated_at AS "updatedAt"
-          FROM templates
-          WHERE id = $1
+          ${this.templateSelectFields}
+          WHERE t.id = $1
         `;
         const res = await pool.query(query, [templateId]);
         if (res.rows[0]) return res.rows[0];
@@ -1205,21 +1484,8 @@ export class DatabaseRepository {
     } else {
       try {
         const query = `
-          SELECT
-            id,
-            name,
-            orientation,
-            output_width AS "outputWidth",
-            output_height AS "outputHeight",
-            background_path AS "backgroundPath",
-            is_active AS "isActive",
-            required_capture_count AS "requiredCaptureCount",
-            countdown_seconds AS "countdownSeconds",
-            placements,
-            created_at AS "createdAt",
-            updated_at AS "updatedAt"
-          FROM templates
-          WHERE name ILIKE $1
+          ${this.templateSelectFields}
+          WHERE t.name ILIKE $1
           LIMIT 1
         `;
         const res = await pool.query(query, [`%${templateId}%`]);
@@ -1241,7 +1507,7 @@ export class DatabaseRepository {
   }
 
   /**
-   * Creates a new template in the database (or in-memory).
+   * Creates a new template in the database with normalized placements and overlays.
    */
   public async createTemplate(
     name: string,
@@ -1251,15 +1517,21 @@ export class DatabaseRepository {
     backgroundPath: string,
     requiredCaptureCount: number,
     countdownSeconds: 3 | 5 | 10,
-    placements: TemplatePlacement[],
+    placements: TemplatePlacement[] = [],
+    overlays: TemplateOverlay[] = [],
   ): Promise<TemplateItem> {
+    let client;
     try {
-      const query = `
+      client = await pool.connect();
+      await client.query('BEGIN');
+
+      const templateRes = await client.query(
+        `
         INSERT INTO templates (
           name, orientation, output_width, output_height,
-          background_path, required_capture_count, countdown_seconds, placements
+          background_path, required_capture_count, countdown_seconds
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING
           id, name, orientation,
           output_width AS "outputWidth",
@@ -1268,22 +1540,80 @@ export class DatabaseRepository {
           is_active AS "isActive",
           required_capture_count AS "requiredCaptureCount",
           countdown_seconds AS "countdownSeconds",
-          placements,
           created_at AS "createdAt",
           updated_at AS "updatedAt"
-      `;
-      const res = await pool.query(query, [
-        name,
-        orientation,
-        outputWidth,
-        outputHeight,
-        backgroundPath,
-        requiredCaptureCount,
-        countdownSeconds,
-        JSON.stringify(placements),
-      ]);
-      return res.rows[0];
+        `,
+        [
+          name,
+          orientation,
+          outputWidth,
+          outputHeight,
+          backgroundPath,
+          requiredCaptureCount,
+          countdownSeconds,
+        ],
+      );
+      const row = templateRes.rows[0];
+      const templateId = row.id;
+
+      if (placements.length > 0) {
+        for (const p of placements) {
+          await client.query(
+            `
+            INSERT INTO template_placements (
+              template_id, capture_index, x, y, width, height, rotation, border_radius, z_index
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `,
+            [
+              templateId,
+              p.captureIndex,
+              p.x,
+              p.y,
+              p.width,
+              p.height,
+              p.rotation || 0,
+              p.borderRadius || 0,
+              p.zIndex || 1,
+            ],
+          );
+        }
+      }
+
+      if (overlays.length > 0) {
+        for (const o of overlays) {
+          await client.query(
+            `
+            INSERT INTO template_overlays (
+              template_id, label, asset_path, x, y, width, height, rotation, z_index
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `,
+            [
+              templateId,
+              o.label,
+              o.assetPath || '',
+              o.x || 0,
+              o.y || 0,
+              o.width,
+              o.height,
+              o.rotation || 0,
+              o.zIndex || 2,
+            ],
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      return {
+        ...row,
+        placements,
+        overlays,
+      };
     } catch {
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
       const id = crypto.randomUUID();
       const template: TemplateItem = {
         id,
@@ -1296,11 +1626,151 @@ export class DatabaseRepository {
         requiredCaptureCount,
         countdownSeconds,
         placements,
+        overlays,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       this.inMemoryTemplates.set(id, template);
       return template;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+
+  /**
+   * Updates template placements and overlays using transactional replace-all.
+   */
+  public async updateTemplateLayout(
+    templateId: string,
+    placements: TemplatePlacement[],
+    overlays: TemplateOverlay[] = [],
+  ): Promise<boolean> {
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+      await client.query('DELETE FROM template_placements WHERE template_id = $1', [templateId]);
+      for (const p of placements) {
+        await client.query(
+          `
+          INSERT INTO template_placements (
+            template_id, capture_index, x, y, width, height, rotation, border_radius, z_index
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `,
+          [
+            templateId,
+            p.captureIndex,
+            p.x,
+            p.y,
+            p.width,
+            p.height,
+            p.rotation || 0,
+            p.borderRadius || 0,
+            p.zIndex || 1,
+          ],
+        );
+      }
+
+      await client.query('DELETE FROM template_overlays WHERE template_id = $1', [templateId]);
+      for (const o of overlays) {
+        await client.query(
+          `
+          INSERT INTO template_overlays (
+            template_id, label, asset_path, x, y, width, height, rotation, z_index
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `,
+          [
+            templateId,
+            o.label,
+            o.assetPath || '',
+            o.x || 0,
+            o.y || 0,
+            o.width,
+            o.height,
+            o.rotation || 0,
+            o.zIndex || 2,
+          ],
+        );
+      }
+      await client.query('UPDATE templates SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [
+        templateId,
+      ]);
+      await client.query('COMMIT');
+      return true;
+    } catch {
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      const mem = this.inMemoryTemplates.get(templateId);
+      if (mem) {
+        mem.placements = placements;
+        mem.overlays = overlays;
+        mem.updatedAt = new Date();
+        return true;
+      }
+      return false;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+
+  /**
+   * Ensures canonical default templates exist in PostgreSQL.
+   */
+  public async seedDefaultTemplatesIfEmpty(): Promise<void> {
+    try {
+      const existing = await this.listActiveTemplates();
+      if (existing.length === 0) {
+        await this.createTemplate(
+          'Classic Portrait Strip',
+          'portrait',
+          1200,
+          1800,
+          'templates/classic-portrait.png',
+          3,
+          5,
+          [
+            {
+              captureIndex: 1,
+              x: 100,
+              y: 120,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 2,
+              x: 100,
+              y: 600,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 3,
+              x: 100,
+              y: 1080,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+          ],
+        );
+      }
+    } catch {
+      // Ignored if DB is unavailable
     }
   }
 
@@ -1414,7 +1884,7 @@ export class DatabaseRepository {
             copies_printed = copies_printed + $2,
             state = 'printed',
             last_activity_at = CURRENT_TIMESTAMP
-        WHERE id = $1 AND state = 'booth_confirmed'
+        WHERE id = $1 AND (state = 'booth_confirmed' OR state = 'printed')
         RETURNING
           id,
           token,
@@ -1438,7 +1908,7 @@ export class DatabaseRepository {
     }
 
     const session = this.inMemorySessions.get(sessionId);
-    if (session && session.state === 'booth_confirmed') {
+    if (session && (session.state === 'booth_confirmed' || session.state === 'printed')) {
       session.isPrinted = true;
       session.copiesPrinted += copiesPrinted;
       session.state = 'printed';

@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { usePhotoStripStore } from '../../store/photostrip-store';
 import { useSessionStore } from '../../store/session-store';
-import { TemplatePicker } from '../TemplatePicker';
+import { EventSelectScreen } from '../events/EventSelectScreen';
+import { TemplatePicker } from './TemplatePicker';
 import { CameraViewfinder } from '../CameraViewfinder';
-import { PhotoStripReview, type ReviewTemplate } from '../PhotoStripReview';
-import { PrintModal } from '../PrintModal';
-import { boothApi } from '../../services/api';
+import { PhotoStripReview, type ReviewTemplate } from './PhotoStripReview';
+import { PrintModal } from './PrintModal';
+import { boothApi, API_BASE_URL, type EventItem } from '../../services/api';
 
 export const PhotoStripWorkflow: React.FC = () => {
   const {
@@ -23,6 +24,11 @@ export const PhotoStripWorkflow: React.FC = () => {
     outputImageUrl,
     isConfirming,
     errorMessage,
+    isPrinted,
+    copiesPrinted,
+    setSession,
+    setSelectedEvent,
+    setStep,
     setTemplate,
     startCountdown,
     stopCountdown,
@@ -31,13 +37,39 @@ export const PhotoStripWorkflow: React.FC = () => {
     setConfirmedOutput,
     setIsConfirming,
     setError,
+    recordPrintSuccess,
     resetPhotoStrip,
   } = usePhotoStripStore();
 
-  const { clearActiveSession } = useSessionStore();
-  const [uploading, setUploading] = useState(false);
+  const { setActiveSession, clearActiveSession } = useSessionStore();
+  const [, setUploading] = useState(false);
 
-  // 1. Template Selection
+  // 1. Event Selection (Setup)
+  const handleEventContinue = async (selectedEvent: EventItem, operatorName: string) => {
+    setError(null);
+    const date = selectedEvent.date || new Date().toISOString().split('T')[0];
+    try {
+      const session = await boothApi.createSession(
+        selectedEvent.name,
+        date,
+        operatorName,
+        'photo_strip',
+      );
+      setSession(session.sessionId, session.token);
+      setActiveSession({ id: session.sessionId, type: 'photo_strip', token: session.token });
+      setSelectedEvent({ id: selectedEvent.id, name: selectedEvent.name, date, operatorName });
+      setStep('template_select');
+    } catch (err: unknown) {
+      console.warn('Backend session creation failed, continuing in mock session mode:', err);
+      const mockId = `mock-strip-${Date.now()}`;
+      setSession(mockId, 'mock-token');
+      setActiveSession({ id: mockId, type: 'photo_strip' });
+      setSelectedEvent({ id: selectedEvent.id, name: selectedEvent.name, date, operatorName });
+      setStep('template_select');
+    }
+  };
+
+  // 2. Template Selection
   const handleSelectTemplate = async (template: ReviewTemplate) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
       try {
@@ -50,6 +82,7 @@ export const PhotoStripWorkflow: React.FC = () => {
     setTemplate(template);
   };
 
+  // 3. Retake Trigger
   const handleRetake = async (captureIndex: number) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
       try {
@@ -61,7 +94,17 @@ export const PhotoStripWorkflow: React.FC = () => {
     startRetake(captureIndex);
   };
 
-  // 2. Capture Completed
+  // Automatically start countdown when entering capturing stage
+  useEffect(() => {
+    if (currentStep === 'capturing') {
+      const timer = setTimeout(() => {
+        startCountdown();
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep, activeSlotIndex, startCountdown]);
+
+  // 4. Capture Completed
   const handleCountdownComplete = useCallback(
     async (blob: Blob) => {
       stopCountdown();
@@ -83,18 +126,17 @@ export const PhotoStripWorkflow: React.FC = () => {
     [sessionId, activeSlotIndex, isRetaking, stopCountdown, addCapture],
   );
 
-  // 3. Confirm Photo Strip
+  // 5. Confirm Photo Strip
   const handleConfirm = async () => {
     setIsConfirming(true);
     setError(null);
     try {
       if (sessionId && !sessionId.startsWith('mock-')) {
         const result = await boothApi.confirmPhotoStrip(sessionId);
-        const imageUrl = `http://localhost:3000/photos/${result.publicId}`;
+        const imageUrl = `${API_BASE_URL}/photos/${result.publicId}`;
         setConfirmedOutput(result.publicId, result.qrUrl, imageUrl);
       } else {
-        // Fallback demo output for mock/offline dev
-        const demoId = 'demo777';
+        const demoId = 'M7p4XaV';
         setConfirmedOutput(
           demoId,
           `https://myphotobooth.com/${demoId}`,
@@ -111,94 +153,62 @@ export const PhotoStripWorkflow: React.FC = () => {
     }
   };
 
-  // 4. Print Recording
-  const handlePrint = async (copies: number) => {
-    if (sessionId) {
-      try {
-        await boothApi.recordPrint(sessionId, copies);
-      } catch (err) {
-        console.warn('Record print failed:', err);
-      }
+  // 6. Print Recording / Dispatch
+  const handlePrint = async (copies: number, recordOnly?: boolean) => {
+    if (sessionId && !sessionId.startsWith('mock-')) {
+      await boothApi.recordPrint(sessionId, copies, recordOnly);
     }
+    recordPrintSuccess(copies);
   };
 
-  // 5. Finish & Return
+  // 7. Finish & Return
   const handleFinish = () => {
     resetPhotoStrip();
     clearActiveSession();
   };
 
-  // RENDER BASED ON STEP
+  // RENDER BASED ON CURRENT STEP
+  if (currentStep === 'setup') {
+    return (
+      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+        <EventSelectScreen onContinue={handleEventContinue} />
+      </div>
+    );
+  }
+
   if (currentStep === 'template_select') {
     return (
-      <div className="flex flex-col flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a] text-white">
+      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
         <TemplatePicker onSelectTemplate={handleSelectTemplate} />
       </div>
     );
   }
 
   if (currentStep === 'capturing') {
-    const totalSlots = selectedTemplate?.placements.length || 3;
+    const totalSlots = selectedTemplate
+      ? (selectedTemplate.requiredCaptureCount ??
+         new Set(selectedTemplate.placements.map((p) => p.captureIndex)).size)
+      : 3;
     return (
-      <div className="flex flex-col flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a] text-white px-6 py-6">
-        {/* Top capture HUD */}
-        <div className="flex items-center justify-between max-w-5xl mx-auto w-full mb-4 bg-white/5 border border-white/10 rounded-2xl px-6 py-4">
-          <div>
-            <span className="text-xs font-bold tracking-widest text-[#48c4a1] uppercase block mb-1">
-              {isRetaking ? 'RETAKE IN PROGRESS' : 'PHOTO STRIP CAPTURE'}
-            </span>
-            <h2 className="text-2xl font-black text-white">
-              {isRetaking
-                ? `Retaking Photo ${activeSlotIndex}`
-                : `Photo ${activeSlotIndex} of ${totalSlots}`}
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              <span className="text-xs text-white/50 block">Retakes Left</span>
-              <span className="text-lg font-bold text-[#48c4a1]">
-                {Math.max(0, 4 - retakeCount)} / 4
-              </span>
-            </div>
-
-            {!isCountingDown && (
-              <button
-                type="button"
-                onClick={startCountdown}
-                disabled={uploading}
-                className="bg-[#48c4a1] hover:bg-[#38a98a] text-[#071d1a] font-black px-6 py-3 rounded-xl transition text-base shadow-lg active:scale-95 cursor-pointer"
-              >
-                {uploading ? 'Processing...' : 'Start Countdown 📸'}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {errorMessage && (
-          <div className="max-w-5xl mx-auto w-full mb-4 bg-red-500/20 border border-red-500/40 text-red-200 px-4 py-3 rounded-xl text-sm">
-            {errorMessage}
-          </div>
-        )}
-
-        {/* Viewfinder with Countdown */}
-        <div className="flex-1 max-w-5xl mx-auto w-full flex items-center justify-center">
-          <CameraViewfinder
-            isCountingDown={isCountingDown}
-            countdownSeconds={countdownSeconds}
-            onCountdownComplete={handleCountdownComplete}
-            onCancelCountdown={stopCountdown}
-          />
-        </div>
+      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a]">
+        <CameraViewfinder
+          countdownSeconds={countdownSeconds}
+          isCountingDown={isCountingDown}
+          activeSlotIndex={activeSlotIndex}
+          totalSlots={totalSlots}
+          isRetaking={isRetaking}
+          onCountdownComplete={handleCountdownComplete}
+          onCancelCountdown={stopCountdown}
+        />
       </div>
     );
   }
 
-  if (currentStep === 'review' && selectedTemplate) {
+  if (currentStep === 'review') {
     return (
-      <div className="flex flex-col flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a] text-white">
+      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
         <PhotoStripReview
-          template={selectedTemplate}
+          template={selectedTemplate ?? undefined}
           captures={captures}
           retakeCount={retakeCount}
           isConfirming={isConfirming}
@@ -210,15 +220,23 @@ export const PhotoStripWorkflow: React.FC = () => {
     );
   }
 
-  if (currentStep === 'complete' && publicId && qrUrl) {
+  if (currentStep === 'complete') {
     return (
-      <PrintModal
-        publicId={publicId}
-        qrUrl={qrUrl}
-        outputImageUrl={outputImageUrl || captures[0]?.dataUrl || ''}
-        onPrintConfirmed={handlePrint}
-        onFinishSession={handleFinish}
-      />
+      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+        <PrintModal
+          publicId={publicId || 'M7p4XaV'}
+          qrUrl={qrUrl || 'https://myphotobooth.com/M7p4XaV'}
+          outputImageUrl={outputImageUrl || captures[0]?.dataUrl || ''}
+          templateName={selectedTemplate?.name}
+          orientation={selectedTemplate?.orientation}
+          outputWidth={selectedTemplate?.outputWidth}
+          outputHeight={selectedTemplate?.outputHeight}
+          isPrinted={isPrinted}
+          copiesPrinted={copiesPrinted}
+          onPrintConfirmed={handlePrint}
+          onFinishSession={handleFinish}
+        />
+      </div>
     );
   }
 

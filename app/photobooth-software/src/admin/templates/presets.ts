@@ -23,10 +23,10 @@ export const layoutPresets: LayoutPreset[] = [
 
 const slot = (captureIndex: number, x: number, y: number, width: number): TemplatePlacement => ({
   captureIndex,
-  x,
-  y,
-  width,
-  height: width * (9 / 16),
+  x: Math.round(x),
+  y: Math.round(y),
+  width: Math.round(width),
+  height: Math.round(width * (9 / 16)),
   rotation: 0,
   borderRadius: 0,
   zIndex: captureIndex,

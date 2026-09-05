@@ -9,8 +9,12 @@ const failedPublication = {
   status: 'failed',
   retryCount: 5,
   lastAttemptAt: null,
+  nextAttemptAt: null,
   lastError: 'Cloud service unavailable.',
   cloudFinalizedAt: null,
+  cloudinaryUrl: null,
+  cloudinaryPublicId: null,
+  expiresAt: null,
   createdAt: '2026-09-05T00:00:00.000Z',
   mediaType: 'image/png',
   eventName: 'SIC General Assembly',
@@ -21,9 +25,19 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('PublicationDashboard', () => {
   it('shows failed jobs and requeues one after a successful retry', async () => {
-    const fetch = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [failedPublication] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { ...failedPublication, status: 'queued', retryCount: 0, lastError: null } }), { status: 200 }));
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [failedPublication] }), { status: 200 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: { ...failedPublication, status: 'queued', retryCount: 0, lastError: null },
+          }),
+          { status: 200 },
+        ),
+      );
     vi.stubGlobal('fetch', fetch);
 
     render(<PublicationDashboard />);
