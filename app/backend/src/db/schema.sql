@@ -21,12 +21,20 @@ CREATE TABLE IF NOT EXISTS templates (
   output_width INT NOT NULL DEFAULT 1800,
   output_height INT NOT NULL DEFAULT 1200,
   background_path TEXT NOT NULL,
+  background_path TEXT,
+  background_x NUMERIC NOT NULL DEFAULT 0,
+  background_y NUMERIC NOT NULL DEFAULT 0,
+  background_width NUMERIC NOT NULL DEFAULT 1800,
+  background_height NUMERIC NOT NULL DEFAULT 1200,
   is_active BOOLEAN NOT NULL DEFAULT true,
   required_capture_count INT NOT NULL DEFAULT 3,
   countdown_seconds INT NOT NULL DEFAULT 5 CHECK (countdown_seconds IN (3, 5, 10)),
+  sort_order INT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS templates_name_unique ON templates (name);
 
 -- 2a. Template Placements Table
 CREATE TABLE IF NOT EXISTS template_placements (
@@ -39,6 +47,12 @@ CREATE TABLE IF NOT EXISTS template_placements (
   height INT NOT NULL CHECK (height > 0),
   rotation INT NOT NULL DEFAULT 0,
   border_radius INT NOT NULL DEFAULT 0 CHECK (border_radius >= 0),
+  x NUMERIC NOT NULL,
+  y NUMERIC NOT NULL,
+  width NUMERIC NOT NULL CHECK (width > 0),
+  height NUMERIC NOT NULL CHECK (height > 0),
+  rotation NUMERIC NOT NULL DEFAULT 0,
+  border_radius NUMERIC NOT NULL DEFAULT 0 CHECK (border_radius >= 0),
   z_index INT NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -56,6 +70,12 @@ CREATE TABLE IF NOT EXISTS template_overlays (
   width INT NOT NULL CHECK (width > 0),
   height INT NOT NULL CHECK (height > 0),
   rotation INT NOT NULL DEFAULT 0,
+  asset_path TEXT,
+  x NUMERIC NOT NULL DEFAULT 0,
+  y NUMERIC NOT NULL DEFAULT 0,
+  width NUMERIC NOT NULL CHECK (width > 0),
+  height NUMERIC NOT NULL CHECK (height > 0),
+  rotation NUMERIC NOT NULL DEFAULT 0,
   z_index INT NOT NULL DEFAULT 2,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

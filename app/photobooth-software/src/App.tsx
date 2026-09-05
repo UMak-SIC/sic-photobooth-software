@@ -57,14 +57,9 @@ const screens: Screen[] = [
   { title: 'Publication queue', route: '/admin/publications', category: 'admin', stage: 'ADMIN' },
 ];
 
-import { WelcomeScreen } from './components/WelcomeScreen';
+import { WelcomeExperienceScreen } from './components/WelcomeScreen';
 import { FlipbookWorkflow } from './components/flipbook/FlipbookWorkflow';
 import { PhotoStripWorkflow } from './components/photostrip/PhotoStripWorkflow';
-import { EventSelectScreen } from './components/events/EventSelectScreen';
-import { TemplatePicker } from './components/photostrip/TemplatePicker';
-import { CameraViewfinder } from './components/CameraViewfinder';
-import { PhotoStripReview } from './components/photostrip/PhotoStripReview';
-import { PrintModal } from './components/photostrip/PrintModal';
 import { useFlipbookStore } from './store/flipbook-store';
 import { useSessionStore } from './store/session-store';
 
@@ -150,7 +145,7 @@ function App() {
             {activeSession?.type === 'photo_strip' ? (
               <PhotoStripWorkflow />
             ) : currentStep === 'welcome' && !activeSession ? (
-              <WelcomeScreen />
+              <WelcomeExperienceScreen />
             ) : (
               <FlipbookWorkflow />
             )}
@@ -225,12 +220,12 @@ function BoothScreen({ screen }: { screen: Screen }) {
   const { title, route } = screen;
   const admin = screen.category === 'admin';
   if (admin) return <AdminScreen name={title} />;
-  if (title === 'Choose experience') return <WelcomeScreen preview />;
-  if (title === 'Event selection') return <EventSelectScreen preview />;
-  if (title === 'Photo strip templates') return <TemplatePicker preview />;
-  if (title === 'Photo capture') return <CameraViewfinder preview />;
-  if (title === 'Photo review') return <PhotoStripReview preview />;
-  if (title === 'Complete and print') return <PrintModal preview />;
+  if (title === 'Choose experience') return <WelcomeScreen />;
+  if (title === 'Event selection') return <EventSelect />;
+  if (title === 'Photo strip templates') return <TemplateSelect />;
+  if (title === 'Photo capture') return <PhotoCapture />;
+  if (title === 'Photo review') return <PhotoReview />;
+  if (title === 'Complete and print') return <Completion />;
   if (title === 'Flipbook frames') return <FrameSelect />;
   if (title === 'Flipbook instructions') return <Instructions />;
   if (title === 'Cover capture') return <CoverCapture />;
@@ -268,6 +263,255 @@ const Button = ({
     {children}
   </button>
 );
+
+function WelcomeScreen() {
+  return (
+    <BoothShell>
+      <div className="flex h-[780px] flex-col items-center justify-center gap-12 px-16">
+        <h4 className="text-center text-[53px] font-black leading-[0.92] tracking-[-0.06em]">
+          What are we creating today?
+        </h4>
+        <div className="flex gap-5">
+          <Choice title="PHOTO STRIPS" image="strip" />
+          <Choice title="FLIPBOOK" image="flip" />
+        </div>
+      </div>
+    </BoothShell>
+  );
+}
+
+function Choice({ title, image }: { title: string; image: string }) {
+  return (
+    <button
+      type="button"
+      className="group flex flex-col items-center gap-5 overflow-hidden rounded-2xl bg-[#176754] px-12 py-10 transition hover:-translate-y-1 active:scale-[0.99]"
+    >
+      <div className={`visual-${image} size-36 rounded-xl`} />
+      <h5 className="text-[22px] font-black tracking-[-0.04em] text-white">{title}</h5>
+    </button>
+  );
+}
+
+function EventSelect() {
+  return (
+    <BoothShell>
+      <div className="flex h-[780px] items-center justify-center">
+        <div className="mx-auto grid w-full max-w-[1100px] grid-cols-[1fr_300px] gap-14 px-14">
+          <div>
+            <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">EVENT DETAILS</p>
+            <h4 className="mt-3 text-[44px] font-black tracking-[-0.06em]">Select the event.</h4>
+            <div className="mt-9 grid gap-3">
+              <EventRow title="SIC General Assembly" date="May 24, 2026" selected />
+              <EventRow title="College Week 2026" date="June 18, 2026" />
+              <button
+                type="button"
+                className="mt-2 w-fit text-[14px] font-bold text-[#146a56] underline underline-offset-4"
+              >
+                Create a new event
+              </button>
+            </div>
+          </div>
+          <aside className="rounded-2xl bg-[#d9f7ed] p-7">
+            <p className="text-[12px] font-bold tracking-wide text-[#28715f]">ACTIVE OPERATOR</p>
+            <p className="mt-3 text-[21px] font-black">Mika Santos</p>
+            <p className="mt-10 text-[13px] leading-5 text-[#4d756b]">
+              Event selection keeps every output, print record, and public QR connected to the right
+              day.
+            </p>
+            <div className="mt-8">
+              <Button>Continue</Button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </BoothShell>
+  );
+}
+
+function EventRow({
+  title,
+  date,
+  selected = false,
+}: {
+  title: string;
+  date: string;
+  selected?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center justify-between rounded-xl border p-5 text-left ${selected ? 'border-[#1a7e67] bg-[#e7fff7] ring-2 ring-[#79d6bf]/50' : 'border-[#c0e2d8] bg-white'}`}
+    >
+      <span>
+        <strong className="block text-[17px]">{title}</strong>
+        <small className="mt-1 block text-[13px] text-[#5b8176]">{date}</small>
+      </span>
+      <span
+        className={`grid size-6 place-items-center rounded-full border ${selected ? 'border-[#176a56] bg-[#176a56] text-white' : 'border-[#a7cfc3]'}`}
+      >
+        {selected ? '✓' : ''}
+      </span>
+    </button>
+  );
+}
+
+function TemplateSelect() {
+  return (
+    <BoothShell>
+      <div className="flex h-[780px] flex-col items-center justify-center px-14 py-12 text-center">
+        <div className="flex w-full max-w-[1000px] items-end justify-between text-left">
+          <div>
+            <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">PHOTO STRIPS</p>
+            <h4 className="mt-2 text-[43px] font-black tracking-[-0.06em]">Pick your layout.</h4>
+          </div>
+          <p className="max-w-[300px] text-[14px] leading-6 text-[#5b8176]">
+            Your selected template stays fixed for this session.
+          </p>
+        </div>
+        <div className="mt-10 grid w-full max-w-[1000px] grid-cols-3 gap-6 text-left">
+          <TemplateCard title="Pioneers" layout="3 photos · Portrait" selected />
+          <TemplateCard title="The Circuit" layout="4 photos · Landscape" />
+          <TemplateCard title="Seafoam" layout="2 photos · Portrait" />
+        </div>
+        <div className="mt-11">
+          <Button>Use Pioneers</Button>
+        </div>
+      </div>
+    </BoothShell>
+  );
+}
+
+function TemplateCard({
+  title,
+  layout,
+  selected = false,
+}: {
+  title: string;
+  layout: string;
+  selected?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`rounded-2xl border p-4 text-left ${selected ? 'border-[#1a7e67] bg-[#e7fff7] ring-2 ring-[#79d6bf]/60' : 'border-[#c0e2d8] bg-white'}`}
+    >
+      <div className={`template-art ${selected ? 'template-pioneers' : ''}`}>
+        <span>
+          SIC
+          <br />
+          2026
+        </span>
+      </div>
+      <strong className="mt-4 block text-[17px]">{title}</strong>
+      <small className="mt-1 block text-[13px] text-[#5b8176]">{layout}</small>
+    </button>
+  );
+}
+
+function PhotoCapture() {
+  return (
+    <BoothShell>
+      <div className="relative h-[780px] overflow-hidden">
+        <div className="camera-scene absolute inset-0 rounded-none">
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)]" />
+          <div className="absolute left-9 top-8 rounded-full bg-black/30 px-4 py-2 text-[12px] font-bold text-white backdrop-blur-sm">
+            CAMERA 01
+          </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-8">
+          <div className="backdrop-blur-md rounded-2xl bg-black/30 px-7 py-5 text-white">
+            <p className="text-[12px] font-bold tracking-wide text-[#a8f3dd]">NEXT CAPTURE</p>
+            <p className="mt-2 text-[56px] font-black leading-none tracking-[-0.07em]">05</p>
+            <p className="mt-2 text-[14px] text-[#c5eee1]">Hold your pose. Auto-capture.</p>
+          </div>
+          <div className="backdrop-blur-md rounded-full bg-black/30 px-7 py-3 text-[17px] font-black text-white">
+            GET READY
+          </div>
+          <div className="backdrop-blur-md rounded-2xl bg-black/30 px-6 py-5 text-white">
+            <div className="flex gap-2">
+              <span className="size-3.5 rounded-full bg-[#a8f3dd]" />
+              <span className="size-3.5 rounded-full bg-[#a8f3dd]" />
+              <span className="size-3.5 rounded-full bg-white/40" />
+            </div>
+            <p className="mt-2 text-[13px] text-[#c5eee1]">2 of 3</p>
+          </div>
+        </div>
+      </div>
+    </BoothShell>
+  );
+}
+
+function PhotoReview() {
+  return (
+    <BoothShell>
+      <div className="flex h-[780px] items-center justify-center gap-12 px-14">
+        <div>
+          <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">
+            PHOTO STRIP REVIEW
+          </p>
+          <h4 className="mt-2 text-[42px] font-black tracking-[-0.06em]">Keep the good ones.</h4>
+          <div className="review-strip mt-7">
+            <div className="review-image a" />
+            <div className="review-image b" />
+            <div className="review-image c retaking" />
+          </div>
+          <p className="mt-5 text-[14px] text-[#5b8176]">Tap a photo to choose it for a retake.</p>
+        </div>
+        <aside className="rounded-2xl bg-[#d9f7ed] p-7">
+          <p className="text-[12px] font-bold tracking-wide text-[#28715f]">SESSION CONTROL</p>
+          <p className="mt-5 text-[25px] font-black">4 retakes left</p>
+          <p className="mt-3 text-[14px] leading-6 text-[#53796e]">
+            Retakes replace one image only. Your remaining photos stay safe.
+          </p>
+          <div className="mt-12 grid gap-3">
+            <Button>Confirm strip</Button>
+            <Button secondary>Retake selected</Button>
+          </div>
+        </aside>
+      </div>
+    </BoothShell>
+  );
+}
+
+function Completion() {
+  return (
+    <BoothShell>
+      <div className="flex h-[780px] flex-col items-center justify-center px-16 text-center">
+        <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">
+          YOUR PHOTO STRIP IS READY
+        </p>
+        <h4 className="mt-3 text-[43px] font-black leading-none tracking-[-0.06em]">
+          Keep this memory close.
+        </h4>
+        <div className="mt-10 flex items-center justify-center gap-10">
+          <div className="final-strip">
+            <div />
+            <div />
+            <div />
+          </div>
+          <aside className="rounded-2xl bg-[#0e473d] p-8 text-white">
+            <div className="qr-grid mx-auto" />
+            <p className="mt-7 text-center text-[14px] font-bold">Scan to retrieve</p>
+            <div className="mt-8 grid gap-3">
+              <button
+                type="button"
+                className="rounded-xl bg-[#a8f3dd] py-3 text-[14px] font-bold text-[#145142]"
+              >
+                Open print handoff
+              </button>
+              <button
+                type="button"
+                className="rounded-xl border border-white/25 py-3 text-[14px] font-bold"
+              >
+                Finish session
+              </button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </BoothShell>
+  );
+}
 
 function FrameSelect() {
   return (
