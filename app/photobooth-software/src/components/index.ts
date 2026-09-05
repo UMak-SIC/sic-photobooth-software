@@ -4,6 +4,7 @@ export * from './events/EventSelectScreen';
 export * from './events/EventRow';
 export * from './events/CreateEventForm';
 export * from './photostrip/PhotoStripWorkflow';
+export * from './photostrip/PhotoStripInstructionsScreen';
 export * from './photostrip/PhotoStripReview';
 export * from './photostrip/TemplatePicker';
 export * from './photostrip/PrintModal';

@@ -56,6 +56,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   const [templates, setTemplates] = useState<ReviewTemplate[]>(DEFAULT_TEMPLATES);
   const [loading, setLoading] = useState<boolean>(!preview);
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_TEMPLATES[0].id);
+  const [confirmingTemplate, setConfirmingTemplate] = useState<ReviewTemplate | null>(null);
 
   useEffect(() => {
     if (preview) return;
@@ -75,11 +76,15 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
     loadTemplates();
   }, [preview]);
 
-  const selectedTemplate = templates.find((t) => t.id === selectedId) || templates[0];
+  const handleCardClick = (template: ReviewTemplate) => {
+    setSelectedId(template.id);
+    setConfirmingTemplate(template);
+  };
 
-  const handleContinue = () => {
-    if (selectedTemplate && onSelectTemplate) {
-      onSelectTemplate(selectedTemplate);
+  const handleConfirmModal = () => {
+    if (confirmingTemplate && onSelectTemplate) {
+      onSelectTemplate(confirmingTemplate);
+      setConfirmingTemplate(null);
     }
   };
 
@@ -91,7 +96,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
           <h4 className="mt-2 text-[43px] font-black tracking-[-0.06em]">Pick your layout.</h4>
         </div>
         <p className="max-w-[300px] text-[14px] leading-6 text-[#5b8176]">
-          Your selected template stays fixed for this session.
+          Click any layout to preview and confirm for this session.
         </p>
       </div>
 
@@ -116,8 +121,8 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
               <button
                 key={template.id}
                 type="button"
-                onClick={() => setSelectedId(template.id)}
-                className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition active:scale-[0.99] cursor-pointer ${
+                onClick={() => handleCardClick(template)}
+                className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition active:scale-[0.99] cursor-pointer hover:shadow-lg ${
                   isSelected
                     ? 'border-[#1a7e67] bg-[#e7fff7] ring-2 ring-[#79d6bf]/60 shadow-md'
                     : 'border-[#c0e2d8] bg-white hover:border-[#8ec5b6] shadow-xs'
@@ -175,7 +180,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                             transform: overlay.rotation
                               ? `rotate(${overlay.rotation}deg)`
                               : undefined,
-                            zIndex: overlay.zIndex ?? 5,
+                            zIndex: (overlay.zIndex ?? 2) * 2 + 1,
                           }}
                         />
                       );
@@ -195,7 +200,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                             height: `${(p.height / cardHeight) * 100}%`,
                             borderRadius: `${((p.borderRadius ?? 0) / cardWidth) * 100}%`,
                             transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
-                            zIndex: p.zIndex ?? 1,
+                            zIndex: (p.zIndex ?? 1) * 2,
                           }}
                         >
                           {p.captureIndex}
@@ -225,16 +230,132 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
         </div>
       )}
 
-      <div className="mt-11">
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={loading || !selectedTemplate}
-          className="rounded-xl bg-[#146a56] px-8 py-3.5 text-[14px] font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] transition hover:bg-[#0f5444] active:scale-[0.98] disabled:opacity-50"
-        >
-          Use {selectedTemplate?.name || 'Layout'}
-        </button>
-      </div>
+      {/* Confirmation Modal */}
+      {confirmingTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in">
+          <div className="flex w-full max-w-[440px] flex-col items-center rounded-3xl bg-white p-7 text-center shadow-2xl animate-scale-in">
+            <p className="text-[12px] font-bold tracking-widest text-[#28806c] uppercase">
+              CONFIRM LAYOUT
+            </p>
+            <h3 className="mt-2 text-[26px] font-black text-[#113b33] tracking-tight">
+              Use {confirmingTemplate.name}?
+            </h3>
+
+            {/* Modal Mini Canvas Preview */}
+            <div className="my-5 flex h-[220px] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#ecfff8] p-3">
+              {(() => {
+                const cardWidth = confirmingTemplate.outputWidth || 1200;
+                const cardHeight = confirmingTemplate.outputHeight || 1800;
+                const isLandscape =
+                  confirmingTemplate.orientation === 'landscape' || cardWidth > cardHeight;
+                const bgUrl = resolveAssetUrl(confirmingTemplate.backgroundPath ?? null);
+
+                return (
+                  <div
+                    className={`mini-canvas ${isLandscape ? 'landscape' : ''} shadow-md rounded-lg overflow-hidden`}
+                    style={{
+                      height: isLandscape ? 'auto' : '100%',
+                      width: isLandscape ? '100%' : 'auto',
+                      maxHeight: '200px',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {bgUrl && (
+                      <img
+                        src={bgUrl}
+                        alt=""
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        style={
+                          confirmingTemplate.background
+                            ? {
+                                left: `${(confirmingTemplate.background.x / cardWidth) * 100}%`,
+                                top: `${(confirmingTemplate.background.y / cardHeight) * 100}%`,
+                                width: `${(confirmingTemplate.background.width / cardWidth) * 100}%`,
+                                height: `${(confirmingTemplate.background.height / cardHeight) * 100}%`,
+                              }
+                            : { left: 0, top: 0, width: '100%', height: '100%' }
+                        }
+                      />
+                    )}
+
+                    {confirmingTemplate.overlays?.map((overlay, idx) => {
+                      const overlayUrl = resolveAssetUrl(overlay.path || overlay.assetPath || null);
+                      if (!overlayUrl) return null;
+                      return (
+                        <img
+                          key={overlay.id || idx}
+                          src={overlayUrl}
+                          alt=""
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          style={{
+                            left: `${(overlay.x / cardWidth) * 100}%`,
+                            top: `${(overlay.y / cardHeight) * 100}%`,
+                            width: `${(overlay.width / cardWidth) * 100}%`,
+                            height: `${(overlay.height / cardHeight) * 100}%`,
+                            transform: overlay.rotation
+                              ? `rotate(${overlay.rotation}deg)`
+                              : undefined,
+                            zIndex: (overlay.zIndex ?? 2) * 2 + 1,
+                          }}
+                        />
+                      );
+                    })}
+
+                    {confirmingTemplate.placements
+                      .slice()
+                      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+                      .map((p) => (
+                        <span
+                          key={p.id ?? `${p.captureIndex}-${p.x}-${p.y}`}
+                          style={{
+                            left: `${(p.x / cardWidth) * 100}%`,
+                            top: `${(p.y / cardHeight) * 100}%`,
+                            width: `${(p.width / cardWidth) * 100}%`,
+                            height: `${(p.height / cardHeight) * 100}%`,
+                            borderRadius: `${((p.borderRadius ?? 0) / cardWidth) * 100}%`,
+                            transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
+                            zIndex: (p.zIndex ?? 1) * 2,
+                          }}
+                        >
+                          {p.captureIndex}
+                        </span>
+                      ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <p className="text-sm text-[#5b8176]">
+              {confirmingTemplate.requiredCaptureCount ??
+                new Set(confirmingTemplate.placements.map((p) => p.captureIndex)).size}{' '}
+              photos · {confirmingTemplate.countdownSeconds || 5}s countdown ·{' '}
+              {confirmingTemplate.orientation}
+            </p>
+
+            <div className="mt-6 flex w-full flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleConfirmModal}
+                className="w-full rounded-2xl bg-[#146a56] py-3.5 text-[15px] font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] transition hover:bg-[#0f5444] active:scale-[0.98] cursor-pointer"
+              >
+                Use this layout →
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfirmingTemplate(null)}
+                className="w-full rounded-2xl border border-[#c0e2d8] bg-transparent py-3 text-[14px] font-semibold text-[#5b8176] transition hover:bg-gray-50 active:scale-[0.98] cursor-pointer"
+              >
+                Choose another
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -263,7 +263,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(print2Body.data.copiesPrinted).toBe(3);
   });
 
-  it('renders high-resolution 300 DPI 4R PNG buffer with embedded QR code', async () => {
+  it('renders high-resolution 300 DPI 4R PNG buffer', async () => {
     const publicId = '7fK92pQ';
     const qrUrl = `https://myphotobooth.com/${publicId}`;
 
@@ -317,6 +317,40 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(pngBuffer[1]).toBe(0x50); // P
     expect(pngBuffer[2]).toBe(0x4e); // N
     expect(pngBuffer[3]).toBe(0x47); // G
+  });
+
+  it('composites overlays on top of photo placements', async () => {
+    const pngBuffer = await photoStripRenderer.renderStrip({
+      width: 1200,
+      height: 1800,
+      backgroundColor: '#ffffff',
+      placements: [
+        {
+          captureIndex: 1,
+          x: 100,
+          y: 120,
+          width: 1000,
+          height: 440,
+          zIndex: 1,
+        },
+      ],
+      overlays: [
+        {
+          label: 'Spiderman Overlay',
+          x: 100,
+          y: 120,
+          width: 500,
+          height: 300,
+          zIndex: 2,
+        },
+      ],
+      captures: [],
+      publicId: 'overlayTest',
+      qrUrl: 'https://myphotobooth.com/overlayTest',
+    });
+
+    expect(Buffer.isBuffer(pngBuffer)).toBe(true);
+    expect(pngBuffer[0]).toBe(0x89);
   });
 
   it('safely tolerates floating-point placement dimensions without throwing sharp error', async () => {

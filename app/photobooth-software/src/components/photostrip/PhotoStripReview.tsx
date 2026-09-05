@@ -169,7 +169,7 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
                     width: `${(overlay.width / outputWidth) * 100}%`,
                     height: `${(overlay.height / outputHeight) * 100}%`,
                     transform: overlay.rotation ? `rotate(${overlay.rotation}deg)` : undefined,
-                    zIndex: overlay.zIndex ?? 5,
+                    zIndex: (overlay.zIndex ?? 2) * 2 + 1,
                   }}
                 />
               );
@@ -196,7 +196,7 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
                     height: `${(p.height / outputHeight) * 100}%`,
                     borderRadius: `${((p.borderRadius ?? 0) / outputWidth) * 100}%`,
                     transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
-                    zIndex: isSelected ? 20 : (p.zIndex ?? 2),
+                    zIndex: isSelected ? 30 : (p.zIndex ?? 1) * 2,
                   }}
                 >
                   {cap ? (

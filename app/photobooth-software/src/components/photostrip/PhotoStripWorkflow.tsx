@@ -3,6 +3,7 @@ import { usePhotoStripStore } from '../../store/photostrip-store';
 import { useSessionStore } from '../../store/session-store';
 import { EventSelectScreen } from '../events/EventSelectScreen';
 import { TemplatePicker } from './TemplatePicker';
+import { PhotoStripInstructionsScreen } from './PhotoStripInstructionsScreen';
 import { CameraViewfinder } from '../CameraViewfinder';
 import { PhotoStripReview, type ReviewTemplate } from './PhotoStripReview';
 import { PrintModal } from './PrintModal';
@@ -69,17 +70,28 @@ export const PhotoStripWorkflow: React.FC = () => {
     }
   };
 
-  // 2. Template Selection
+  // 2. Template Selection (Advances to Instructions)
   const handleSelectTemplate = async (template: ReviewTemplate) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
       try {
         await boothApi.selectTemplate(sessionId, template.id);
-        await boothApi.transition(sessionId, 'capturing');
       } catch (err) {
         console.warn('Backend template selection failed, continuing in local mode:', err);
       }
     }
     setTemplate(template);
+  };
+
+  // 2b. Start Capturing from Instructions (Manual click or 6-sec auto-advance)
+  const handleStartCapturing = async () => {
+    if (sessionId && !sessionId.startsWith('mock-')) {
+      try {
+        await boothApi.transition(sessionId, 'capturing');
+      } catch (err) {
+        console.warn('Backend transition to capturing failed:', err);
+      }
+    }
+    setStep('capturing');
   };
 
   // 3. Retake Trigger
@@ -180,6 +192,17 @@ export const PhotoStripWorkflow: React.FC = () => {
     return (
       <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <TemplatePicker onSelectTemplate={handleSelectTemplate} />
+      </div>
+    );
+  }
+
+  if (currentStep === 'instructions') {
+    return (
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
+        <PhotoStripInstructionsScreen
+          template={selectedTemplate}
+          onStart={handleStartCapturing}
+        />
       </div>
     );
   }

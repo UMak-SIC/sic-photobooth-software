@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
-export type PhotoStripStep = 'setup' | 'template_select' | 'capturing' | 'review' | 'complete';
+export type PhotoStripStep =
+  | 'setup'
+  | 'template_select'
+  | 'instructions'
+  | 'capturing'
+  | 'review'
+  | 'complete';
 
 export interface PhotoCaptureItem {
   captureIndex: number;
@@ -94,7 +100,7 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       activeSlotIndex: 1,
       isRetaking: false,
       countdownSeconds: (selectedTemplate.countdownSeconds as 3 | 5 | 10) || 5,
-      currentStep: 'capturing',
+      currentStep: 'instructions',
     }),
 
   startCountdown: () => set({ isCountingDown: true }),
