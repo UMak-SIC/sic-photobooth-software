@@ -18,6 +18,7 @@ export const layoutPresets: LayoutPreset[] = [
   { id: 'H', label: 'Layout H', orientation: 'landscape', captures: 1 },
   { id: 'I', label: 'Layout I', orientation: 'portrait', captures: 2 },
   { id: 'J', label: 'Layout J – 8 unique', orientation: 'portrait', captures: 8 },
+  { id: 'K', label: 'Layout K', orientation: 'portrait', captures: 1 },
 ];
 
 const slot = (captureIndex: number, x: number, y: number, width: number): TemplatePlacement => ({
@@ -63,6 +64,8 @@ export function layoutPlacements(id: string): TemplatePlacement[] {
         slot(row + 1, 90, y, 373),
         slot(row + 5, 737, y, 373),
       ]);
+    case 'K':
+      return [slot(1, 150, 200, 900), slot(1, 150, 950, 900)];
     default:
       return [];
   }
