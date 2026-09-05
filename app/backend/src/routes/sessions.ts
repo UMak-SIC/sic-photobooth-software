@@ -8,6 +8,7 @@ import { sessionStateMachine, type SessionState } from '../services/session-stat
 import { storageService } from '../services/storage.js';
 import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
+import { flipbookConfig } from '../config.js';
 import type { SessionType } from '@photobooth/public-output';
 
 const createSessionSchema = z.object({
@@ -558,8 +559,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
         const buffer = await data.toBuffer();
         const validation = mediaValidator.validateVideo(buffer, {
-          minDurationSeconds: 4.5,
-          maxDurationSeconds: 8.0,
+          minDurationSeconds: flipbookConfig.videoDurationMinSeconds,
+          maxDurationSeconds: flipbookConfig.videoDurationMaxSeconds,
         });
         if (!validation.isValid) {
           return reply.status(400).send({
@@ -715,23 +716,62 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const outputsDir = storageService.getSessionDir(id, 'outputs');
         const outputPath = path.join(outputsDir, `${publicId}.gif`);
 
-        // Execute GIF Rendering
+        // Render Primary Active GIF Output
         await gifRenderer.renderFlipbookGif(
           selectedCover.filePath,
           selectedVideo.filePath,
           overlayPath,
           outputPath,
-          intermediateDir,
+          path.join(intermediateDir, 'render'),
           {
-            frameCount: 21,
-            coverHoldMs: 3000,
-            frameDelayMs: 500,
-            timeoutMs: 120000,
+            frameCount: flipbookConfig.gifFrameCount,
+            coverHoldMs: flipbookConfig.gifCoverHoldMs,
+            frameDelayMs: flipbookConfig.gifFrameDelayMs,
+            outputWidth: flipbookConfig.gifOutputWidth,
+            outputHeight: flipbookConfig.gifOutputHeight,
+            timeoutMs: flipbookConfig.gifTimeoutMs,
           },
         );
 
-        // Mirror output to global outputs directory for fast retrieval
+        // Mirror primary output to global outputs directory
         await storageService.mirrorToGlobalOutputs(outputPath, publicId, 'gif');
+
+        // If comparison testing is enabled, also render both variants for side-by-side testing
+        if (flipbookConfig.enableComparisonVariants) {
+          const outputPrdPath = path.join(outputsDir, `${publicId}_prd.gif`);
+          const outputCustomPath = path.join(outputsDir, `${publicId}_custom.gif`);
+
+          await gifRenderer.renderFlipbookGif(
+            selectedCover.filePath,
+            selectedVideo.filePath,
+            overlayPath,
+            outputPrdPath,
+            path.join(intermediateDir, 'prd'),
+            {
+              frameCount: 21,
+              coverHoldMs: 3000,
+              frameDelayMs: 500,
+              timeoutMs: flipbookConfig.gifTimeoutMs,
+            },
+          );
+
+          await gifRenderer.renderFlipbookGif(
+            selectedCover.filePath,
+            selectedVideo.filePath,
+            overlayPath,
+            outputCustomPath,
+            path.join(intermediateDir, 'custom'),
+            {
+              frameCount: 20,
+              coverHoldMs: 3000,
+              frameDelayMs: 250,
+              timeoutMs: flipbookConfig.gifTimeoutMs,
+            },
+          );
+
+          await storageService.mirrorToGlobalOutputs(outputPrdPath, `${publicId}_prd`, 'gif');
+          await storageService.mirrorToGlobalOutputs(outputCustomPath, `${publicId}_custom`, 'gif');
+        }
 
         // Record output and queue for cloud publishing
         const outputId = await dbRepository.saveGeneratedOutput(
@@ -739,8 +779,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           publicId,
           'image/gif',
           outputPath,
-          600,
-          400,
+          flipbookConfig.gifOutputWidth,
+          flipbookConfig.gifOutputHeight,
         );
 
         const qrUrl = `https://myphotobooth.com/${publicId}`;
@@ -752,6 +792,12 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             publicId,
             qrUrl,
             state: 'booth_confirmed',
+            variants: flipbookConfig.enableComparisonVariants
+              ? {
+                  prd: `/photos/${publicId}?variant=prd`,
+                  custom: `/photos/${publicId}?variant=custom`,
+                }
+              : undefined,
           },
         });
       } catch {

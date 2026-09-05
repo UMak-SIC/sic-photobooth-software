@@ -1,3 +1,5 @@
+import { flipbookConfig } from '../config.js';
+
 export type SupportedImageFormat = 'png' | 'jpeg';
 export type SupportedVideoFormat = 'mp4' | 'mkv' | 'webm';
 
@@ -20,7 +22,7 @@ export interface VideoValidationResult {
 
 export const MAX_PHOTO_SIZE_BYTES = 15 * 1024 * 1024; // 15MB
 export const MAX_VIDEO_SIZE_BYTES = 100 * 1024 * 1024; // 100MB
-export const EXPECTED_VIDEO_DURATION_SECONDS = 6.0;
+export const EXPECTED_VIDEO_DURATION_SECONDS = flipbookConfig.videoRecordingDurationSeconds;
 
 export class MediaValidator {
   /**
@@ -501,17 +503,18 @@ export class MediaValidator {
         };
       }
 
-      const minDuration = options?.minDurationSeconds ?? 4.5;
-      const maxDuration = options?.maxDurationSeconds ?? 8.0;
+      const minDuration = options?.minDurationSeconds ?? flipbookConfig.videoDurationMinSeconds;
+      const maxDuration = options?.maxDurationSeconds ?? flipbookConfig.videoDurationMaxSeconds;
 
       // Allow 0.05s epsilon tolerance for floating-point duration boundaries
       if (duration < minDuration - 0.05 || duration > maxDuration + 0.05) {
+        const expectedSec = flipbookConfig.videoRecordingDurationSeconds;
         return {
           isValid: false,
           format,
           sizeBytes,
           durationSeconds: duration,
-          error: `Invalid video duration (${duration.toFixed(1)}s). Flipbook recordings must be 6 seconds (allowed: ${minDuration.toFixed(1)}s-${maxDuration.toFixed(1)}s).`,
+          error: `Invalid video duration (${duration.toFixed(1)}s). Flipbook recordings must be ${expectedSec.toFixed(0)} seconds (allowed: ${minDuration.toFixed(1)}s-${maxDuration.toFixed(1)}s).`,
         };
       }
 

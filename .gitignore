@@ -17,3 +17,8 @@ Thumbs.db
 
 # Playwright MCP browser state
 .playwright-mcp/
+
+# Local media storage
+storage/
+app/storage/
+
