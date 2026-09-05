@@ -82,6 +82,20 @@ describe('MediaValidator', () => {
     expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
   });
 
+  it('ignores false-positive 0x44 0x89 byte patterns in cluster payload without corrupting duration', () => {
+    // Create streamed WebM with random payload containing 0x44 0x89 and a huge float/double value
+    const baseWebm = createSyntheticStreamedWebm(5.0);
+    const fakeDurationNoise = Buffer.from([
+      0x44, 0x89, 0x88, // 8-byte double prefix
+      0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // huge double (1.79e308)
+    ]);
+    const noisyWebm = Buffer.concat([baseWebm, fakeDurationNoise]);
+    const result = validator.validateVideo(noisyWebm);
+    expect(result.isValid).toBe(true);
+    expect(result.format).toBe('webm');
+    expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
+  });
+
   it('rejects video files with missing duration headers when duration is required', () => {
     const headerWithoutDuration = Buffer.from([
       0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x00,

@@ -61,7 +61,8 @@ export const templateApi = {
   uploadCover: (id: string, file: File) => upload<Template>(`/templates/${id}/cover`, file),
   uploadOverlay: (id: string, overlayId: string, file: File) =>
     upload<Template>(`/templates/${id}/overlays?overlayId=${encodeURIComponent(overlayId)}`, file),
-  importArchive: (file: File) => upload<Template[]>(`/templates/import`, file),
+  importArchive: (file: File, type?: Template['type']) =>
+    upload<Template[]>(`/templates/import${type ? `?type=${type}` : ''}`, file),
 };
 
 async function upload<T>(path: string, file: File) {

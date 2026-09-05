@@ -97,7 +97,7 @@ export function useCamera() {
     };
   }, [stopCamera]);
 
-  // Capture static photo snapshot from active video stream
+  // Capture static photo snapshot from active video stream cropped to exact 2.41:1.32 aspect ratio
   const capturePhoto = useCallback(async (): Promise<Blob> => {
     if (!videoRef.current || !streamRef.current) {
       console.error('capturePhoto failed: videoRef or streamRef is null');
@@ -105,11 +105,30 @@ export function useCamera() {
     }
 
     const video = videoRef.current;
+    const vWidth = video.videoWidth > 0 ? video.videoWidth : 1280;
+    const vHeight = video.videoHeight > 0 ? video.videoHeight : 720;
+
+    const targetRatio = 2.41 / 1.32; // 241 / 132
+    const sourceRatio = vWidth / vHeight;
+
+    let sx = 0;
+    let sy = 0;
+    let sw = vWidth;
+    let sh = vHeight;
+
+    if (sourceRatio > targetRatio) {
+      // Wider than target -> crop excess width
+      sw = Math.round(vHeight * targetRatio);
+      sx = Math.round((vWidth - sw) / 2);
+    } else {
+      // Taller than target (e.g. standard 16:9 or 4:3) -> keep 100% full width, crop minimal excess height
+      sh = Math.round(vWidth / targetRatio);
+      sy = Math.round((vHeight - sh) / 2);
+    }
+
     const canvas = document.createElement('canvas');
-    const width = video.videoWidth > 0 ? video.videoWidth : 1280;
-    const height = video.videoHeight > 0 ? video.videoHeight : 720;
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = Math.max(sw, 482);
+    canvas.height = Math.max(sh, 264);
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -118,7 +137,7 @@ export function useCamera() {
     }
 
     try {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     } catch (drawErr) {
       console.error('capturePhoto failed during ctx.drawImage:', drawErr);
       throw new Error('Camera capture failed. Check the camera feed and retake this photo.');

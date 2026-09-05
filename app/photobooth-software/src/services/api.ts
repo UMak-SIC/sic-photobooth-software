@@ -30,8 +30,33 @@ export interface EventItem {
 export interface FrameItem {
   id: string;
   name: string;
-  overlayPath: string;
-  isActive: boolean;
+  type?: 'photo_strip' | 'flipbook';
+  coverPath?: string | null;
+  backgroundPath?: string | null;
+  overlayPath?: string | null;
+  isActive?: boolean;
+  placements?: Array<{
+    id?: string;
+    captureIndex: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+    borderRadius?: number;
+    zIndex?: number;
+  }>;
+  overlays?: Array<{
+    id?: string;
+    label?: string;
+    path?: string | null;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+    zIndex?: number;
+  }>;
 }
 
 export interface SessionInfo {

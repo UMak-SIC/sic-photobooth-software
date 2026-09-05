@@ -98,8 +98,12 @@ export const photoRoutes: FastifyPluginAsync = async (fastify) => {
       let filePath: string | null = null;
       const extension = output.mediaType === 'image/gif' ? 'gif' : 'png';
 
-      // If a specific variant is requested (e.g. prd or custom)
-      if (variant && (variant === 'prd' || variant === 'custom') && output.filePath) {
+      // If a specific variant is requested (e.g. motion, prd, custom)
+      if (
+        variant &&
+        (variant === 'motion' || variant === 'prd' || variant === 'custom') &&
+        output.filePath
+      ) {
         const variantCandidate = output.filePath.replace(
           new RegExp(`\\.${extension}$`),
           `_${variant}.${extension}`,

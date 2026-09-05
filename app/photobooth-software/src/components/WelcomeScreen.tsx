@@ -33,12 +33,12 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
       );
       setFlipbookSession(session.sessionId, session.token);
       setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
-      setFlipbookStep('frame_select');
+      setFlipbookStep('instructions');
     } catch {
       // Offline fallback
       setFlipbookSession('mock-flipbook-session-id', 'mock-token');
       setActiveSession({ id: 'mock-flipbook-session-id', type: 'flipbook' });
-      setFlipbookStep('frame_select');
+      setFlipbookStep('instructions');
     } finally {
       setLoading(false);
     }

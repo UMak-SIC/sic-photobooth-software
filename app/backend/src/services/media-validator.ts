@@ -329,7 +329,24 @@ export class MediaValidator {
 
     let timecodeScaleNs = 1000000;
 
-    for (let i = 0; i < Math.min(buffer.length - 6, 65536); i++) {
+    // Find the position of the first Cluster, if any. Header / Segment Info must precede the first Cluster.
+    let firstClusterPos = -1;
+    for (let i = 0; i <= buffer.length - 4; i++) {
+      if (
+        buffer[i] === 0x1f &&
+        buffer[i + 1] === 0x43 &&
+        buffer[i + 2] === 0xb6 &&
+        buffer[i + 3] === 0x75
+      ) {
+        firstClusterPos = i;
+        break;
+      }
+    }
+
+    const headerSearchLimit =
+      firstClusterPos >= 0 ? firstClusterPos : Math.min(buffer.length - 6, 4096);
+
+    for (let i = 0; i < headerSearchLimit; i++) {
       // TimecodeScale: [0x2A, 0xD7, 0xB1]
       if (
         buffer[i] === 0x2a &&
@@ -340,7 +357,10 @@ export class MediaValidator {
         const lengthByte = buffer[i + 3];
         const valLen = lengthByte & 0x7f;
         if (valLen === 4 && i + 8 <= buffer.length) {
-          timecodeScaleNs = buffer.readUInt32BE(i + 4);
+          const scale = buffer.readUInt32BE(i + 4);
+          if (scale > 0) {
+            timecodeScaleNs = scale;
+          }
         }
       }
 
@@ -350,13 +370,25 @@ export class MediaValidator {
         const valLen = lengthByte & 0x7f;
         if (valLen === 4 && i + 7 <= buffer.length) {
           const rawDuration = buffer.readFloatBE(i + 3);
-          if (rawDuration > 0) {
-            return (rawDuration * timecodeScaleNs) / 1000000000;
+          const durationSec = (rawDuration * timecodeScaleNs) / 1000000000;
+          if (
+            !Number.isNaN(durationSec) &&
+            Number.isFinite(durationSec) &&
+            durationSec > 0 &&
+            durationSec < 3600
+          ) {
+            return durationSec;
           }
         } else if (valLen === 8 && i + 11 <= buffer.length) {
           const rawDuration = buffer.readDoubleBE(i + 3);
-          if (rawDuration > 0) {
-            return (rawDuration * timecodeScaleNs) / 1000000000;
+          const durationSec = (rawDuration * timecodeScaleNs) / 1000000000;
+          if (
+            !Number.isNaN(durationSec) &&
+            Number.isFinite(durationSec) &&
+            durationSec > 0 &&
+            durationSec < 3600
+          ) {
+            return durationSec;
           }
         }
       }
@@ -367,7 +399,8 @@ export class MediaValidator {
     let maxClusterTimestamp = -1;
     let maxBlockTimestamp = -1;
 
-    for (let i = 0; i <= buffer.length - 8; i++) {
+    const startClusterIdx = firstClusterPos >= 0 ? firstClusterPos : 0;
+    for (let i = startClusterIdx; i <= buffer.length - 8; i++) {
       if (
         buffer[i] === 0x1f &&
         buffer[i + 1] === 0x43 &&

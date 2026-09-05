@@ -26,7 +26,10 @@ export function parseZip(buffer: Buffer): Map<string, Buffer> {
   return files;
 }
 
-export function parseManifest(entries: Map<string, Buffer>): ImportPackage {
+export function parseManifest(
+  entries: Map<string, Buffer>,
+  defaultType?: 'photo_strip' | 'flipbook',
+): ImportPackage {
   const manifest = entries.get('manifest.json');
   if (!manifest) throw new Error('Missing manifest.json in archive');
   let raw: unknown;
@@ -47,7 +50,7 @@ export function parseManifest(entries: Map<string, Buffer>): ImportPackage {
   for (const item of manifestTemplates) {
     if (typeof item !== 'object' || item === null) throw new Error('Invalid template in archive');
     const record = item as Record<string, unknown>;
-    const draft = validateTemplateDraft(stripPaths(record));
+    const draft = validateTemplateDraft(stripPaths(record, defaultType));
     const backgroundPath = typeof record.backgroundPath === 'string' ? record.backgroundPath : null;
     const coverPath = typeof record.coverPath === 'string' ? record.coverPath : null;
     const overlays = ((record.overlays as Array<Record<string, unknown>> | undefined) ?? []).map(
@@ -64,14 +67,31 @@ export function parseManifest(entries: Map<string, Buffer>): ImportPackage {
   return { version: 1, templates };
 }
 
-function stripPaths(record: Record<string, unknown>): Record<string, unknown> {
+function stripPaths(
+  record: Record<string, unknown>,
+  defaultType?: 'photo_strip' | 'flipbook',
+): Record<string, unknown> {
   const placements = ((record.placements as Array<Record<string, unknown>> | undefined) ?? []).map(
     ({ id: _id, ...placement }) => placement,
   );
   const overlays = ((record.overlays as Array<Record<string, unknown>> | undefined) ?? []).map(
     ({ path: _path, ...overlay }) => overlay,
   );
-  return { name: record.name, orientation: record.orientation, background: record.background, placements, overlays };
+  const type =
+    record.type === 'flipbook' || record.type === 'photo_strip'
+      ? record.type
+      : record.coverPath
+        ? 'flipbook'
+        : (defaultType ?? 'photo_strip');
+
+  return {
+    name: record.name,
+    type,
+    orientation: record.orientation,
+    background: record.background,
+    placements,
+    overlays,
+  };
 }
 
 function assertAssetsExist(

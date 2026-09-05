@@ -90,7 +90,7 @@ export function AdminRouter() {
           }}
           onImport={async (file) => {
             try {
-              setTemplates(await templateApi.importArchive(file));
+              setTemplates(await templateApi.importArchive(file, 'photo_strip'));
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : String(cause));
             }
@@ -101,7 +101,60 @@ export function AdminRouter() {
     );
 
   if (path === '/admin/events') return <AdminFrame onNavigate={navigate}><AdminEventsPage /></AdminFrame>;
-  if (path === '/admin/frames') return <AdminFrame onNavigate={navigate}><TemplateLibrary templates={flipbooks} error={error} onCreate={() => { store.reset(); store.setDraft({ ...emptyDraft(), type: 'flipbook', placements: flipbookPlacements() }); navigate('/admin/frames/new'); }} onEdit={(template) => { store.setSaved(template); navigate(`/admin/frames/${template.id}`); }} onActive={async (template) => { await templateApi.setActive(template.id, !template.active); setFlipbooks(await templateApi.list('flipbook')); }} onMove={() => {}} onDuplicate={async (template) => { await templateApi.duplicate(template.id); setFlipbooks(await templateApi.list('flipbook')); }} onDelete={async (template) => { if (window.confirm(`Delete “${template.name}”?`)) { await templateApi.remove(template.id); setFlipbooks(await templateApi.list('flipbook')); } }} onImport={async (file) => { await templateApi.importArchive(file); setFlipbooks(await templateApi.list('flipbook')); }} type="flipbook" /></AdminFrame>;
+  if (path === '/admin/frames')
+    return (
+      <AdminFrame onNavigate={navigate}>
+        <TemplateLibrary
+          templates={flipbooks}
+          error={error}
+          onCreate={() => {
+            store.reset();
+            store.setDraft({ ...emptyDraft(), type: 'flipbook', placements: flipbookPlacements() });
+            navigate('/admin/frames/new');
+          }}
+          onEdit={(template) => {
+            store.setSaved(template);
+            navigate(`/admin/frames/${template.id}`);
+          }}
+          onActive={async (template) => {
+            try {
+              await templateApi.setActive(template.id, !template.active);
+              setFlipbooks(await templateApi.list('flipbook'));
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause));
+            }
+          }}
+          onMove={() => {}}
+          onDuplicate={async (template) => {
+            try {
+              await templateApi.duplicate(template.id);
+              setFlipbooks(await templateApi.list('flipbook'));
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause));
+            }
+          }}
+          onDelete={async (template) => {
+            if (window.confirm(`Delete “${template.name}”?`)) {
+              try {
+                await templateApi.remove(template.id);
+                setFlipbooks(await templateApi.list('flipbook'));
+              } catch (cause) {
+                setError(cause instanceof Error ? cause.message : String(cause));
+              }
+            }
+          }}
+          onImport={async (file) => {
+            try {
+              await templateApi.importArchive(file, 'flipbook');
+              setFlipbooks(await templateApi.list('flipbook'));
+            } catch (cause) {
+              setError(cause instanceof Error ? cause.message : String(cause));
+            }
+          }}
+          type="flipbook"
+        />
+      </AdminFrame>
+    );
   if (path === '/admin/publications') return <AdminFrame onNavigate={navigate}><PublicationDashboard /></AdminFrame>;
 
   const isFlipbookRoute = path.startsWith('/admin/frames/');

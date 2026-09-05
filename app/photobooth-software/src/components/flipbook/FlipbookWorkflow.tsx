@@ -12,8 +12,6 @@ export function FlipbookWorkflow() {
   const { currentStep } = useFlipbookStore();
 
   switch (currentStep) {
-    case 'frame_select':
-      return <FrameSelectScreen />;
     case 'instructions':
       return <InstructionsScreen />;
     case 'cover_capture':
@@ -26,9 +24,11 @@ export function FlipbookWorkflow() {
       return <FlipReviewVideoScreen />;
     case 'processing':
       return <ProcessingScreen />;
+    case 'frame_select':
+      return <FrameSelectScreen />;
     case 'complete':
       return <FlipbookCompletionScreen />;
     default:
-      return <FrameSelectScreen />;
+      return <InstructionsScreen />;
   }
 }

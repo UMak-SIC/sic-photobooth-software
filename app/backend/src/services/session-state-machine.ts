@@ -19,6 +19,7 @@ export type FlipbookState =
   | 'review'
   | 'processing'
   | 'booth_confirmed'
+  | 'printed'
   | 'cancelled';
 
 export type SessionState = PhotoStripState | FlipbookState;
@@ -36,14 +37,15 @@ const PHOTO_STRIP_VALID_TRANSITIONS: Record<PhotoStripState, PhotoStripState[]> 
 };
 
 const FLIPBOOK_VALID_TRANSITIONS: Record<FlipbookState, FlipbookState[]> = {
-  created: ['frame_selected', 'instructions', 'cancelled'],
-  frame_selected: ['instructions', 'frame_selected', 'cancelled'],
+  created: ['instructions', 'frame_selected', 'cancelled'],
   instructions: ['cover_capture', 'cancelled'],
   cover_capture: ['video_capture', 'cancelled'],
   video_capture: ['review', 'cancelled'],
   review: ['processing', 'cancelled'],
-  processing: ['booth_confirmed', 'cover_capture', 'cancelled'], // cover_capture on 2-min timeout recovery
-  booth_confirmed: [],
+  processing: ['frame_selected', 'booth_confirmed', 'cover_capture', 'cancelled'], // cover_capture on 2-min timeout recovery
+  frame_selected: ['booth_confirmed', 'frame_selected', 'instructions', 'cancelled'],
+  booth_confirmed: ['printed', 'frame_selected'],
+  printed: [],
   cancelled: [],
 };
 

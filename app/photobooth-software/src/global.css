@@ -515,30 +515,35 @@ button {
 }
 
 /* ==========================================================================
-   Photo Strip 4R Print Styles (300 DPI PNG CUPS Handoff)
+   Photo Strip & Flipbook 4R Print Styles (300 DPI PNG & PDF Handoff)
    ========================================================================== */
 @media screen {
-  .print-only-target {
+  .print-only-target,
+  #flipbook-print-portal {
     display: none !important;
   }
 }
 
 @media print {
   @page {
+    size: 4in 6in;
     margin: 0;
-    size: auto;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   html,
   body {
-    width: 100%;
-    height: 100%;
+    width: 4in !important;
+    height: 6in !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
-    overflow: hidden !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    overflow: visible !important;
   }
 
   body * {
@@ -546,15 +551,17 @@ button {
   }
 
   .print-only-target,
-  .print-only-target * {
+  .print-only-target *,
+  #flipbook-print-portal,
+  #flipbook-print-portal * {
     visibility: visible;
   }
 
   .print-only-target {
     position: fixed;
     inset: 0;
-    width: 100vw;
-    height: 100vh;
+    width: 4in;
+    height: 6in;
     margin: 0;
     padding: 0;
     display: flex !important;
@@ -576,6 +583,39 @@ button {
     margin: 0 auto;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  #flipbook-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 4in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-sheet-4r {
+    display: block !important;
+    width: 4in !important;
+    height: 6in !important;
+    min-width: 4in !important;
+    min-height: 6in !important;
+    max-width: 4in !important;
+    max-height: 6in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+    background-color: #ffffff !important;
+  }
+
+  .print-sheet-4r:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   .no-print,

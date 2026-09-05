@@ -186,7 +186,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post('/templates/import', async (request, reply) => {
+  fastify.post<{ Querystring: { type?: 'photo_strip' | 'flipbook' } }>('/templates/import', async (request, reply) => {
     let file;
     try {
       file = await request.file();
@@ -196,17 +196,13 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     if (!file) return errorResponse(reply, 'INVALID_ARCHIVE', 'A template archive file is required');
     try {
       const entries = parseZip(await file.toBuffer());
-      const pkg = parseManifest(entries);
+      const pkg = parseManifest(entries, request.query.type);
       const existingNames = new Set((await templateRepository.list()).map((t) => t.name));
       const seenNames = new Set<string>();
       for (const entry of pkg.templates) {
-        if (seenNames.has(entry.template.name) || existingNames.has(entry.template.name))
-          return errorResponse(
-            reply,
-            'TEMPLATE_NAME_EXISTS',
-            `A template named “${entry.template.name}” already exists or is duplicated in the archive`,
-            409,
-          );
+        if (existingNames.has(entry.template.name) || seenNames.has(entry.template.name)) {
+          entry.template.name = duplicateName(entry.template.name, [...existingNames, ...seenNames]);
+        }
         seenNames.add(entry.template.name);
       }
       const imported = [];
