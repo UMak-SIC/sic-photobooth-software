@@ -10,12 +10,16 @@ const publicId = `I${randomBytes(3).toString('hex')}`;
 const clientAddress = `integration-${randomBytes(6).toString('hex')}`;
 
 describeIntegration('Supabase public output integration', () => {
-  const service = createClient(url!, serviceRoleKey!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const publicClient = createClient(url!, publishableKey!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const service = url
+    ? createClient(url, serviceRoleKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : (null as any);
+  const publicClient = url
+    ? createClient(url, publishableKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+    : (null as any);
 
   afterAll(async () => {
     await service.from('public_outputs').delete().eq('public_id', publicId);
