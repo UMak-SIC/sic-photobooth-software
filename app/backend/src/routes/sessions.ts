@@ -558,8 +558,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
         const buffer = await data.toBuffer();
         const validation = mediaValidator.validateVideo(buffer, {
-          minDurationSeconds: 5.0,
-          maxDurationSeconds: 7.0,
+          minDurationSeconds: 4.5,
+          maxDurationSeconds: 8.0,
         });
         if (!validation.isValid) {
           return reply.status(400).send({

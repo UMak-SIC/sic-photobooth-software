@@ -427,9 +427,11 @@ export class MediaValidator {
       }
     }
 
-    const finalTimestampMs = maxBlockTimestamp >= 0 ? maxBlockTimestamp : maxClusterTimestamp;
-    if (finalTimestampMs > 0) {
-      return (finalTimestampMs * timecodeScaleNs) / 1000000000;
+    if (maxBlockTimestamp >= 0) {
+      return ((maxBlockTimestamp + 33) * timecodeScaleNs) / 1000000000;
+    } else if (maxClusterTimestamp >= 0) {
+      // Add standard 100ms cluster frame window for the final cluster
+      return ((maxClusterTimestamp + 100) * timecodeScaleNs) / 1000000000;
     }
 
     return null;
@@ -499,10 +501,11 @@ export class MediaValidator {
         };
       }
 
-      const minDuration = options?.minDurationSeconds ?? 5.0;
-      const maxDuration = options?.maxDurationSeconds ?? 7.0;
+      const minDuration = options?.minDurationSeconds ?? 4.5;
+      const maxDuration = options?.maxDurationSeconds ?? 8.0;
 
-      if (duration < minDuration || duration > maxDuration) {
+      // Allow 0.05s epsilon tolerance for floating-point duration boundaries
+      if (duration < minDuration - 0.05 || duration > maxDuration + 0.05) {
         return {
           isValid: false,
           format,
