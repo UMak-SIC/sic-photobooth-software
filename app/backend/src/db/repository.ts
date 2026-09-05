@@ -79,7 +79,12 @@ export class DatabaseRepository {
       );
       return result.rows[0];
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505'
+      ) {
         throw error;
       }
       const key = `${name}_${date}`;

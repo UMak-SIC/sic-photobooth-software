@@ -22,3 +22,7 @@ Thumbs.db
 storage/
 app/storage/
 
+# Local dev certificates
+certificates/
+*.pem
+

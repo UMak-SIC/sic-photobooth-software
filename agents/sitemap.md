@@ -57,4 +57,4 @@ This app reads public delivery data only. It never contacts the local backend.
 
 Owner: `app/backend/`
 
-The API is session-oriented. Implemented event setup routes are `GET /api/events` and `POST /api/events`. The API must also cover health, sessions, workflow transitions, templates/frames, media registration, retakes, finalization, local approved-output retrieval, printing records, and publication administration.
+The API is session-oriented. Implemented routes cover event setup (`GET /api/events`, `POST /api/events`), health (`GET /health`), sessions (`POST /api/sessions`, capture uploads, flipbook processing), and public output retrieval (`GET /photos/:id`, `GET /photos/:id/info`). The API must also cover templates/frames management, retakes, printing records, and publication administration.
