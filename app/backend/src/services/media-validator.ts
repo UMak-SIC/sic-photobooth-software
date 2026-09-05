@@ -313,11 +313,11 @@ export class MediaValidator {
     }
 
     // Fallback for MediaRecorder WebM streams (which omit Segment Info Duration [0x44, 0x89]):
-    // Traverse Cluster headers ([0x1F, 0x43, 0xB6, 0x75]) and Timecodes ([0xE7]) / SimpleBlocks ([0xA3]).
+    // Traverse Cluster headers ([0x1F, 0x43, 0xB6, 0x75]) and Timecodes ([0xE7]).
     let maxClusterTimestamp = -1;
     let maxBlockTimestamp = -1;
 
-    for (let i = 0; i <= buffer.length - 4; i++) {
+    for (let i = 0; i <= buffer.length - 8; i++) {
       if (
         buffer[i] === 0x1f &&
         buffer[i + 1] === 0x43 &&
@@ -337,8 +337,9 @@ export class MediaValidator {
         }
         pos += vintLen;
 
-        let clusterTimecode = 0;
-        const headerLimit = Math.min(pos + 128, buffer.length);
+        let clusterTimecode = -1;
+        // Search ONLY within the immediate first 16 bytes of the cluster body for Timecode (0xE7)
+        const headerLimit = Math.min(pos + 16, buffer.length);
         while (pos < headerLimit) {
           if (buffer[pos] === 0xe7 && pos + 2 <= buffer.length) {
             pos++;
@@ -354,60 +355,81 @@ export class MediaValidator {
               if (val > maxClusterTimestamp) {
                 maxClusterTimestamp = val;
               }
+              pos += tcLen;
             }
             break;
           }
           pos++;
         }
 
-        // Check for SimpleBlocks [0xA3] within cluster
-        const blockLimit = Math.min(i + 131072, buffer.length - 6);
-        while (pos < blockLimit) {
-          if (
-            buffer[pos] === 0x1f &&
-            buffer[pos + 1] === 0x43 &&
-            buffer[pos + 2] === 0xb6 &&
-            buffer[pos + 3] === 0x75
-          ) {
-            break; // next cluster
-          }
-          if (buffer[pos] === 0xa3 && pos + 4 < buffer.length) {
-            let bPos = pos + 1;
-            const bFirst = buffer[bPos];
-            let bMask = 0x80;
-            let bVintLen = 1;
-            while ((bFirst & bMask) === 0 && bVintLen <= 8) {
-              bMask >>= 1;
-              bVintLen++;
+        if (clusterTimecode >= 0) {
+          // Parse child elements (SimpleBlocks 0xA3) by jumping element lengths
+          const blockScanLimit = Math.min(i + 2097152, buffer.length - 4);
+          while (pos < blockScanLimit) {
+            const elemId = buffer[pos];
+            if (
+              pos + 4 <= buffer.length &&
+              buffer[pos] === 0x1f &&
+              buffer[pos + 1] === 0x43 &&
+              buffer[pos + 2] === 0xb6 &&
+              buffer[pos + 3] === 0x75
+            ) {
+              // Next cluster
+              break;
             }
-            bPos += bVintLen;
-            if (bPos + 3 <= buffer.length) {
-              const tFirst = buffer[bPos];
-              let tMask = 0x80;
-              let tVintLen = 1;
-              while ((tFirst & tMask) === 0 && tVintLen <= 8) {
-                tMask >>= 1;
-                tVintLen++;
+
+            if (elemId === 0xa3 && pos + 4 < buffer.length) {
+              let bPos = pos + 1;
+              const bFirst = buffer[bPos];
+              let bMask = 0x80;
+              let bVintLen = 1;
+              while ((bFirst & bMask) === 0 && bVintLen <= 8) {
+                bMask >>= 1;
+                bVintLen++;
               }
-              bPos += tVintLen;
-              if (bPos + 2 <= buffer.length) {
-                const relTimecode = buffer.readInt16BE(bPos);
-                const blockTotalTime = clusterTimecode + relTimecode;
-                if (blockTotalTime > maxBlockTimestamp) {
-                  maxBlockTimestamp = blockTotalTime;
+              let bSize = bFirst & (bMask - 1);
+              for (let b = 1; b < bVintLen; b++) {
+                bSize = bSize * 256 + buffer[bPos + b];
+              }
+              bPos += bVintLen;
+
+              if (bPos + 3 <= buffer.length) {
+                const tFirst = buffer[bPos];
+                let tMask = 0x80;
+                let tVintLen = 1;
+                while ((tFirst & tMask) === 0 && tVintLen <= 8) {
+                  tMask >>= 1;
+                  tVintLen++;
+                }
+                bPos += tVintLen;
+
+                if (bPos + 2 <= buffer.length) {
+                  const relTimecode = buffer.readInt16BE(bPos);
+                  const blockTotalTime = clusterTimecode + relTimecode;
+                  if (
+                    relTimecode >= -1000 &&
+                    relTimecode <= 5000 &&
+                    blockTotalTime > maxBlockTimestamp
+                  ) {
+                    maxBlockTimestamp = blockTotalTime;
+                  }
                 }
               }
+
+              if (bSize > 0 && pos + 1 + bVintLen + bSize <= buffer.length) {
+                pos += 1 + bVintLen + bSize;
+                continue;
+              }
             }
+            pos++;
           }
-          pos++;
         }
       }
     }
 
     const finalTimestampMs = maxBlockTimestamp >= 0 ? maxBlockTimestamp : maxClusterTimestamp;
     if (finalTimestampMs > 0) {
-      // Add standard 33ms single-frame window to account for the last frame display time
-      return ((finalTimestampMs + 33) * timecodeScaleNs) / 1000000000;
+      return (finalTimestampMs * timecodeScaleNs) / 1000000000;
     }
 
     return null;

@@ -202,8 +202,8 @@ function createSyntheticStreamedWebm(durationSeconds: number): Buffer {
     0x00, // Timecode 0
   ]);
 
-  // Cluster 2 (t=durationSeconds * 1000 - 33)
-  const targetTimecode = Math.max(0, Math.round(durationSeconds * 1000 - 33));
+  // Cluster 2 (t=durationSeconds * 1000)
+  const targetTimecode = Math.max(0, Math.round(durationSeconds * 1000));
   const cluster2 = Buffer.alloc(9);
   cluster2[0] = 0x1f;
   cluster2[1] = 0x43;
