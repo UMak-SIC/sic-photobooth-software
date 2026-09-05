@@ -131,7 +131,7 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[x] Completed` |
 | **TSK-0904** | Implement Publication Administration Dashboard with manual retry for dead-letter queue jobs | `app/photobooth-software`, `app/backend` | Contract § Publishing and Retrieval | Displays queued, in_progress, uploaded, failed jobs with retry action. | `[x] Completed` |
 | **TSK-0905** | Implement standardized error banner and recovery toast system across photobooth UI | `app/photobooth-software` | US-81..84, Contract § Events and Errors, `agents/recovery.md` | Displays exact contract error messages for camera, composition, print, and general failures. | `[ ] Planned` |
-| **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when an active capture workflow is in progress. | `[ ] Planned` |
+| **TSK-0906** | Implement browser navigation guard warning against page reload during active workflows | `app/photobooth-software` | US-81, Contract § Assisted Booth | Prompts `beforeunload` warning when unsaved Photo Strip layout or Flipbook frame edits are in progress. | `[x] Completed` |
 
 ---
 
