@@ -407,10 +407,11 @@ This section resolves implementation details established after the original user
 * The editor offers grid presets such as `2x1`, `2x2`, `3x1`, and `3x2` only as placement starting points. The saved model uses freeform placements.
 * Each placement has `captureIndex`, `x`, `y`, `width`, `height`, `rotation`, `borderRadius`, and `zIndex`.
 * Each overlay has a `label`, `x`, `y`, `width`, `height`, `rotation`, and `zIndex`.
-* Multiple placements may link to the same `captureIndex`, allowing one capture to appear in multiple printed positions. Moving or resizing linked placements updates every linked copy.
+* Multiple placements may reference the same `captureIndex`, allowing one capture to appear in multiple printed positions. Each placement remains independently movable and resizable.
 * The editor shows numbered rectangles rather than live image previews. Overlays render as labeled dashed shapes above the placements by `zIndex`.
-* The editor provides manual inputs for every placement field, every overlay field, and for the background image transform: `x`, `y`, `width`, and `height`.
-* Administrators can create, edit, delete, activate, and deactivate templates. A session stores a snapshot of the selected template at selection time, so later edits never change that session’s result.
+ * The editor provides manual inputs for every placement field, every overlay field, and for the background image transform: `x`, `y`, `width`, and `height`.
+* Photo placements and overlays have independently editable `width` and `height`; the backend accepts any positive dimensions.
+ * Administrators can create, edit, delete, activate, and deactivate templates. A session stores a snapshot of the selected template at selection time, so later edits never change that session’s result.
 
 #### Flipbook Contract
 
@@ -598,7 +599,7 @@ Each placement includes:
 * Border radius
 * Layer order
 
-Grid presets are editor conveniences only. Multiple placements may reference one capture index, and linked placements move and resize together.
+Grid presets are editor conveniences only. Multiple placements may reference one capture index, but every placement moves and resizes independently.
 
 Template definitions will be stored separately from generated session media, including a snapshot recorded when a session selects the template.
 
