@@ -13,6 +13,13 @@ export class TemplateStorage {
     return path.join(this.baseDir, templateId);
   }
 
+  private assetPath(filePath: string): string {
+    const resolved = path.resolve(config.storageDir, filePath);
+    if (!resolved.startsWith(`${this.baseDir}${path.sep}`))
+      throw new Error('Invalid template asset path');
+    return resolved;
+  }
+
   public async saveAsset(
     templateId: string,
     kind: 'background' | 'overlay',
@@ -31,14 +38,11 @@ export class TemplateStorage {
 
   public async removeAsset(filePath: string | null | undefined): Promise<void> {
     if (!filePath) return;
-    const resolved = path.resolve(filePath);
-    if (!resolved.startsWith(`${this.baseDir}${path.sep}`))
-      throw new Error('Invalid template asset path');
-    await fs.promises.rm(resolved, { force: true });
+    await fs.promises.rm(this.assetPath(filePath), { force: true });
   }
 
   public async readAsset(templateId: string, filePath: string): Promise<Buffer> {
-    const resolved = path.resolve(filePath);
+    const resolved = this.assetPath(filePath);
     const templateDir = this.templateDir(templateId);
     if (!resolved.startsWith(`${templateDir}${path.sep}`))
       throw new Error('Invalid template asset path');
