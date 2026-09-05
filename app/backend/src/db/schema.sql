@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS publication_records (
   status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'in_progress', 'uploaded', 'failed')),
   retry_count INT NOT NULL DEFAULT 0,
   last_attempt_at TIMESTAMPTZ,
-  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  next_attempt_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   last_error TEXT,
   cloudinary_url TEXT,
   cloudinary_public_id TEXT,

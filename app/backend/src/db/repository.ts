@@ -120,6 +120,12 @@ export interface PublicationRecord {
   eventDate: string;
 }
 
+export interface LocalPublicationOutput {
+  publicId: string;
+  filePath: string;
+  mediaType: string;
+}
+
 export class DatabaseRepository {
   public async listEvents(): Promise<EventData[]> {
     try {
@@ -189,53 +195,6 @@ export class DatabaseRepository {
     ],
   ]);
   private inMemoryTemplates: Map<string, TemplateItem> = new Map([
-    [
-      'classic-portrait',
-      {
-        id: 'classic-portrait',
-        name: 'Classic Portrait Strip',
-        orientation: 'portrait',
-        outputWidth: 1200,
-        outputHeight: 1800,
-        backgroundPath: 'templates/classic-portrait.png',
-        isActive: true,
-        requiredCaptureCount: 3,
-        countdownSeconds: 5,
-        placements: [
-          {
-            captureIndex: 1,
-            x: 100,
-            y: 120,
-            width: 1000,
-            height: 440,
-            rotation: 0,
-            borderRadius: 8,
-            zIndex: 1,
-          },
-          {
-            captureIndex: 2,
-            x: 100,
-            y: 600,
-            width: 1000,
-            height: 440,
-            rotation: 0,
-            borderRadius: 8,
-            zIndex: 1,
-          },
-          {
-            captureIndex: 3,
-            x: 100,
-            y: 1080,
-            width: 1000,
-            height: 440,
-            rotation: 0,
-            borderRadius: 8,
-            zIndex: 1,
-          },
-        ],
-        overlays: [],
-      },
-    ],
     [
       'grid-landscape',
       {
@@ -1137,6 +1096,21 @@ export class DatabaseRepository {
     }
   }
 
+  public async getPublicationOutput(id: string): Promise<LocalPublicationOutput | null> {
+    try {
+      const result = await pool.query(
+        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType"
+         FROM publication_records p
+         JOIN generated_outputs o ON o.id = p.output_id
+         WHERE p.id = $1`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    return publication ? this.inMemoryOutputs.get(publication.publicId) ?? null : null;
+  }
+
   public async retryPublication(id: string): Promise<PublicationRecord | null> {
     let retried: PublicationRecord | undefined;
     try {
@@ -1171,6 +1145,61 @@ export class DatabaseRepository {
     publication.retryCount = 0;
     publication.lastAttemptAt = null;
     publication.nextAttemptAt = new Date();
+    publication.lastError = null;
+    return publication;
+  }
+
+  public async deleteLocalPublication(id: string): Promise<LocalPublicationOutput | null> {
+    try {
+      const result = await pool.query(
+        `DELETE FROM generated_outputs o
+         WHERE o.id = (
+           SELECT output_id FROM publication_records WHERE id = $1 AND status <> 'in_progress'
+         )
+         RETURNING public_id AS "publicId", file_path AS "filePath", media_type AS "mediaType"`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    const output = publication && this.inMemoryOutputs.get(publication.publicId);
+    if (!publication || !output || publication.status === 'in_progress') return null;
+    this.inMemoryPublications.delete(id);
+    this.inMemoryOutputs.delete(publication.publicId);
+    return output;
+  }
+
+  public async removeCloudPublication(id: string): Promise<PublicationRecord | null> {
+    try {
+      const result = await pool.query(
+        `WITH removed AS (
+           UPDATE publication_records
+           SET status = 'failed', cloud_finalized_at = NULL, cloudinary_url = NULL,
+             cloudinary_public_id = NULL, expires_at = NULL, next_attempt_at = NULL, last_error = NULL
+           WHERE id = $1 AND status = 'uploaded'
+           RETURNING *
+         )
+         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+           p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+           p.cloud_finalized_at AS "cloudFinalizedAt", p.cloudinary_url AS "cloudinaryUrl",
+           p.cloudinary_public_id AS "cloudinaryPublicId", p.expires_at AS "expiresAt", p.created_at AS "createdAt",
+           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+         FROM removed p
+         JOIN generated_outputs o ON o.id = p.output_id
+         JOIN sessions s ON s.id = o.session_id
+         JOIN events e ON e.id = s.event_id`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    if (!publication || publication.status !== 'uploaded') return null;
+    publication.status = 'failed';
+    publication.cloudFinalizedAt = null;
+    publication.cloudinaryUrl = null;
+    publication.cloudinaryPublicId = null;
+    publication.expiresAt = null;
+    publication.nextAttemptAt = null;
     publication.lastError = null;
     return publication;
   }
@@ -1717,60 +1746,6 @@ export class DatabaseRepository {
       if (client) {
         client.release();
       }
-    }
-  }
-
-  /**
-   * Ensures canonical default templates exist in PostgreSQL.
-   */
-  public async seedDefaultTemplatesIfEmpty(): Promise<void> {
-    try {
-      const existing = await this.listActiveTemplates();
-      if (existing.length === 0) {
-        await this.createTemplate(
-          'Classic Portrait Strip',
-          'portrait',
-          1200,
-          1800,
-          'templates/classic-portrait.png',
-          3,
-          5,
-          [
-            {
-              captureIndex: 1,
-              x: 100,
-              y: 120,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 2,
-              x: 100,
-              y: 600,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-            {
-              captureIndex: 3,
-              x: 100,
-              y: 1080,
-              width: 1000,
-              height: 440,
-              rotation: 0,
-              borderRadius: 8,
-              zIndex: 1,
-            },
-          ],
-        );
-      }
-    } catch {
-      // Ignored if DB is unavailable
     }
   }
 

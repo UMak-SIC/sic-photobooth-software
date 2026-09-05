@@ -36,4 +36,24 @@ describe('Publication routes', () => {
     const response = await app.inject({ method: 'POST', url: '/api/publications/not-a-uuid/retry' });
     expect(response.statusCode).toBe(400);
   });
+
+  it('deletes a local output and its publication record', async () => {
+    const publicId = `D${crypto.randomUUID().replaceAll('-', '').slice(0, 6)}`;
+    await dbRepository.saveGeneratedOutput(
+      'publication-delete-session',
+      publicId,
+      'image/png',
+      'outputs/publication-delete.png',
+      1200,
+      1800,
+    );
+    const listed = await app.inject({ method: 'GET', url: '/api/publications' });
+    const publication = JSON.parse(listed.body).data.find((item: { publicId: string }) => item.publicId === publicId);
+
+    const deleted = await app.inject({ method: 'DELETE', url: `/api/publications/${publication.id}/local` });
+
+    expect(deleted.statusCode).toBe(204);
+    const after = await app.inject({ method: 'GET', url: '/api/publications' });
+    expect(JSON.parse(after.body).data.some((item: { publicId: string }) => item.publicId === publicId)).toBe(false);
+  });
 });

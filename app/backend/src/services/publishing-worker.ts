@@ -5,6 +5,7 @@ import { dbRepository } from '../db/repository.js';
 import {
   isSupabaseConfigured,
   publicOutputExists,
+  removePublicOutput,
   registerPublicOutput,
 } from './supabase-publication.js';
 
@@ -13,6 +14,7 @@ const CLOUDINARY_PATH = 'photobooth';
 const MAX_ATTEMPTS = 5;
 const RETRY_BASE_MS = 5000;
 const RETRY_MAX_MS = 15 * 60 * 1000;
+const UPLOAD_TIMEOUT_MS = 30 * 1000;
 const STALLED_UPLOAD_MS = 5 * 60 * 1000;
 
 const configured =
@@ -68,7 +70,7 @@ async function uploadToCloudinary(
     folder: CLOUDINARY_PATH,
     resource_type: 'image',
     overwrite: true,
-    timeout: STALLED_UPLOAD_MS,
+    timeout: UPLOAD_TIMEOUT_MS,
   });
   return { url: result.secure_url, cloudinaryPublicId: result.public_id };
 }
@@ -90,6 +92,31 @@ export function retryDelayMs(attempt: number, random: () => number = Math.random
   return Math.floor(cap / 2 + random() * (cap / 2));
 }
 
+export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Publishing provider request timed out.')), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export async function deleteCloudPublication(publicId: string, cloudinaryPublicId: string): Promise<void> {
+  if (!configured || !isSupabaseConfigured()) {
+    throw new Error('Cloud publishing is not configured.');
+  }
+  await withTimeout(
+    cloudinary.uploader.destroy(cloudinaryPublicId, { resource_type: 'image', invalidate: true }),
+    UPLOAD_TIMEOUT_MS,
+  );
+  await withTimeout(removePublicOutput(publicId), UPLOAD_TIMEOUT_MS);
+}
+
 async function processPublication(
   publication: {
     id: string;
@@ -107,21 +134,27 @@ async function processPublication(
   let cloudFinalizedAt: Date | null = null;
   let expiresAt: Date | null = null;
   try {
-    const upload = await uploadToCloudinary(publication.filePath, publication.publicId);
+    const upload = await withTimeout(
+      uploadToCloudinary(publication.filePath, publication.publicId),
+      UPLOAD_TIMEOUT_MS,
+    );
     cloudinaryUrl = upload.url;
     cloudinaryPublicId = upload.cloudinaryPublicId;
     cloudFinalizedAt = new Date();
     expiresAt = addMonths(cloudFinalizedAt, config.publishing.retentionMonths);
-    await registerPublicOutput({
-      publicId: publication.publicId,
-      cloudinaryUrl,
-      cloudinaryPublicId,
-      mediaType: publication.mediaType,
-      eventName: publication.eventName,
-      eventDate: publication.eventDate,
-      cloudFinalizedAt,
-      expiresAt,
-    });
+    await withTimeout(
+      registerPublicOutput({
+        publicId: publication.publicId,
+        cloudinaryUrl,
+        cloudinaryPublicId,
+        mediaType: publication.mediaType,
+        eventName: publication.eventName,
+        eventDate: publication.eventDate,
+        cloudFinalizedAt,
+        expiresAt,
+      }),
+      UPLOAD_TIMEOUT_MS,
+    );
     const markedUploaded = await dbRepository.markPublicationUploaded(
       publication.id,
       cloudinaryUrl,
@@ -133,7 +166,7 @@ async function processPublication(
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error);
     const attempt = publication.retryCount + 1;
-    if (cloudinaryPublicId && attempt >= MAX_ATTEMPTS) {
+    if (cloudinaryPublicId) {
       try {
         if (await publicOutputExists(publication.publicId)) {
           if (
@@ -148,7 +181,7 @@ async function processPublication(
             return;
           }
           message = `${message} Supabase record exists but the local job could not be finalized.`;
-        } else {
+        } else if (attempt >= MAX_ATTEMPTS) {
           await cloudinary.uploader.destroy(cloudinaryPublicId, {
             resource_type: 'image',
             invalidate: true,

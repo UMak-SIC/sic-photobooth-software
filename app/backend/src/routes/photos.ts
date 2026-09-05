@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import fs from 'node:fs';
+import sharp from 'sharp';
 import {
   isValidPublicId,
   type PublicOutputMetadata,
@@ -67,11 +68,11 @@ export const photoRoutes: FastifyPluginAsync = async (fastify) => {
   /**
    * Streams the approved public output binary file (image/png or image/gif).
    */
-  fastify.get<{ Params: { id: string }; Querystring: { variant?: string } }>(
+  fastify.get<{ Params: { id: string }; Querystring: { variant?: string; preview?: string } }>(
     '/photos/:id',
     async (request, reply) => {
       const { id } = request.params;
-      const { variant } = request.query;
+      const { variant, preview } = request.query;
 
       if (!isValidPublicId(id)) {
         return reply.status(400).send({
@@ -130,6 +131,10 @@ export const photoRoutes: FastifyPluginAsync = async (fastify) => {
             message: 'Photo not found. Check the QR code or enter the full link/code again.',
           },
         });
+      }
+
+      if (preview === 'true' && output.mediaType === 'image/gif') {
+        return reply.type('image/png').send(await sharp(filePath, { animated: false }).png().toBuffer());
       }
 
       const contentType =

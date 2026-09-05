@@ -62,6 +62,15 @@ describe('Versioned Database Migrations', () => {
     expect(schema003).toContain('ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order INT');
   });
 
+  it('allows completed publication jobs to have no next retry', () => {
+    const dir = findMigrationsDir();
+    const schema006 = fs.readFileSync(
+      path.join(dir, '006_allow_completed_publications_without_retry.sql'),
+      'utf8',
+    );
+    expect(schema006).toContain('ALTER COLUMN next_attempt_at DROP NOT NULL');
+  });
+
   it('verifies all migration files have unique, monotonically incrementing 3-digit prefixes', () => {
     const dir = findMigrationsDir();
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();

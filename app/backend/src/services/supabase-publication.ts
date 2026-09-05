@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config.js';
 
+const REQUEST_TIMEOUT_MS = 30 * 1000;
+
 export interface PublicOutputPublication {
   publicId: string;
   cloudinaryUrl: string;
@@ -16,6 +18,10 @@ const configured = Boolean(config.supabase.url) && Boolean(config.supabase.servi
 const supabase = configured
   ? createClient(config.supabase.url, config.supabase.serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        fetch: (input, init) =>
+          fetch(input, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }),
+      },
     })
   : null;
 
@@ -55,4 +61,10 @@ export async function publicOutputExists(publicId: string): Promise<boolean> {
     .maybeSingle();
   if (error) throw new Error(`Supabase publication lookup failed: ${error.message}`);
   return data !== null;
+}
+
+export async function removePublicOutput(publicId: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase publishing is not configured.');
+  const { error } = await supabase.from('public_outputs').delete().eq('public_id', publicId);
+  if (error) throw new Error(`Supabase publication deletion failed: ${error.message}`);
 }
