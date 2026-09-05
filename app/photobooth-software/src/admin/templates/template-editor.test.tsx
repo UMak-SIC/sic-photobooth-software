@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { TemplateEditor } from './template-editor';
+import { flipbookPlacements } from './presets';
 import type { Template, TemplateDraft } from './types';
 
 const mockDraft: TemplateDraft = {
@@ -45,6 +46,17 @@ const mockDraft: TemplateDraft = {
     },
   ],
 };
+
+describe('Flipbook layout', () => {
+  it('uses one portrait layout with four slots', () => {
+    expect(flipbookPlacements()).toMatchObject([
+      { captureIndex: 1, x: 290, y: 150 },
+      { captureIndex: 2, x: 290, y: 540 },
+      { captureIndex: 3, x: 290, y: 930 },
+      { captureIndex: 4, x: 290, y: 1320 },
+    ]);
+  });
+});
 
 describe('TemplateEditor', () => {
   beforeEach(() => {

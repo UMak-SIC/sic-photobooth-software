@@ -20,6 +20,7 @@ export function toTemplateDto(template: Template): TemplateDto {
   return {
     ...template,
     backgroundPath: template.backgroundPath ? `/templates/${template.id}/background` : null,
+    coverPath: template.coverPath ? `/templates/${template.id}/cover` : null,
     overlays: template.overlays.map((overlay) => ({
       ...overlay,
       path: overlay.path ? `/templates/${template.id}/overlays/${overlay.id}` : null,
@@ -39,8 +40,8 @@ export function duplicateName(name: string, existingNames: Iterable<string>): st
 }
 
 export const templateRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/templates', async (_request, reply) =>
-    reply.send({ success: true, data: (await templateRepository.list()).map(toTemplateDto) }),
+  fastify.get<{ Querystring: { type?: 'photo_strip' | 'flipbook' } }>('/templates', async (request, reply) =>
+    reply.send({ success: true, data: (await templateRepository.list(request.query.type)).map(toTemplateDto) }),
   );
 
   fastify.patch<{ Body: { orderedIds?: string[] } }>('/templates/order', async (request, reply) => {
@@ -60,8 +61,8 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.get('/templates/export', async (_request, reply) => {
-    const templates = await templateRepository.list();
+  fastify.get<{ Querystring: { type?: 'photo_strip' | 'flipbook' } }>('/templates/export', async (request, reply) => {
+    const templates = await templateRepository.list(request.query.type);
     const assetName = (templateId: string, kind: string, assetPath: string) =>
       `assets/${templateId}/${kind}${path.extname(assetPath).toLowerCase()}`;
     const manifest = {
@@ -71,6 +72,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         backgroundPath: template.backgroundPath
           ? assetName(template.id, 'background', template.backgroundPath)
           : null,
+        coverPath: template.coverPath ? assetName(template.id, 'cover', template.coverPath) : null,
         overlays: template.overlays.map((overlay) => ({
           ...overlay,
           path: overlay.path ? assetName(template.id, `overlay-${overlay.id}`, overlay.path) : null,
@@ -83,19 +85,24 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         if (template.backgroundPath)
           yield {
             name: assetName(template.id, 'background', template.backgroundPath),
-            content: await templateStorage.readAsset(template.id, template.backgroundPath),
+            content: await templateStorage.readAsset(template.id, template.backgroundPath, template.type),
+          };
+        if (template.coverPath)
+          yield {
+            name: assetName(template.id, 'cover', template.coverPath),
+            content: await templateStorage.readAsset(template.id, template.coverPath, template.type),
           };
         for (const overlay of template.overlays) {
           if (overlay.path)
             yield {
               name: assetName(template.id, `overlay-${overlay.id}`, overlay.path),
-              content: await templateStorage.readAsset(template.id, overlay.path),
+            content: await templateStorage.readAsset(template.id, overlay.path, template.type),
             };
         }
       }
     }
     return reply
-      .header('Content-Disposition', 'attachment; filename="photobooth-templates.zip"')
+      .header('Content-Disposition', `attachment; filename="${request.query.type === 'flipbook' ? 'flipbook-frames' : 'photobooth-templates'}.zip"`)
       .type('application/zip')
       .send(Readable.from(zip(entries())));
   });
@@ -107,6 +114,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     const draft: TemplateDraft = {
       name: duplicateName(source.name, (await templateRepository.list()).map((item) => item.name)),
       orientation: source.orientation,
+      type: source.type,
       background: source.background,
       placements: source.placements.map(({ id: _id, ...placement }) => placement),
       overlays: source.overlays.map(({ id: _id, path: _path, ...overlay }) => overlay),
@@ -124,8 +132,21 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
           source.backgroundPath,
           duplicate.id,
           'background',
+          source.type,
+          source.type,
         );
         duplicate = (await templateRepository.setBackgroundPath(duplicate.id, backgroundPath)) ?? duplicate;
+      }
+      if (source.coverPath) {
+        const coverPath = await templateStorage.copyAsset(
+          source.id,
+          source.coverPath,
+          duplicate.id,
+          'cover',
+          source.type,
+          source.type,
+        );
+        duplicate = (await templateRepository.setCoverPath(duplicate.id, coverPath)) ?? duplicate;
       }
       for (const [index, overlay] of source.overlays.entries()) {
         if (!overlay.path || !duplicate.overlays[index]?.id) continue;
@@ -134,6 +155,8 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
           overlay.path,
           duplicate.id,
           'overlay',
+          source.type,
+          source.type,
         );
         duplicate = (await templateRepository.addOverlayPath(
           duplicate.id,
@@ -145,7 +168,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     } catch (error: unknown) {
       if (duplicate) {
         await templateRepository.delete(duplicate.id);
-        await templateStorage.removeTemplate(duplicate.id);
+        await templateStorage.removeTemplate(duplicate.id, duplicate.type);
       }
       return errorResponse(
         reply,
@@ -188,8 +211,20 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
             'background',
             assetExtension(entry.backgroundPath),
             entries.get(entry.backgroundPath)!,
+            template.type,
           );
           const updated = await templateRepository.setBackgroundPath(template.id, assetPath);
+          if (updated) Object.assign(template, updated);
+        }
+        if (entry.coverPath) {
+          const assetPath = await templateStorage.saveAsset(
+            template.id,
+            'cover',
+            assetExtension(entry.coverPath),
+            entries.get(entry.coverPath)!,
+            template.type,
+          );
+          const updated = await templateRepository.setCoverPath(template.id, assetPath);
           if (updated) Object.assign(template, updated);
         }
         for (const overlay of entry.overlays) {
@@ -199,6 +234,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
               'overlay',
               assetExtension(overlay.path),
               entries.get(overlay.path)!,
+              template.type,
             );
             const updated = await templateRepository.addOverlayPath(template.id, overlay.id, assetPath);
             if (updated) Object.assign(template, updated);
@@ -301,7 +337,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     const template = await templateRepository.delete(request.params.id);
     if (!template)
       return errorResponse(reply, 'TEMPLATE_NOT_FOUND', 'Template does not exist', 404);
-    await templateStorage.removeTemplate(template.id);
+    await templateStorage.removeTemplate(template.id, template.type);
     return reply.status(204).send();
   });
 
@@ -320,6 +356,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       'background',
       imageExtension(validation.format),
       buffer,
+      template.type,
     );
     try {
       const updated = await templateRepository.setBackgroundPath(template.id, assetPath);
@@ -334,6 +371,21 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       await templateStorage.removeAsset(assetPath);
       throw error;
     }
+  });
+
+  fastify.post<{ Params: { id: string } }>('/templates/:id/cover', async (request, reply) => {
+    const template = await templateRepository.get(request.params.id);
+    if (!template || template.type !== 'flipbook')
+      return errorResponse(reply, 'TEMPLATE_NOT_FOUND', 'Flipbook template does not exist', 404);
+    const file = await request.file();
+    if (!file) return errorResponse(reply, 'INVALID_ASSET', 'An image file is required');
+    const buffer = await file.toBuffer();
+    const validation = mediaValidator.validateImage(buffer);
+    if (!validation.isValid || !validation.format)
+      return errorResponse(reply, 'INVALID_ASSET', validation.error ?? 'Invalid image');
+    const assetPath = await templateStorage.saveAsset(template.id, 'cover', imageExtension(validation.format), buffer, template.type);
+    const updated = await templateRepository.setCoverPath(template.id, assetPath);
+    return reply.send({ success: true, data: toTemplateDto(updated!) });
   });
 
   fastify.post<{ Params: { id: string }; Querystring: { overlayId?: string } }>(
@@ -353,9 +405,10 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         return errorResponse(reply, 'INVALID_ASSET', validation.error ?? 'Invalid image');
       const assetPath = await templateStorage.saveAsset(
         template.id,
-        'overlay',
-        imageExtension(validation.format),
-        buffer,
+      'overlay',
+      imageExtension(validation.format),
+      buffer,
+      template.type,
       );
       try {
         const updated = await templateRepository.addOverlayPath(template.id, overlayId, assetPath);
@@ -378,12 +431,18 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       return reply
         .type(assetContentType(template.backgroundPath))
-        .send(await templateStorage.readAsset(template.id, template.backgroundPath));
+          .send(await templateStorage.readAsset(template.id, template.backgroundPath, template.type));
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT')
         return errorResponse(reply, 'ASSET_NOT_FOUND', 'Background asset does not exist', 404);
       throw error;
     }
+  });
+
+  fastify.get<{ Params: { id: string } }>('/templates/:id/cover', async (request, reply) => {
+    const template = await templateRepository.get(request.params.id);
+    if (!template?.coverPath) return errorResponse(reply, 'ASSET_NOT_FOUND', 'Cover asset does not exist', 404);
+    return reply.type(assetContentType(template.coverPath)).send(await templateStorage.readAsset(template.id, template.coverPath, template.type));
   });
 
   fastify.get<{ Params: { id: string; overlayId: string } }>(
@@ -398,7 +457,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       try {
         return reply
           .type(assetContentType(overlay.path))
-          .send(await templateStorage.readAsset(template.id, overlay.path));
+          .send(await templateStorage.readAsset(template.id, overlay.path, template.type));
       } catch (error: unknown) {
         if ((error as NodeJS.ErrnoException).code === 'ENOENT')
           return errorResponse(reply, 'ASSET_NOT_FOUND', 'Overlay asset does not exist', 404);

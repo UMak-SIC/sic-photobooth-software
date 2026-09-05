@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const orientationSchema = z.enum(['portrait', 'landscape']);
+export const templateTypeSchema = z.enum(['photo_strip', 'flipbook']);
 
 const geometryNumber = z.number().finite();
 const positiveGeometryNumber = geometryNumber.positive();
@@ -43,6 +44,7 @@ export const backgroundSchema = z
 export const templateDraftSchema = z
   .object({
     name: z.string().trim().min(1).max(255),
+    type: templateTypeSchema.default('photo_strip'),
     orientation: orientationSchema,
     background: backgroundSchema,
     placements: z.array(placementSchema).min(1),
@@ -61,6 +63,7 @@ export interface Template extends TemplateDraft {
   active: boolean;
   requiredCaptureCount: number;
   backgroundPath: string | null;
+  coverPath: string | null;
   sortOrder: number | null;
   createdAt: Date;
   updatedAt: Date;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
+import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
 import { validateTemplateDraft, type Template } from '../src/templates/types.js';
 import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
 import { zip } from '../src/templates/zip.js';
@@ -18,6 +18,11 @@ const placement = {
 };
 
 describe('template persistence boundaries', () => {
+  it('rejects route names before querying a UUID template id', () => {
+    expect(isTemplateId('edit')).toBe(false);
+    expect(isTemplateId('22222222-2222-4222-8222-222222222222')).toBe(true);
+  });
+
   it('accepts relative database asset paths when removing assets', async () => {
     const storage = new TemplateStorage();
 

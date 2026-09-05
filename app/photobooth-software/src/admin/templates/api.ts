@@ -34,7 +34,7 @@ const stripPaths = (draft: TemplateDraft): TemplateDraft => ({
 });
 
 export const templateApi = {
-  list: () => request<Template[]>('/templates'),
+  list: (type?: Template['type']) => request<Template[]>(`/templates${type ? `?type=${type}` : ''}`),
   get: (id: string) => request<Template>(`/templates/${id}`),
   duplicate: (id: string) =>
     request<Template>(`/templates/${id}/duplicate`, { method: 'POST' }),
@@ -57,6 +57,7 @@ export const templateApi = {
     }),
   remove: (id: string) => request<void>(`/templates/${id}`, { method: 'DELETE' }),
   uploadBackground: (id: string, file: File) => upload<Template>(`/templates/${id}/background`, file),
+  uploadCover: (id: string, file: File) => upload<Template>(`/templates/${id}/cover`, file),
   uploadOverlay: (id: string, overlayId: string, file: File) =>
     upload<Template>(`/templates/${id}/overlays?overlayId=${encodeURIComponent(overlayId)}`, file),
   importArchive: (file: File) => upload<Template[]>(`/templates/import`, file),

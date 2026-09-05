@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { assetUrl, templateApi } from './api';
-import { layoutPlacements, layoutPresets } from './presets';
+import { flipbookPlacements, layoutPlacements, layoutPresets } from './presets';
 import type { Template, TemplateDraft, TemplateOverlay, TemplatePlacement } from './types';
 import { dimensionsFor } from './types';
 
@@ -33,6 +33,8 @@ export function TemplateEditor({
   const [preview, setPreview] = useState(false);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [overlayFiles, setOverlayFiles] = useState<Record<number, File>>({});
   const [overlayPreviews, setOverlayPreviews] = useState<Record<number, string>>({});
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -52,7 +54,7 @@ export function TemplateEditor({
 
   useEffect(() => {
     if (!templateId && draft.placements.length === 0)
-      setDraft({ ...draft, placements: layoutPlacements('A') });
+      setDraft({ ...draft, orientation: draft.type === 'flipbook' ? 'portrait' : draft.orientation, placements: draft.type === 'flipbook' ? flipbookPlacements() : layoutPlacements('A') });
   }, [draft, setDraft, templateId]);
 
   const dimensions = dimensionsFor(draft.orientation);
@@ -146,12 +148,16 @@ export function TemplateEditor({
       let template = backgroundFile
         ? await templateApi.uploadBackground(saved.id, backgroundFile)
         : saved;
+      if (draft.type === 'flipbook' && coverFile)
+        template = await templateApi.uploadCover(template.id, coverFile);
       for (const [index, file] of Object.entries(overlayFiles)) {
         const overlay = template.overlays.find((o) => o.id === draft.overlays[Number(index)]?.id);
         if (overlay?.id) template = await templateApi.uploadOverlay(template.id, overlay.id, file);
       }
       setBackgroundFile(null);
       setBackgroundPreview(null);
+      setCoverFile(null);
+      setCoverPreview(null);
       setOverlayFiles({});
       setOverlayPreviews({});
       onSaved(template);
@@ -163,6 +169,8 @@ export function TemplateEditor({
 
   const backgroundSource =
     backgroundPreview ?? assetUrl(initialTemplate?.backgroundPath ?? null, initialTemplate?.updatedAt);
+  const coverSource = coverPreview ?? assetUrl(initialTemplate?.coverPath ?? null, initialTemplate?.updatedAt);
+  const isFlipbook = draft.type === 'flipbook';
 
   const onPointerMove = (event: React.PointerEvent) => {
     if (!drag.current || !canvasRef.current) return;
@@ -333,10 +341,10 @@ export function TemplateEditor({
       <header className="editor-header">
         <div>
           <button className="back-link" onClick={onBack} type="button">
-            <span className="back-arrow">←</span> Templates
+            <span className="back-arrow">←</span> {isFlipbook ? 'Flipbook frames' : 'Templates'}
           </button>
-          <p className="admin-eyebrow">{templateId ? 'EDIT TEMPLATE' : 'NEW TEMPLATE'}</p>
-          <h1>{templateId ? draft.name || 'Edit template' : 'New photo strip template'}</h1>
+          <p className="admin-eyebrow">{templateId ? `EDIT ${isFlipbook ? 'FLIPBOOK' : 'PHOTO STRIP'} TEMPLATE` : `NEW ${isFlipbook ? 'FLIPBOOK' : 'PHOTO STRIP'} TEMPLATE`}</p>
+          <h1>{templateId ? draft.name || 'Edit template' : `New ${isFlipbook ? 'Flipbook' : 'photo strip'} template`}</h1>
         </div>
         <div className="editor-header-actions">
           <button className="secondary-button" onClick={() => setPreview(true)} type="button">
@@ -372,9 +380,9 @@ export function TemplateEditor({
                 placeholder="e.g. Pioneers Strip"
               />
             </label>
-            <div className="toolbar-field">
-              <span className="toolbar-label">Orientation</span>
-              <div className="orientation-pills">
+              <div className="toolbar-field">
+                <span className="toolbar-label">Orientation</span>
+                {isFlipbook ? <span className="admin-muted">Portrait (4×6)</span> : <div className="orientation-pills">
                 <button
                   type="button"
                   className={`orientation-pill ${draft.orientation === 'portrait' ? 'active' : ''}`}
@@ -401,12 +409,12 @@ export function TemplateEditor({
                 >
                   Landscape (6×4)
                 </button>
+                </div>}
               </div>
-            </div>
-            <div className="preset-group">
+              {!isFlipbook && <div className="preset-group">
               <span className="toolbar-label">Layouts</span>
               <div className="preset-buttons">
-                {layoutPresets.map((preset) => (
+                    {layoutPresets.map((preset) => (
                   <button
                     aria-label={`${preset.label}, ${preset.captures} photos`}
                     key={preset.id}
@@ -424,9 +432,8 @@ export function TemplateEditor({
                     {preset.id}
                   </button>
                 ))}
-              </div>
+              </div></div>}
             </div>
-          </div>
 
           <div className="canvas-wrapper">
             <div
@@ -979,6 +986,10 @@ export function TemplateEditor({
             {/* BACKGROUND SECTION */}
             {(activeTab === 'all' || activeTab === 'background') && (
               <section className="inspector-card background-panel">
+                {isFlipbook && <div className="background-upload-card">
+                  <div className="panel-header"><div><h3 className="panel-title">COVER PHOTO</h3><p className="panel-subtitle">Shown when guests choose this Flipbook.</p></div></div>
+                  <div className="bg-preview-row"><div className="bg-thumbnail checkerboard">{coverSource ? <img alt="Cover preview" src={coverSource} /> : <span className="empty-thumb-placeholder">❖</span>}</div><div className="bg-actions"><label className="upload-button compact">{coverSource ? 'Change cover photo' : 'Upload Cover Photo'}<input accept="image/png,image/jpeg,image/svg+xml" onChange={(event) => { const file = event.target.files?.[0]; if (file) { setCoverFile(file); setCoverPreview(URL.createObjectURL(file)); setMessage('Cover photo ready. It uploads when you save.'); } }} type="file" /></label></div></div>
+                </div>}
                 <div className="panel-header">
                   <div>
                     <h3 className="panel-title">BACKGROUND IMAGE</h3>

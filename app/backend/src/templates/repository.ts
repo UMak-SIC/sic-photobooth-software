@@ -4,10 +4,12 @@ import { dimensionsFor, type Template, type TemplateDraft } from './types.js';
 type TemplateRow = {
   id: string;
   name: string;
+  type: Template['type'];
   orientation: Template['orientation'];
   output_width: 1200 | 1800;
   output_height: 1200 | 1800;
   background_path: string | null;
+  cover_path: string | null;
   background_x: number;
   background_y: number;
   background_width: number;
@@ -66,12 +68,14 @@ export function mapTemplate(
   return {
     id: row.id,
     name: row.name,
+    type: row.type,
     orientation: row.orientation,
     width: row.output_width,
     height: row.output_height,
     active: row.is_active,
     requiredCaptureCount: row.required_capture_count,
     backgroundPath: row.background_path,
+    coverPath: row.cover_path,
     sortOrder: row.sort_order,
     background: {
       x: Number(row.background_x),
@@ -105,10 +109,12 @@ export function mapTemplate(
 }
 
 const templateSelect = `
-  SELECT id, name, orientation, output_width, output_height, background_path,
+  SELECT id, name, type, orientation, output_width, output_height, background_path, cover_path,
     background_x, background_y, background_width, background_height, is_active,
     required_capture_count, sort_order, created_at, updated_at
   FROM templates`;
+
+export const isTemplateId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 
 export class TemplateRepository {
   private async hydrate(row: TemplateRow): Promise<Template> {
@@ -125,12 +131,13 @@ export class TemplateRepository {
     return mapTemplate(row, placements.rows, overlays.rows);
   }
 
-  public async list(): Promise<Template[]> {
-    const result = await pool.query<TemplateRow>(`${templateSelect} ORDER BY sort_order ASC NULLS LAST, name ASC`);
+  public async list(type?: Template['type']): Promise<Template[]> {
+    const result = await pool.query<TemplateRow>(`${templateSelect}${type ? ' WHERE type = $1' : ''} ORDER BY sort_order ASC NULLS LAST, name ASC`, type ? [type] : []);
     return Promise.all(result.rows.map((row) => this.hydrate(row)));
   }
 
   public async get(id: string): Promise<Template | null> {
+    if (!isTemplateId(id)) return null;
     const result = await pool.query<TemplateRow>(`${templateSelect} WHERE id = $1`, [id]);
     return result.rows[0] ? this.hydrate(result.rows[0]) : null;
   }
@@ -141,10 +148,11 @@ export class TemplateRepository {
     try {
       await client.query('BEGIN');
       const result = await client.query<TemplateRow>(
-        `INSERT INTO templates (name, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, required_capture_count)
-         VALUES ($1, $2, $3, $4, NULL, $5, $6, $7, $8, $9) RETURNING id, name, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
+        `INSERT INTO templates (name, type, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, required_capture_count)
+         VALUES ($1, $2, $3, $4, $5, NULL, $6, $7, $8, $9, $10) RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
         [
           draft.name,
+          draft.type,
           draft.orientation,
           dimensions.width,
           dimensions.height,
@@ -219,10 +227,11 @@ export class TemplateRepository {
       );
       const overlays = mergeOverlayAssetPaths(draft.overlays, existingOverlays.rows);
       const result = await client.query<TemplateRow>(
-        `UPDATE templates SET name=$2, orientation=$3, output_width=$4, output_height=$5, background_x=$6, background_y=$7, background_width=$8, background_height=$9, required_capture_count=$10, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
+        `UPDATE templates SET name=$2, type=$3, orientation=$4, output_width=$5, output_height=$6, background_x=$7, background_y=$8, background_width=$9, background_height=$10, required_capture_count=$11, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
         [
           id,
           draft.name,
+          draft.type,
           draft.orientation,
           dimensions.width,
           dimensions.height,
@@ -252,7 +261,7 @@ export class TemplateRepository {
 
   public async setActive(id: string, active: boolean): Promise<Template | null> {
     const result = await pool.query<TemplateRow>(
-      `UPDATE templates SET is_active=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
+      `UPDATE templates SET is_active=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
       [id, active],
     );
     return result.rows[0] ? this.hydrate(result.rows[0]) : null;
@@ -260,7 +269,15 @@ export class TemplateRepository {
 
   public async setBackgroundPath(id: string, path: string): Promise<Template | null> {
     const result = await pool.query<TemplateRow>(
-      `UPDATE templates SET background_path=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, orientation, output_width, output_height, background_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
+      `UPDATE templates SET background_path=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
+      [id, path],
+    );
+    return result.rows[0] ? this.hydrate(result.rows[0]) : null;
+  }
+
+  public async setCoverPath(id: string, path: string): Promise<Template | null> {
+    const result = await pool.query<TemplateRow>(
+      `UPDATE templates SET cover_path=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
       [id, path],
     );
     return result.rows[0] ? this.hydrate(result.rows[0]) : null;
