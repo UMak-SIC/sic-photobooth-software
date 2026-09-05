@@ -1,12 +1,37 @@
 import { useState } from 'react';
 import { useFlipbookStore } from '../store/flipbook-store';
+import { usePhotoStripStore } from '../store/photostrip-store';
 import { useSessionStore } from '../store/session-store';
 import { boothApi } from '../services/api';
 
 export function WelcomeExperienceScreen() {
-  const { setSession, setStep } = useFlipbookStore();
+  const { setSession: setFlipbookSession, setStep: setFlipbookStep } = useFlipbookStore();
+  const { setSession: setPhotoStripSession, setStep: setPhotoStripStep } = usePhotoStripStore();
   const { setActiveSession } = useSessionStore();
   const [loading, setLoading] = useState(false);
+
+  const handleStartPhotoStrip = async () => {
+    setLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const session = await boothApi.createSession(
+        'SIC General Assembly',
+        today,
+        'Operator',
+        'photo_strip',
+      );
+      setPhotoStripSession(session.sessionId, session.token);
+      setActiveSession({ id: session.sessionId, type: 'photo_strip', token: session.token });
+      setPhotoStripStep('template_select');
+    } catch {
+      // Offline fallback
+      setPhotoStripSession('mock-photo-strip-session-id', 'mock-token');
+      setActiveSession({ id: 'mock-photo-strip-session-id', type: 'photo_strip' });
+      setPhotoStripStep('template_select');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleStartFlipbook = async () => {
     setLoading(true);
@@ -18,14 +43,14 @@ export function WelcomeExperienceScreen() {
         'Operator',
         'flipbook',
       );
-      setSession(session.sessionId, session.token);
-      setActiveSession({ id: session.sessionId, type: 'flipbook' });
-      setStep('frame_select');
+      setFlipbookSession(session.sessionId, session.token);
+      setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
+      setFlipbookStep('frame_select');
     } catch {
       // Offline fallback
-      setSession('mock-flipbook-session-id', 'mock-token');
+      setFlipbookSession('mock-flipbook-session-id', 'mock-token');
       setActiveSession({ id: 'mock-flipbook-session-id', type: 'flipbook' });
-      setStep('frame_select');
+      setFlipbookStep('frame_select');
     } finally {
       setLoading(false);
     }
@@ -44,13 +69,16 @@ export function WelcomeExperienceScreen() {
         {/* Photo Strips */}
         <button
           type="button"
-          disabled
-          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754]/40 px-12 py-12 transition opacity-60 cursor-not-allowed"
+          disabled={loading}
+          onClick={handleStartPhotoStrip}
+          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99] cursor-pointer"
         >
-          <div className="visual-strip size-40 rounded-2xl bg-[#0e473d]/40 flex items-center justify-center font-bold text-white/50 text-base">
+          <div className="visual-strip size-40 rounded-2xl bg-[#0e473d] flex items-center justify-center font-black text-[#9ef0dc] text-xl shadow-inner">
             PHOTO STRIP
           </div>
-          <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">PHOTO STRIPS</h5>
+          <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
+            {loading ? 'Starting...' : 'PHOTO STRIPS'}
+          </h5>
         </button>
 
         {/* Flipbook */}
