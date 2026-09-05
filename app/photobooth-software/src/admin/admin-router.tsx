@@ -6,6 +6,9 @@ import { layoutPlacements } from './templates/presets';
 import { useTemplateStore } from './templates/template-store';
 import { draftFromTemplate, emptyDraft, type Template } from './templates/types';
 import { PublicationDashboard } from './publications/publication-dashboard';
+import { AdminEventsPage } from '../pages/AdminEventsPage';
+
+type Frame = { id: string; name: string; isActive: boolean };
 
 export function AdminRouter() {
   const [path, setPath] = useState(window.location.pathname);
@@ -32,7 +35,7 @@ export function AdminRouter() {
 
   if (path === '/admin/templates')
     return (
-      <AdminFrame>
+      <AdminFrame onNavigate={navigate}>
         <TemplateLibrary
           templates={templates}
           error={error}
@@ -94,11 +97,13 @@ export function AdminRouter() {
       </AdminFrame>
     );
 
-  if (path === '/admin/publications') return <AdminFrame><PublicationDashboard /></AdminFrame>;
+  if (path === '/admin/events') return <AdminFrame onNavigate={navigate}><AdminEventsPage /></AdminFrame>;
+  if (path === '/admin/frames') return <AdminFrame onNavigate={navigate}><AdminFramesPage /></AdminFrame>;
+  if (path === '/admin/publications') return <AdminFrame onNavigate={navigate}><PublicationDashboard /></AdminFrame>;
 
   const id = path.startsWith('/admin/templates/') ? path.split('/').at(-1) : undefined;
   return (
-    <AdminFrame>
+    <AdminFrame onNavigate={navigate}>
       <TemplateEditor
         templateId={id === 'new' ? undefined : id}
         initialTemplate={store.saved}
@@ -119,16 +124,58 @@ export function AdminRouter() {
   );
 }
 
-function AdminFrame({ children }: { children: React.ReactNode }) {
+function AdminFrame({ children, onNavigate }: { children: React.ReactNode; onNavigate: (path: string) => void }) {
   return (
     <main className="admin-app">
       <aside className="admin-sidebar">
         <div className="admin-brand"><span className="admin-mark">SIC</span><strong>SIC BOOTH</strong></div>
         <p className="admin-eyebrow">OPERATIONS</p>
-        <nav aria-label="Administration"><a href="/admin/templates">Templates</a><span>Events</span><span>Flipbook frames</span><a href="/admin/publications">Publications</a></nav>
+        <nav aria-label="Administration">
+          {[
+            ['/admin/events', 'Events'],
+            ['/admin/templates', 'Templates'],
+            ['/admin/frames', 'Flipbook frames'],
+            ['/admin/publications', 'Publications'],
+          ].map(([path, label]) => (
+            <a href={path} key={path} onClick={(event) => { event.preventDefault(); onNavigate(path); }}>{label}</a>
+          ))}
+        </nav>
         <p className="admin-operator">Mika Santos<br /><span>Operator</span></p>
       </aside>
       <section className="admin-content">{children}</section>
     </main>
+  );
+}
+
+function AdminFramesPage() {
+  const [frames, setFrames] = useState<Frame[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/frames')
+      .then(async (response) => {
+        if (!response.ok) throw new Error('Could not load frames.');
+        const body = (await response.json()) as { data: Frame[] };
+        setFrames(body.data);
+      })
+      .catch((cause: Error) => setError(cause.message));
+  }, []);
+
+  return (
+    <div className="admin-page">
+      <header className="admin-page-header">
+        <div>
+          <p className="admin-eyebrow">FLIPBOOK FRAMES</p>
+          <h1>Frame library</h1>
+          <p className="admin-muted">Frames available for Flipbook sessions.</p>
+        </div>
+      </header>
+      {error && <p className="admin-error" role="alert">{error}</p>}
+      {frames.length === 0 && !error ? <div className="admin-empty"><strong>No frames yet.</strong></div> : (
+        <div className="template-grid">
+          {frames.map((frame) => <article className="template-card" key={frame.id}><div className="template-card-body"><h2>{frame.name}</h2><span className={frame.isActive ? 'status active' : 'status'}>{frame.isActive ? 'Active' : 'Inactive'}</span></div></article>)}
+        </div>
+      )}
+    </div>
   );
 }
