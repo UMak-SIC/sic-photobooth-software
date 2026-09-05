@@ -99,10 +99,10 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0701** | Implement Captive Portal home page with QR camera scanner and fallback manual URL/code input | `app/captive-website` | US-105, US-106, US-107, Arch § Captive Portal | Provides smooth camera QR scan and reliable manual input fallback. | `[ ] Planned` |
-| **TSK-0702** | Implement public ID extraction integration using `packages/public-output` | `app/captive-website` | US-107, Arch § Offline Local Retrieval | Scanned full URL extracts 7-char base-62 ID without browser redirection. | `[ ] Planned` |
-| **TSK-0703** | Implement local output retrieval client connecting to local Fastify backend (`/photos/:id`) | `app/captive-website` | US-108, US-111, US-112, US-113, US-115 | Fetches only finalized/approved assets; zero exposure of admin/booth controls. | `[ ] Planned` |
-| **TSK-0704** | Implement processing state feedback and "Photo not found" recovery error screen | `app/captive-website` | US-109, US-110, Contract § Events/Errors | Displays exact user messages specified in Authoritative Implementation Contract. | `[ ] Planned` |
+| **TSK-0701** | Implement Captive Portal home page with QR camera scanner and fallback manual URL/code input | `app/captive-website` | US-105, US-106, US-107, Arch § Captive Portal | Provides smooth camera QR scan and reliable manual input fallback. | `[x] Completed` |
+| **TSK-0702** | Implement public ID extraction integration using `packages/public-output` | `app/captive-website` | US-107, Arch § Offline Local Retrieval | Scanned full URL extracts 7-char base-62 ID without browser redirection. | `[x] Completed` |
+| **TSK-0703** | Implement local output retrieval client connecting to local Fastify backend (`/photos/:id`) | `app/captive-website` | US-108, US-111, US-112, US-113, US-115 | Fetches only finalized/approved assets; zero exposure of admin/booth controls. | `[x] Completed` |
+| **TSK-0704** | Implement processing state feedback and "Photo not found" recovery error screen | `app/captive-website` | US-109, US-110, Contract § Events/Errors | Displays exact user messages specified in Authoritative Implementation Contract. | `[x] Completed` |
 
 ---
 

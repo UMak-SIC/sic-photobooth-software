@@ -50,4 +50,28 @@ describe('Fastify Server Routes', () => {
       'Photo not found. Check the QR code or enter the full link/code again.',
     );
   });
+
+  it('GET /photos/:id/info with invalid ID returns 400', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/photos/invalid_id/info',
+    });
+
+    expect(response.statusCode).toBe(400);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('INVALID_PUBLIC_ID');
+  });
+
+  it('GET /photos/:id/info with non-existent ID returns 404', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/photos/7fK92pQ/info',
+    });
+
+    expect(response.statusCode).toBe(404);
+    const body = JSON.parse(response.body);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('PHOTO_NOT_FOUND');
+  });
 });
