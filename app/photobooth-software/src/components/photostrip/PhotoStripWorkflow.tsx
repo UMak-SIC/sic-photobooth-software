@@ -171,7 +171,7 @@ export const PhotoStripWorkflow: React.FC = () => {
   if (currentStep === 'setup') {
     return (
       <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
-        <EventSelectScreen onContinue={handleEventContinue} />
+        <EventSelectScreen onContinue={handleEventContinue} onBack={handleFinish} />
       </div>
     );
   }

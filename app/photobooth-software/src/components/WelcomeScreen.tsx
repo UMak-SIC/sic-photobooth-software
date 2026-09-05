@@ -1,18 +1,15 @@
-import { useState } from 'react';
 import { useFlipbookStore } from '../store/flipbook-store';
 import { usePhotoStripStore } from '../store/photostrip-store';
 import { useSessionStore } from '../store/session-store';
-import { boothApi } from '../services/api';
 
 export interface WelcomeScreenProps {
   preview?: boolean;
 }
 
 export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
-  const { setSession: setFlipbookSession, setStep: setFlipbookStep } = useFlipbookStore();
+  const { setStep: setFlipbookStep } = useFlipbookStore();
   const { setStep: setPhotoStripStep } = usePhotoStripStore();
   const { setActiveSession } = useSessionStore();
-  const [loading, setLoading] = useState(false);
 
   const handleStartPhotoStrip = () => {
     if (preview) return;
@@ -20,28 +17,10 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
     setPhotoStripStep('setup');
   };
 
-  const handleStartFlipbook = async () => {
+  const handleStartFlipbook = () => {
     if (preview) return;
-    setLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const session = await boothApi.createSession(
-        'SIC General Assembly',
-        today,
-        'Operator',
-        'flipbook',
-      );
-      setFlipbookSession(session.sessionId, session.token);
-      setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
-      setFlipbookStep('instructions');
-    } catch {
-      // Offline fallback
-      setFlipbookSession('mock-flipbook-session-id', 'mock-token');
-      setActiveSession({ id: 'mock-flipbook-session-id', type: 'flipbook' });
-      setFlipbookStep('instructions');
-    } finally {
-      setLoading(false);
-    }
+    setActiveSession({ id: '', type: 'flipbook' });
+    setFlipbookStep('setup');
   };
 
   return (
@@ -57,7 +36,6 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
         {/* Photo Strips */}
         <button
           type="button"
-          disabled={loading}
           onClick={handleStartPhotoStrip}
           className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99] cursor-pointer"
         >
@@ -65,22 +43,21 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
             PHOTO STRIP
           </div>
           <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
-            {loading ? 'Starting...' : 'PHOTO STRIPS'}
+            PHOTO STRIPS
           </h5>
         </button>
 
         {/* Flipbook */}
         <button
           type="button"
-          disabled={loading}
           onClick={handleStartFlipbook}
-          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99]"
+          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99] cursor-pointer"
         >
           <div className="visual-flip size-40 rounded-2xl bg-[#0e473d] flex items-center justify-center font-black text-[#9ef0dc] text-xl shadow-inner">
             FLIPBOOK
           </div>
           <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
-            {loading ? 'Starting...' : 'FLIPBOOK'}
+            FLIPBOOK
           </h5>
         </button>
       </div>

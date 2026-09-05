@@ -6,6 +6,7 @@ import { boothApi } from '../../services/api';
 export interface EventSelectScreenProps {
   preview?: boolean;
   onContinue?: (selectedEvent: Event, operatorName: string) => void;
+  onBack?: () => void;
 }
 
 const DEFAULT_EVENTS: Event[] = [
@@ -13,7 +14,7 @@ const DEFAULT_EVENTS: Event[] = [
   { id: '2', name: 'College Week 2026', date: 'June 18, 2026', operatorName: 'J. Domingo' },
 ];
 
-export function EventSelectScreen({ preview = false, onContinue }: EventSelectScreenProps) {
+export function EventSelectScreen({ preview = false, onContinue, onBack }: EventSelectScreenProps) {
   const [events, setEvents] = useState<Event[]>(DEFAULT_EVENTS);
   const [selectedId, setSelectedId] = useState<string>('1');
   const [operatorName, setOperatorName] = useState<string>('Mika Santos');
@@ -74,6 +75,15 @@ export function EventSelectScreen({ preview = false, onContinue }: EventSelectSc
     <div className="artboard relative flex h-full min-h-[780px] w-full items-center justify-center overflow-hidden bg-[#ecfff8] text-[#113b33]">
       <div className="mx-auto grid w-full max-w-[1100px] grid-cols-[1fr_300px] gap-14 px-14 py-10">
         <div>
+          {onBack && !isCreating && !preview && (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-[#28806c] hover:text-[#146a56] transition cursor-pointer"
+            >
+              ← Back to experience choice
+            </button>
+          )}
           <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">EVENT DETAILS</p>
           <h4 className="mt-3 text-[44px] font-black tracking-[-0.06em]">Select the event.</h4>
 
