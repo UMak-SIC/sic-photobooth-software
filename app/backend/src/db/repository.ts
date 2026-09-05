@@ -705,7 +705,6 @@ export class DatabaseRepository {
             throw new Error('Maximum retake limit of 4 reached for this session');
           }
 
-          await client.query(
           const updCapRes = await client.query(
             `UPDATE session_captures
              SET file_path = $3, created_at = CURRENT_TIMESTAMP
