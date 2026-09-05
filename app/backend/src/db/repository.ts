@@ -1341,6 +1341,44 @@ export class DatabaseRepository {
     }
   }
 
+  /**
+   * Retrieves the latest generated output for a session.
+   */
+  public async getLatestOutputForSession(sessionId: string): Promise<OutputItem | null> {
+    try {
+      const query = `
+        SELECT
+          o.id,
+          o.session_id AS "sessionId",
+          o.public_id AS "publicId",
+          o.media_type AS "mediaType",
+          o.file_path AS "filePath",
+          o.width,
+          o.height,
+          o.created_at AS "createdAt",
+          e.name AS "eventName",
+          e.date::text AS "eventDate"
+        FROM generated_outputs o
+        JOIN sessions s ON o.session_id = s.id
+        JOIN events e ON s.event_id = e.id
+        WHERE o.session_id = $1
+        ORDER BY o.created_at DESC
+        LIMIT 1
+      `;
+      const res = await pool.query(query, [sessionId]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    for (const output of this.inMemoryOutputs.values()) {
+      if (output.sessionId === sessionId) {
+        return output;
+      }
+    }
+    return null;
+  }
+
   private readonly templateSelectFields = `
     SELECT
       t.id,
@@ -1838,7 +1876,7 @@ export class DatabaseRepository {
             copies_printed = copies_printed + $2,
             state = 'printed',
             last_activity_at = CURRENT_TIMESTAMP
-        WHERE id = $1 AND state = 'booth_confirmed'
+        WHERE id = $1 AND (state = 'booth_confirmed' OR state = 'printed')
         RETURNING
           id,
           token,
@@ -1862,7 +1900,7 @@ export class DatabaseRepository {
     }
 
     const session = this.inMemorySessions.get(sessionId);
-    if (session && session.state === 'booth_confirmed') {
+    if (session && (session.state === 'booth_confirmed' || session.state === 'printed')) {
       session.isPrinted = true;
       session.copiesPrinted += copiesPrinted;
       session.state = 'printed';

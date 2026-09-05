@@ -10,7 +10,10 @@ import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
 import { flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
+import { printerService } from '../services/printer.js';
 import type { SessionType } from '@photobooth/public-output';
+import { templateRepository } from '../templates/repository.js';
+import { toTemplateDto } from '../templates/routes.js';
 
 const createSessionSchema = z.object({
   eventName: z.string().min(1),
@@ -38,6 +41,7 @@ const selectFlipbookSchema = z.object({
 
 const printSessionSchema = z.object({
   copies: z.number().int().min(1).default(1),
+  recordOnly: z.boolean().optional(),
 });
 
 function isSessionAuthorized(
@@ -78,19 +82,19 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // 0b. List active templates for Photo Strip
+  // 0b. List active templates for Photo Strip (unifies with canonical templateRepository)
   fastify.get('/api/templates', async (_request, reply) => {
     try {
-      const templates = await dbRepository.listActiveTemplates();
+      const all = await templateRepository.list();
       return reply.send({
         success: true,
-        data: templates,
+        data: all.filter((t) => t.active).map(toTemplateDto),
       });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
+    } catch {
+      const fallback = await dbRepository.listActiveTemplates();
+      return reply.send({
+        success: true,
+        data: fallback,
       });
     }
   });
@@ -451,9 +455,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           return undefined;
         };
 
-        const isRetake = data.fields?.isRetake
-          ? getFieldValue(data.fields.isRetake) === 'true' || session.state === 'review'
-          : session.state === 'review';
+        const query = request.query as { captureIndex?: string; isRetake?: string } | undefined;
+        const isRetake =
+          query?.isRetake === 'true' ||
+          (data.fields?.isRetake && getFieldValue(data.fields.isRetake) === 'true') ||
+          session.state === 'review';
 
         if (isRetake && session.retakeCount >= 4) {
           return reply.status(400).send({
@@ -471,7 +477,10 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             ? (snapshot.requiredCaptureCount as number)
             : 3;
 
-        const rawIndexStr = getFieldValue(data.fields?.captureIndex);
+        const queryIndex = query?.captureIndex;
+        const fieldIndex = getFieldValue(data.fields?.captureIndex);
+        const filenameIndex = data.filename?.match(/photo_(\d+)/)?.[1];
+        const rawIndexStr = queryIndex || fieldIndex || filenameIndex;
         const rawIndex = rawIndexStr ? parseInt(rawIndexStr, 10) : 1;
         if (!Number.isInteger(rawIndex) || rawIndex < 1 || rawIndex > targetCount) {
           return reply.status(400).send({
@@ -1106,12 +1115,14 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // 10c. Print Recording (Firefox/CUPS handoff)
+  // 10c. Print Recording (Direct CUPS printing / manual record)
   fastify.post<{ Params: { id: string } }>('/api/sessions/:id/print', async (request, reply) => {
     const { id } = request.params;
     const sessionToken = request.headers['x-session-token'];
 
     const parseResult = printSessionSchema.safeParse(request.body || {});
     const copies = parseResult.success ? parseResult.data.copies : 1;
+    const recordOnly = parseResult.success ? !!parseResult.data.recordOnly : false;
 
     try {
       const session = await dbRepository.getSessionById(id);
@@ -1141,11 +1152,36 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       sessionStateMachine.assertValidTransition(session.type, session.state, 'printed');
 
+      let printJobId: string | undefined;
+
+      if (!recordOnly) {
+        const output = await dbRepository.getLatestOutputForSession(id);
+        if (output && output.filePath) {
+          const printResult = await printerService.printImage(output.filePath, copies);
+          if (!printResult.success) {
+            return reply.status(502).send({
+              success: false,
+              error: {
+                code: 'PRINT_FAILED',
+                message:
+                  'Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.',
+                details: printResult.error,
+              },
+            });
+          }
+          printJobId = printResult.jobId;
+        }
+      }
+
       const updated = await dbRepository.recordPrintStatus(id, copies);
 
       return reply.send({
         success: true,
         data: stripToken(updated),
+        data: {
+          ...stripToken(updated),
+          jobId: printJobId,
+        },
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

@@ -7,6 +7,8 @@ describe('template layouts', () => {
       for (const placement of layoutPlacements(preset.id)) {
         expect(placement.width).toBeGreaterThan(0);
         expect(placement.height).toBeGreaterThan(0);
+        expect(Number.isInteger(placement.width)).toBe(true);
+        expect(Number.isInteger(placement.height)).toBe(true);
       }
     }
   });

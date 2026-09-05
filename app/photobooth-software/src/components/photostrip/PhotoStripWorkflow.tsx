@@ -6,7 +6,7 @@ import { TemplatePicker } from './TemplatePicker';
 import { CameraViewfinder } from '../CameraViewfinder';
 import { PhotoStripReview, type ReviewTemplate } from './PhotoStripReview';
 import { PrintModal } from './PrintModal';
-import { boothApi, type EventItem } from '../../services/api';
+import { boothApi, API_BASE_URL, type EventItem } from '../../services/api';
 
 export const PhotoStripWorkflow: React.FC = () => {
   const {
@@ -24,6 +24,8 @@ export const PhotoStripWorkflow: React.FC = () => {
     outputImageUrl,
     isConfirming,
     errorMessage,
+    isPrinted,
+    copiesPrinted,
     setSession,
     setSelectedEvent,
     setStep,
@@ -35,6 +37,7 @@ export const PhotoStripWorkflow: React.FC = () => {
     setConfirmedOutput,
     setIsConfirming,
     setError,
+    recordPrintSuccess,
     resetPhotoStrip,
   } = usePhotoStripStore();
 
@@ -130,7 +133,7 @@ export const PhotoStripWorkflow: React.FC = () => {
     try {
       if (sessionId && !sessionId.startsWith('mock-')) {
         const result = await boothApi.confirmPhotoStrip(sessionId);
-        const imageUrl = `http://localhost:3000/photos/${result.publicId}`;
+        const imageUrl = `${API_BASE_URL}/photos/${result.publicId}`;
         setConfirmedOutput(result.publicId, result.qrUrl, imageUrl);
       } else {
         const demoId = 'M7p4XaV';
@@ -152,13 +155,13 @@ export const PhotoStripWorkflow: React.FC = () => {
 
   // 6. Print Recording
   const handlePrint = async (copies: number) => {
+  // 6. Print Recording / Dispatch
+  const handlePrint = async (copies: number, recordOnly?: boolean) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
-      try {
-        await boothApi.recordPrint(sessionId, copies);
-      } catch (err) {
-        console.warn('Record print failed:', err);
-      }
+      await boothApi.recordPrint(sessionId, copies);
+      await boothApi.recordPrint(sessionId, copies, recordOnly);
     }
+    recordPrintSuccess(copies);
   };
 
   // 7. Finish & Return
@@ -185,7 +188,10 @@ export const PhotoStripWorkflow: React.FC = () => {
   }
 
   if (currentStep === 'capturing') {
-    const totalSlots = selectedTemplate?.placements.length || 3;
+    const totalSlots = selectedTemplate
+      ? (selectedTemplate.requiredCaptureCount ??
+         new Set(selectedTemplate.placements.map((p) => p.captureIndex)).size)
+      : 3;
     return (
       <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a]">
         <CameraViewfinder
@@ -224,6 +230,12 @@ export const PhotoStripWorkflow: React.FC = () => {
           publicId={publicId || 'M7p4XaV'}
           qrUrl={qrUrl || 'https://myphotobooth.com/M7p4XaV'}
           outputImageUrl={outputImageUrl || captures[0]?.dataUrl || ''}
+          templateName={selectedTemplate?.name}
+          orientation={selectedTemplate?.orientation}
+          outputWidth={selectedTemplate?.outputWidth}
+          outputHeight={selectedTemplate?.outputHeight}
+          isPrinted={isPrinted}
+          copiesPrinted={copiesPrinted}
           onPrintConfirmed={handlePrint}
           onFinishSession={handleFinish}
         />

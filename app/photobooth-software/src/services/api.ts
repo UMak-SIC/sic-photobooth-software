@@ -1,6 +1,15 @@
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+export const resolveAssetUrl = (relativeUrl: string | null): string | null => {
+  if (!relativeUrl) return null;
+  if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://') || relativeUrl.startsWith('data:')) {
+    return relativeUrl;
+  }
+  return new URL(relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`, API_BASE_URL).toString();
+};
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -149,7 +158,7 @@ export class BoothApiClient {
   }
 
   public async listTemplates(): Promise<ReviewTemplate[]> {
-    const res = await fetch(`${API_BASE_URL}/api/templates`);
+    const res = await fetch(`${API_BASE_URL}/templates?active=true`);
     const body: ApiResponse<ReviewTemplate[]> = await res.json();
     if (!res.ok || !body.success || !body.data) {
       throw new Error(body.error?.message || 'Failed to list templates');
@@ -323,10 +332,16 @@ export class BoothApiClient {
   }
 
   public async recordPrint(sessionId: string, copies: number = 1): Promise<void> {
+  public async recordPrint(
+    sessionId: string,
+    copies: number = 1,
+    recordOnly?: boolean,
+  ): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/print`, {
       method: 'POST',
       headers: this.getHeaders('application/json'),
       body: JSON.stringify({ copies }),
+      body: JSON.stringify({ copies, recordOnly }),
     });
     const body: ApiResponse = await res.json();
     if (!res.ok || !body.success) {

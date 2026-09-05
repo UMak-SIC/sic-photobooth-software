@@ -111,13 +111,22 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
   if (preview) {
     return (
       <div className="artboard relative h-full min-h-[780px] w-full overflow-hidden bg-[#071d1a] text-white">
-        <div className="camera-scene absolute inset-0 rounded-none">
+        <div className="absolute inset-0 bg-[#071d1a]">
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)]" />
           <div className="absolute left-9 top-8 rounded-full bg-black/30 px-4 py-2 text-[12px] font-bold text-white backdrop-blur-sm">
             CAMERA 01
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-8">
+        {/* Low opacity Get Ready screen */}
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/40 backdrop-blur-xs text-center">
+          <h3 className="text-[52px] md:text-[68px] font-black tracking-tight text-white uppercase drop-shadow-2xl animate-pulse">
+            Get Ready!
+          </h3>
+          <p className="mt-2 text-[15px] font-bold text-[#a8f3dd] tracking-wider uppercase">
+            Hold your pose
+          </p>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 z-20 flex items-end justify-between p-8">
           <div className="backdrop-blur-md rounded-2xl bg-black/30 px-7 py-5 text-white">
             <p className="text-[12px] font-bold tracking-wide text-[#a8f3dd]">NEXT CAPTURE</p>
             <p className="mt-2 text-[56px] font-black leading-none tracking-[-0.07em]">05</p>
@@ -152,9 +161,18 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
         className="absolute inset-0 size-full object-cover -scale-x-100"
       />
 
-      {/* Fallback pattern when camera is starting or unavailable */}
-      {!isActive && !activeError && (
-        <div className="camera-scene absolute inset-0 opacity-80" />
+      {/* Low-opacity screen that says Get Ready! before taking photo / while camera initializes or gets ready */}
+      {(!isActive && !activeError) && (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/50 backdrop-blur-xs text-center transition-opacity duration-300">
+          <div className="flex flex-col items-center">
+            <h3 className="text-[52px] md:text-[68px] font-black tracking-tight text-white uppercase drop-shadow-2xl animate-pulse">
+              Get Ready!
+            </h3>
+            <p className="mt-2 text-[15px] font-bold text-[#a8f3dd] tracking-wider uppercase">
+              {isRetaking ? `Retaking photo #${activeSlotIndex}` : `Photo ${activeSlotIndex} of ${totalSlots}`}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Subtle Scene Vignette */}

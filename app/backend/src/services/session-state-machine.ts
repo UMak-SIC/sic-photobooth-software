@@ -31,7 +31,7 @@ const PHOTO_STRIP_VALID_TRANSITIONS: Record<PhotoStripState, PhotoStripState[]> 
   capturing: ['review', 'capturing', 'cancelled'],
   review: ['capturing', 'booth_confirmed', 'cancelled'], // capturing on retake
   booth_confirmed: ['printed'],
-  printed: [],
+  printed: ['printed'],
   cancelled: [],
 };
 

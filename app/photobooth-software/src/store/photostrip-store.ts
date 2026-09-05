@@ -33,6 +33,8 @@ export interface PhotoStripState {
   outputImageUrl: string | null;
   isConfirming: boolean;
   errorMessage: string | null;
+  isPrinted: boolean;
+  copiesPrinted: number;
 
   setSession: (sessionId: string, token: string) => void;
   setSelectedEvent: (event: PhotoStripEvent | null) => void;
@@ -45,6 +47,7 @@ export interface PhotoStripState {
   setConfirmedOutput: (publicId: string, qrUrl: string, outputImageUrl: string) => void;
   setIsConfirming: (isConfirming: boolean) => void;
   setError: (error: string | null) => void;
+  recordPrintSuccess: (copies: number) => void;
   resetPhotoStrip: () => void;
 }
 
@@ -65,10 +68,18 @@ const initialState = {
   outputImageUrl: null,
   isConfirming: false,
   errorMessage: null,
+  isPrinted: false,
+  copiesPrinted: 0,
 };
 
 export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
   ...initialState,
+
+  recordPrintSuccess: (copies: number) =>
+    set((state) => ({
+      isPrinted: true,
+      copiesPrinted: state.copiesPrinted + copies,
+    })),
 
   setSelectedEvent: (selectedEvent) => set({ selectedEvent }),
 
@@ -117,7 +128,10 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       return;
     }
 
-    const totalNeeded = state.selectedTemplate?.placements.length || 3;
+    const totalNeeded = state.selectedTemplate
+      ? (state.selectedTemplate.requiredCaptureCount ??
+         new Set(state.selectedTemplate.placements.map((p) => p.captureIndex)).size)
+      : 3;
     if (targetSlot < totalNeeded) {
       set({
         captures: updatedCaptures,

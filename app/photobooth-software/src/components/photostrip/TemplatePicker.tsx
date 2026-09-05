@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { ReviewTemplate } from './PhotoStripReview';
-import { boothApi } from '../../services/api';
+import { boothApi, resolveAssetUrl } from '../../services/api';
 
 export interface TemplatePickerProps {
   preview?: boolean;
@@ -104,29 +104,121 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
         <div className="mt-10 grid w-full max-w-[1000px] grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 text-left">
           {templates.map((template) => {
             const isSelected = template.id === selectedId;
+            const cardWidth = template.outputWidth || 1200;
+            const cardHeight = template.outputHeight || 1800;
+            const isLandscape = template.orientation === 'landscape' || cardWidth > cardHeight;
+            const uniquePhotosCount =
+              template.requiredCaptureCount ??
+              new Set(template.placements.map((p) => p.captureIndex)).size;
+            const bgUrl = resolveAssetUrl(template.backgroundPath ?? null);
+
             return (
               <button
                 key={template.id}
                 type="button"
                 onClick={() => setSelectedId(template.id)}
-                className={`rounded-2xl border p-4 text-left transition active:scale-[0.99] cursor-pointer ${
+                className={`flex flex-col justify-between rounded-2xl border p-4 text-left transition active:scale-[0.99] cursor-pointer ${
                   isSelected
-                    ? 'border-[#1a7e67] bg-[#e7fff7] ring-2 ring-[#79d6bf]/60 shadow-sm'
-                    : 'border-[#c0e2d8] bg-white hover:border-[#8ec5b6]'
+                    ? 'border-[#1a7e67] bg-[#e7fff7] ring-2 ring-[#79d6bf]/60 shadow-md'
+                    : 'border-[#c0e2d8] bg-white hover:border-[#8ec5b6] shadow-xs'
                 }`}
               >
-                <div className={`template-art ${isSelected ? 'template-pioneers' : ''}`}>
-                  <span>
-                    SIC
-                    <br />
-                    2026
-                  </span>
+                {/* Dynamic Mini-Preview Artboard */}
+                <div className="relative mb-3 flex h-[230px] w-full items-center justify-center overflow-hidden rounded-xl bg-gray-50/50 p-2">
+                  <div
+                    className={`mini-canvas ${isLandscape ? 'landscape' : ''} shadow-md rounded-lg overflow-hidden`}
+                    style={{
+                      height: isLandscape ? 'auto' : '100%',
+                      width: isLandscape ? '100%' : 'auto',
+                      maxHeight: '210px',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {/* Background */}
+                    {bgUrl && (
+                      <img
+                        src={bgUrl}
+                        alt=""
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        style={
+                          template.background
+                            ? {
+                                left: `${(template.background.x / cardWidth) * 100}%`,
+                                top: `${(template.background.y / cardHeight) * 100}%`,
+                                width: `${(template.background.width / cardWidth) * 100}%`,
+                                height: `${(template.background.height / cardHeight) * 100}%`,
+                              }
+                            : { left: 0, top: 0, width: '100%', height: '100%' }
+                        }
+                      />
+                    )}
+
+                    {/* Overlays */}
+                    {template.overlays?.map((overlay, idx) => {
+                      const overlayUrl = resolveAssetUrl(overlay.path || overlay.assetPath || null);
+                      if (!overlayUrl) return null;
+                      return (
+                        <img
+                          key={overlay.id || idx}
+                          src={overlayUrl}
+                          alt=""
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          style={{
+                            left: `${(overlay.x / cardWidth) * 100}%`,
+                            top: `${(overlay.y / cardHeight) * 100}%`,
+                            width: `${(overlay.width / cardWidth) * 100}%`,
+                            height: `${(overlay.height / cardHeight) * 100}%`,
+                            transform: overlay.rotation ? `rotate(${overlay.rotation}deg)` : undefined,
+                            zIndex: overlay.zIndex ?? 5,
+                          }}
+                        />
+                      );
+                    })}
+
+                    {/* Placements */}
+                    {template.placements
+                      .slice()
+                      .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+                      .map((p) => (
+                        <span
+                          key={p.id ?? `${p.captureIndex}-${p.x}-${p.y}`}
+                          style={{
+                            left: `${(p.x / cardWidth) * 100}%`,
+                            top: `${(p.y / cardHeight) * 100}%`,
+                            width: `${(p.width / cardWidth) * 100}%`,
+                            height: `${(p.height / cardHeight) * 100}%`,
+                            borderRadius: p.borderRadius
+                              ? `${(p.borderRadius / cardWidth) * 100}%`
+                              : '4px',
+                            transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
+                            zIndex: p.zIndex ?? 1,
+                          }}
+                        >
+                          {p.captureIndex}
+                        </span>
+                      ))}
+                  </div>
                 </div>
-                <strong className="mt-4 block text-[17px] text-[#113b33]">{template.name}</strong>
-                <small className="mt-1 block text-[13px] text-[#5b8176]">
-                  {template.placements.length} photos ·{' '}
-                  <span className="capitalize">{template.orientation}</span>
-                </small>
+
+                {/* Metadata & Labels */}
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <strong className="block text-[17px] font-bold text-[#113b33] truncate">
+                      {template.name}
+                    </strong>
+                    <span className="rounded-md bg-[#1b6d5b]/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#186453]">
+                      {template.orientation}
+                    </span>
+                  </div>
+                  <small className="mt-1 block text-[13px] text-[#5b8176]">
+                    {uniquePhotosCount} {uniquePhotosCount === 1 ? 'photo' : 'photos'} ·{' '}
+                    <span>{template.countdownSeconds || 5}s timer</span>
+                  </small>
+                </div>
               </button>
             );
           })}
