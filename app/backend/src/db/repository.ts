@@ -11,6 +11,27 @@ export interface EventData {
 }
 
 export class DatabaseRepository {
+  public async listEvents(): Promise<EventData[]> {
+    const result = await pool.query(`
+      SELECT id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+      FROM events
+      ORDER BY date DESC, name ASC
+    `);
+    return result.rows;
+  }
+
+  public async createEvent(name: string, date: string, operatorName: string): Promise<EventData> {
+    const result = await pool.query(
+      `
+        INSERT INTO events (name, date, operator_name)
+        VALUES ($1, $2, $3)
+        RETURNING id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+      `,
+      [name, date, operatorName],
+    );
+    return result.rows[0];
+  }
+
   /**
    * Creates or returns an existing event by name and date.
    */

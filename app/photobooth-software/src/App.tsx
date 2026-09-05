@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AdminEventsPage } from './pages/AdminEventsPage';
 
 type Category = 'all' | 'guest' | 'admin';
 
@@ -697,7 +698,7 @@ function Processing() {
 function AdminScreen({ name }: { name: string }) {
   const content =
     name === 'Event management' ? (
-      <AdminEvents />
+      <AdminEventsPage />
     ) : name === 'Template library' ? (
       <AdminTemplates />
     ) : name === 'Template editor' ? (
@@ -734,44 +735,6 @@ function AdminScreen({ name }: { name: string }) {
   );
 }
 
-function AdminEvents() {
-  return (
-    <div className="p-10">
-      <div className="grid grid-cols-[1fr_230px] gap-8">
-        <div>
-          <p className="text-[25px] font-black tracking-[-0.05em]">Current events</p>
-          <div className="mt-7 overflow-hidden rounded-xl border border-[#cde7dd] bg-white">
-            <AdminRow title="SIC General Assembly" sub="May 24, 2026 · Mika Santos" active />
-            <AdminRow title="College Week 2026" sub="June 18, 2026 · J. Domingo" />
-          </div>
-        </div>
-        <div className="rounded-xl bg-[#ddf7ee] p-6">
-          <p className="text-[11px] font-bold tracking-wide text-[#26715e]">CREATE EVENT</p>
-          <label className="mt-5 block text-[12px] font-bold">
-            Event name
-            <input
-              className="mt-2 w-full rounded-lg border border-[#98cdbd] bg-white px-3 py-2"
-              defaultValue="SIC General Assembly"
-            />
-          </label>
-          <label className="mt-4 block text-[12px] font-bold">
-            Event date
-            <input
-              className="mt-2 w-full rounded-lg border border-[#98cdbd] bg-white px-3 py-2"
-              defaultValue="2026-05-24"
-            />
-          </label>
-          <button
-            type="button"
-            className="mt-5 rounded-lg bg-[#146a56] px-4 py-2 text-[12px] font-bold text-white"
-          >
-            Save event
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 function AdminRow({
   title,
   sub,
