@@ -169,12 +169,15 @@ export class MediaValidator {
   }
 
   /**
-   * Extracts duration in seconds from an MP4 buffer by reading the mvhd box.
+   * Extracts duration in seconds from an MP4 buffer by reading the mvhd, mehd, or tfdt boxes.
    */
   public parseMp4Duration(buffer: Buffer): number | null {
     if (!buffer || buffer.length < 16) {
       return null;
     }
+
+    let timescale: number | null = null;
+    let explicitDuration: number | null = null;
 
     let offset = 0;
     while (offset + 8 <= buffer.length) {
@@ -199,18 +202,20 @@ export class MediaValidator {
           if (childType === 'mvhd') {
             const version = buffer.readUInt8(moovOffset + 8);
             if (version === 0 && moovOffset + 28 <= moovEnd) {
-              const timescale = buffer.readUInt32BE(moovOffset + 20);
-              const duration = buffer.readUInt32BE(moovOffset + 24);
-              if (timescale > 0) {
-                return duration / timescale;
+              const ts = buffer.readUInt32BE(moovOffset + 20);
+              const dur = buffer.readUInt32BE(moovOffset + 24);
+              if (ts > 0) timescale = ts;
+              if (ts > 0 && dur > 0) {
+                explicitDuration = dur / ts;
               }
             } else if (version === 1 && moovOffset + 40 <= moovEnd) {
-              const timescale = buffer.readUInt32BE(moovOffset + 28);
+              const ts = buffer.readUInt32BE(moovOffset + 28);
               const durationHigh = buffer.readUInt32BE(moovOffset + 32);
               const durationLow = buffer.readUInt32BE(moovOffset + 36);
-              const duration = durationHigh * 2 ** 32 + durationLow;
-              if (timescale > 0) {
-                return duration / timescale;
+              const dur = durationHigh * 2 ** 32 + durationLow;
+              if (ts > 0) timescale = ts;
+              if (ts > 0 && dur > 0) {
+                explicitDuration = dur / ts;
               }
             }
           }
@@ -221,11 +226,51 @@ export class MediaValidator {
       offset += actualSize;
     }
 
+    if (explicitDuration !== null && explicitDuration > 0) {
+      return explicitDuration;
+    }
+
+    // Fragmented MP4 fallback (mehd / tfdt boxes)
+    const effectiveTimescale = timescale ?? 1000;
+    let maxDecodeTime = -1;
+
+    for (let i = 0; i <= buffer.length - 8; i++) {
+      const boxType = buffer.toString('ascii', i + 4, i + 8);
+
+      if (boxType === 'mehd' && i + 16 <= buffer.length) {
+        const version = buffer.readUInt8(i + 8);
+        const mehdDur = version === 0 ? buffer.readUInt32BE(i + 12) : buffer.readUInt32BE(i + 20);
+        if (mehdDur > 0 && effectiveTimescale > 0) {
+          return mehdDur / effectiveTimescale;
+        }
+      }
+
+      if (boxType === 'tfdt' && i + 16 <= buffer.length) {
+        const version = buffer.readUInt8(i + 8);
+        let decodeTime = 0;
+        if (version === 0) {
+          decodeTime = buffer.readUInt32BE(i + 12);
+        } else if (version === 1 && i + 20 <= buffer.length) {
+          const high = buffer.readUInt32BE(i + 12);
+          const low = buffer.readUInt32BE(i + 16);
+          decodeTime = high * 2 ** 32 + low;
+        }
+        if (decodeTime > maxDecodeTime) {
+          maxDecodeTime = decodeTime;
+        }
+      }
+    }
+
+    if (maxDecodeTime > 0 && effectiveTimescale > 0) {
+      return maxDecodeTime / effectiveTimescale;
+    }
+
     return null;
   }
 
   /**
-   * Extracts duration in seconds from a WebM / MKV buffer by reading EBML Info Duration.
+   * Extracts duration in seconds from a WebM / MKV buffer by reading EBML Info Duration,
+   * or by traversing cluster/block timecodes when duration is omitted by MediaRecorder.
    */
   public parseWebmDuration(buffer: Buffer): number | null {
     if (!buffer || buffer.length < 8) {
@@ -255,12 +300,114 @@ export class MediaValidator {
         const valLen = lengthByte & 0x7f;
         if (valLen === 4 && i + 7 <= buffer.length) {
           const rawDuration = buffer.readFloatBE(i + 3);
-          return (rawDuration * timecodeScaleNs) / 1000000000;
+          if (rawDuration > 0) {
+            return (rawDuration * timecodeScaleNs) / 1000000000;
+          }
         } else if (valLen === 8 && i + 11 <= buffer.length) {
           const rawDuration = buffer.readDoubleBE(i + 3);
-          return (rawDuration * timecodeScaleNs) / 1000000000;
+          if (rawDuration > 0) {
+            return (rawDuration * timecodeScaleNs) / 1000000000;
+          }
         }
       }
+    }
+
+    // Fallback for MediaRecorder WebM streams (which omit Segment Info Duration [0x44, 0x89]):
+    // Traverse Cluster headers ([0x1F, 0x43, 0xB6, 0x75]) and Timecodes ([0xE7]) / SimpleBlocks ([0xA3]).
+    let maxClusterTimestamp = -1;
+    let maxBlockTimestamp = -1;
+
+    for (let i = 0; i <= buffer.length - 4; i++) {
+      if (
+        buffer[i] === 0x1f &&
+        buffer[i + 1] === 0x43 &&
+        buffer[i + 2] === 0xb6 &&
+        buffer[i + 3] === 0x75
+      ) {
+        let pos = i + 4;
+        if (pos >= buffer.length) continue;
+
+        // Skip Cluster size VINT
+        const firstByte = buffer[pos];
+        let mask = 0x80;
+        let vintLen = 1;
+        while ((firstByte & mask) === 0 && vintLen <= 8) {
+          mask >>= 1;
+          vintLen++;
+        }
+        pos += vintLen;
+
+        let clusterTimecode = 0;
+        const headerLimit = Math.min(pos + 128, buffer.length);
+        while (pos < headerLimit) {
+          if (buffer[pos] === 0xe7 && pos + 2 <= buffer.length) {
+            pos++;
+            const tcLenByte = buffer[pos];
+            const tcLen = tcLenByte & 0x7f;
+            pos++;
+            if (tcLen >= 1 && tcLen <= 8 && pos + tcLen <= buffer.length) {
+              let val = 0;
+              for (let b = 0; b < tcLen; b++) {
+                val = val * 256 + buffer[pos + b];
+              }
+              clusterTimecode = val;
+              if (val > maxClusterTimestamp) {
+                maxClusterTimestamp = val;
+              }
+            }
+            break;
+          }
+          pos++;
+        }
+
+        // Check for SimpleBlocks [0xA3] within cluster
+        const blockLimit = Math.min(i + 131072, buffer.length - 6);
+        while (pos < blockLimit) {
+          if (
+            buffer[pos] === 0x1f &&
+            buffer[pos + 1] === 0x43 &&
+            buffer[pos + 2] === 0xb6 &&
+            buffer[pos + 3] === 0x75
+          ) {
+            break; // next cluster
+          }
+          if (buffer[pos] === 0xa3 && pos + 4 < buffer.length) {
+            let bPos = pos + 1;
+            const bFirst = buffer[bPos];
+            let bMask = 0x80;
+            let bVintLen = 1;
+            while ((bFirst & bMask) === 0 && bVintLen <= 8) {
+              bMask >>= 1;
+              bVintLen++;
+            }
+            bPos += bVintLen;
+            if (bPos + 3 <= buffer.length) {
+              const tFirst = buffer[bPos];
+              let tMask = 0x80;
+              let tVintLen = 1;
+              while ((tFirst & tMask) === 0 && tVintLen <= 8) {
+                tMask >>= 1;
+                tVintLen++;
+              }
+              bPos += tVintLen;
+              if (bPos + 2 <= buffer.length) {
+                const relTimecode = buffer.readInt16BE(bPos);
+                const blockTotalTime = clusterTimecode + relTimecode;
+                if (blockTotalTime > maxBlockTimestamp) {
+                  maxBlockTimestamp = blockTotalTime;
+                }
+              }
+            }
+          }
+          pos++;
+        }
+      }
+    }
+
+    const finalTimestampMs = maxBlockTimestamp >= 0 ? maxBlockTimestamp : maxClusterTimestamp;
+    if (finalTimestampMs > 0) {
+      // Add standard 33ms single-frame window to account for the last frame display time
+      return ((finalTimestampMs + 33) * timecodeScaleNs) / 1000000000;
     }
 
     return null;
