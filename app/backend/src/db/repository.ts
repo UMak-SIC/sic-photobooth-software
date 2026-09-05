@@ -90,14 +90,28 @@ export interface OutputItem {
 
 export type PublicationStatus = 'queued' | 'in_progress' | 'uploaded' | 'failed';
 
+export interface QueuedPublication {
+  id: string;
+  publicId: string;
+  filePath: string;
+  mediaType: string;
+  eventName: string;
+  eventDate: string;
+  retryCount: number;
+}
+
 export interface PublicationRecord {
   id: string;
   publicId: string;
   status: PublicationStatus;
   retryCount: number;
   lastAttemptAt: Date | null;
+  nextAttemptAt: Date | null;
   lastError: string | null;
   cloudFinalizedAt: Date | null;
+  cloudinaryUrl: string | null;
+  cloudinaryPublicId: string | null;
+  expiresAt: Date | null;
   createdAt: Date;
   mediaType: string;
   eventName: string;
@@ -937,9 +951,10 @@ export class DatabaseRepository {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query(`DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`, [
-          sessionId,
-        ]);
+        await client.query(
+          `DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`,
+          [sessionId],
+        );
         await client.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
         await client.query(
           `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
@@ -1035,8 +1050,12 @@ export class DatabaseRepository {
         status: 'queued',
         retryCount: 0,
         lastAttemptAt: null,
+        nextAttemptAt: new Date(),
         lastError: null,
         cloudFinalizedAt: null,
+        cloudinaryUrl: null,
+        cloudinaryPublicId: null,
+        expiresAt: null,
         createdAt: new Date(),
         mediaType,
         eventName: output.eventName,
@@ -1085,8 +1104,10 @@ export class DatabaseRepository {
     try {
       const result = await pool.query(`
         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
-          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
-          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
         FROM publication_records p
         JOIN generated_outputs o ON o.id = p.output_id
@@ -1110,13 +1131,16 @@ export class DatabaseRepository {
       const result = await pool.query(
         `WITH requeued AS (
           UPDATE publication_records
-          SET status = 'queued', retry_count = 0, last_attempt_at = NULL, last_error = NULL
+          SET status = 'queued', retry_count = 0, last_attempt_at = NULL,
+            next_attempt_at = CURRENT_TIMESTAMP, last_error = NULL
           WHERE id = $1 AND status = 'failed'
           RETURNING *
         )
         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
-          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
-          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
         FROM requeued p
         JOIN generated_outputs o ON o.id = p.output_id
@@ -1134,8 +1158,183 @@ export class DatabaseRepository {
     publication.status = 'queued';
     publication.retryCount = 0;
     publication.lastAttemptAt = null;
+    publication.nextAttemptAt = new Date();
     publication.lastError = null;
     return publication;
+  }
+
+  /**
+   * Atomically claims up to `limit` queued publications for upload, marking them in_progress.
+   */
+  public async claimQueuedPublications(
+    limit: number,
+    now: Date = new Date(),
+  ): Promise<QueuedPublication[]> {
+    let pgClaimed: QueuedPublication[] = [];
+    try {
+      const claim = await pool.query(
+        `UPDATE publication_records p
+         SET status = 'in_progress', last_attempt_at = CURRENT_TIMESTAMP
+         WHERE p.id IN (
+           SELECT q.id
+           FROM publication_records q
+           JOIN generated_outputs o ON o.id = q.output_id
+           WHERE q.status = 'queued' AND q.next_attempt_at <= $2
+           ORDER BY q.created_at
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id`,
+        [limit, now],
+      );
+      if (claim.rows.length > 0) {
+        const details = await pool.query(
+          `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
+             e.name AS "eventName", e.date::text AS "eventDate", p.retry_count AS "retryCount"
+           FROM publication_records p
+           JOIN generated_outputs o ON o.id = p.output_id
+           JOIN sessions s ON s.id = o.session_id
+           JOIN events e ON e.id = s.event_id
+           WHERE p.id = ANY($1::uuid[])
+           ORDER BY p.created_at`,
+          [claim.rows.map((r) => r.id)],
+        );
+        pgClaimed = details.rows;
+      }
+    } catch {
+      pgClaimed = [];
+    }
+    const remaining = limit - pgClaimed.length;
+    if (remaining <= 0) return pgClaimed;
+    return [...pgClaimed, ...this.claimQueuedInMemory(remaining, now)];
+  }
+
+  /**
+   * Claims queued publications from the in-memory mirror (degraded / hybrid operation).
+   */
+  private claimQueuedInMemory(limit: number, now: Date): QueuedPublication[] {
+    return Array.from(this.inMemoryPublications.entries())
+      .filter(
+        ([, p]) => p.status === 'queued' && p.nextAttemptAt !== null && p.nextAttemptAt <= now,
+      )
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime())
+      .slice(0, limit)
+      .map(([id, p]) => {
+        const output = this.inMemoryOutputs.get(p.publicId);
+        if (!output) return null;
+        p.status = 'in_progress';
+        p.lastAttemptAt = now;
+        this.inMemoryPublications.set(id, p);
+        return {
+          id,
+          publicId: p.publicId,
+          filePath: output.filePath,
+          mediaType: output.mediaType,
+          eventName: output.eventName,
+          eventDate: output.eventDate,
+          retryCount: p.retryCount,
+        };
+      })
+      .filter((q): q is QueuedPublication => q !== null);
+  }
+
+  /**
+   * Marks a publication successfully uploaded to Cloudinary.
+   */
+  public async markPublicationUploaded(
+    id: string,
+    cloudinaryUrl: string,
+    cloudinaryPublicId: string,
+    cloudFinalizedAt: Date,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = 'uploaded', cloudinary_url = $2, cloudinary_public_id = $3,
+           cloud_finalized_at = $4, expires_at = $5, next_attempt_at = NULL, last_error = NULL
+         WHERE id = $1`,
+        [id, cloudinaryUrl, cloudinaryPublicId, cloudFinalizedAt, expiresAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return true;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return false;
+    pub.status = 'uploaded';
+    pub.cloudinaryUrl = cloudinaryUrl;
+    pub.cloudinaryPublicId = cloudinaryPublicId;
+    pub.cloudFinalizedAt = cloudFinalizedAt;
+    pub.expiresAt = expiresAt;
+    pub.nextAttemptAt = null;
+    pub.lastError = null;
+    return true;
+  }
+
+  /**
+   * Records a failed upload attempt. A null nextAttemptAt is a dead-letter job.
+   */
+  public async markPublicationFailed(
+    id: string,
+    error: string,
+    nextAttemptAt: Date | null,
+  ): Promise<void> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = CASE WHEN $3 IS NULL THEN 'failed' ELSE 'queued' END,
+           retry_count = retry_count + 1,
+           last_attempt_at = CURRENT_TIMESTAMP,
+           next_attempt_at = $3,
+           last_error = $2
+         WHERE id = $1`,
+        [id, error, nextAttemptAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return;
+    pub.retryCount += 1;
+    pub.lastAttemptAt = new Date();
+    pub.nextAttemptAt = nextAttemptAt;
+    pub.lastError = error;
+    pub.status = nextAttemptAt === null ? 'failed' : 'queued';
+  }
+
+  /** Requeues interrupted work and counts the interrupted attempt toward the dead-letter limit. */
+  public async recoverStalledPublications(staleBefore: Date, maxAttempts: number): Promise<void> {
+    try {
+      await pool.query(
+        `UPDATE publication_records
+         SET retry_count = retry_count + 1,
+           status = CASE WHEN retry_count + 1 >= $2 THEN 'failed' ELSE 'queued' END,
+           next_attempt_at = CASE WHEN retry_count + 1 >= $2 THEN NULL ELSE CURRENT_TIMESTAMP END,
+           last_error = 'Upload worker interrupted; job requeued.'
+         WHERE status = 'in_progress' AND last_attempt_at < $1`,
+        [staleBefore, maxAttempts],
+      );
+    } catch {
+      // The in-memory mirror below keeps degraded mode recoverable too.
+    }
+    for (const publication of this.inMemoryPublications.values()) {
+      if (
+        publication.status === 'in_progress' &&
+        publication.lastAttemptAt !== null &&
+        publication.lastAttemptAt < staleBefore
+      ) {
+        publication.retryCount += 1;
+        publication.status = publication.retryCount >= maxAttempts ? 'failed' : 'queued';
+        publication.nextAttemptAt = publication.status === 'failed' ? null : new Date();
+        publication.lastError = 'Upload worker interrupted; job requeued.';
+      }
+    }
   }
 
   /**
