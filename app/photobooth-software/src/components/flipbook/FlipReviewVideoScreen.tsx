@@ -65,7 +65,9 @@ function VideoItemPreview({
           </svg>
           <span>5 SEC</span>
           <span>•</span>
-          <span>CLIP 0{index} {isSelected ? '✓' : ''}</span>
+          <span>
+            CLIP 0{index} {isSelected ? '✓' : ''}
+          </span>
         </div>
       </div>
     </button>
@@ -124,8 +126,8 @@ export function FlipReviewVideoScreen() {
   });
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-6 md:px-12 py-10">
-      {/* 5-Minute Auto-select Banner from Design Sheet */}
+    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#0e473d] px-6 py-10 text-white md:px-12">
+      {/* 5-Minute Auto-select Banner */}
       <div className="flex justify-center z-10">
         <span className="rounded-full bg-white/20 border border-white/10 px-6 py-2.5 text-[13px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
           Auto-selects in {formattedMMSS}
@@ -166,8 +168,19 @@ export function FlipReviewVideoScreen() {
           {loading ? (
             <>
               <svg className="animate-spin size-5 text-[#0e473d]" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
               </svg>
               <span>Creating flipbook...</span>
             </>

@@ -75,7 +75,7 @@ export function ProcessingScreen() {
   }, [sessionId, setConfirmedOutput, resetToCoverCapture]);
 
   return (
-    <div className="relative grid w-full min-h-[calc(100vh-77px)] place-items-center overflow-hidden bg-[#ecfff8] px-8 text-[#113b33]">
+    <div className="relative grid w-full min-h-[100vh] place-items-center overflow-hidden bg-[#ecfff8] px-8 text-[#113b33]">
       <div className="max-w-[620px] text-center px-8">
         {/* Visual Orb Spinner */}
         <div className="relative mx-auto grid size-52 place-items-center">

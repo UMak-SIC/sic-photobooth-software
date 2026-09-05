@@ -49,7 +49,9 @@ export function FrameSelectScreen() {
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
   const motionGifUrl = outputGifUrl
     ? `${outputGifUrl}?variant=motion`
-    : (publicId ? `${API_BASE_URL}/photos/${publicId}?variant=motion` : null);
+    : publicId
+      ? `${API_BASE_URL}/photos/${publicId}?variant=motion`
+      : null;
 
   const resolveAssetUrl = (p: string | null | undefined) => {
     if (!p) return null;
@@ -124,14 +126,12 @@ export function FrameSelectScreen() {
   };
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-6 lg:px-12 py-6 text-[#113b33]">
+    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-6 py-6 text-[#113b33] lg:px-12">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 w-full max-w-6xl items-center my-auto">
         {/* Left Column: Exclusive 4-Instance Booklet Preview */}
         <div className="lg:col-span-6 flex flex-col items-start gap-2.5 w-full">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-black tracking-widest text-[#28806c] uppercase">
-              PREVIEW
-            </p>
+            <p className="text-xs font-black tracking-widest text-[#28806c] uppercase">PREVIEW</p>
             <span className="text-[10px] font-bold text-[#146a56] bg-[#146a56]/10 px-2.5 py-0.5 rounded-none">
               4.0&quot; × 1.5&quot; Booklet • {selectedFrame?.name || 'SIC Seal'}
             </span>
@@ -333,9 +333,7 @@ export function FrameSelectScreen() {
                       <p className="text-[10px] font-black tracking-widest text-[#a8f3dd] uppercase truncate max-w-full">
                         {selectedFrame?.name || 'SOCIETY OF INNOVATIVE COMPUTING'}
                       </p>
-                      <p className="text-[8px] text-[#c5eee1] mt-0.5">
-                        UMak-SIC
-                      </p>
+                      <p className="text-[8px] text-[#c5eee1] mt-0.5">UMak-SIC</p>
                     </div>
                   </>
                 )}
@@ -365,8 +363,18 @@ export function FrameSelectScreen() {
 
           {errorMessage && (
             <div className="flex items-center gap-3 rounded-none bg-[#b91c1c] px-4 py-2 text-white shadow-md">
-              <svg className="size-4 text-white shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              <svg
+                className="size-4 text-white shrink-0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
               </svg>
               <span className="text-xs font-semibold">{errorMessage}</span>
             </div>
@@ -374,7 +382,9 @@ export function FrameSelectScreen() {
 
           {/* Available Designs Header */}
           <div className="flex items-center justify-between pt-1">
-            <p className="text-xs font-black tracking-widest text-[#28806c] uppercase">AVAILABLE DESIGNS</p>
+            <p className="text-xs font-black tracking-widest text-[#28806c] uppercase">
+              AVAILABLE DESIGNS
+            </p>
             <span className="text-xs text-[#5b8176] font-semibold">{frames.length} options</span>
           </div>
 
@@ -384,69 +394,77 @@ export function FrameSelectScreen() {
             aria-label="Booklet Frame Selection"
             className="flex flex-col gap-2.5 overflow-y-auto max-h-[290px] md:max-h-[320px] pr-2"
           >
-            {fetchingFrames ? (
-              // Loading Skeleton
-              [1, 2, 3].map((n) => (
-                <div key={n} className="h-14 w-full bg-white/60 animate-pulse rounded-none" />
-              ))
-            ) : (
-              frames.map((frame, index) => {
-                const isSelected = frame.id === selectedId;
-                const frameCoverUrl = resolveAssetUrl(frame.coverPath);
-                return (
-                  <button
-                    key={frame.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    onClick={() => setSelectedId(frame.id)}
-                    onKeyDown={(e) => handleKeyDown(e, index)}
-                    className={`rounded-none border-0 px-4 py-3 text-left transition-all cursor-pointer flex items-center justify-between gap-3.5 ${
-                      isSelected
-                        ? 'bg-[#e7fff7] shadow-md ring-2 ring-[#1a7e67]'
-                        : 'bg-white hover:bg-[#f2faf7] shadow-sm'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Mini Visual Swatch */}
-                      <div className={`size-10 shrink-0 rounded-none overflow-hidden relative border ${
-                        isSelected ? 'border-[#146a56] bg-[#c2ffe1]' : 'border-gray-200 bg-gray-100'
-                      }`}>
-                        {frameCoverUrl ? (
-                          <div className="size-full overflow-hidden relative">
-                            <img
-                              src={frameCoverUrl}
-                              alt={frame.name}
-                              className="absolute top-0 left-0 w-full"
-                              style={{ height: '400%', objectFit: 'cover', objectPosition: 'top' }}
-                            />
-                          </div>
-                        ) : (
-                          <div className="size-full flex items-center justify-between p-0.5">
-                            <div className="w-[35%] h-full bg-[#0e473d] flex items-center justify-center text-[6px] font-black text-white">
-                              SIC
+            {fetchingFrames
+              ? // Loading Skeleton
+                [1, 2, 3].map((n) => (
+                  <div key={n} className="h-14 w-full bg-white/60 animate-pulse rounded-none" />
+                ))
+              : frames.map((frame, index) => {
+                  const isSelected = frame.id === selectedId;
+                  const frameCoverUrl = resolveAssetUrl(frame.coverPath);
+                  return (
+                    <button
+                      key={frame.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      onClick={() => setSelectedId(frame.id)}
+                      onKeyDown={(e) => handleKeyDown(e, index)}
+                      className={`rounded-none border-0 px-4 py-3 text-left transition-all cursor-pointer flex items-center justify-between gap-3.5 ${
+                        isSelected
+                          ? 'bg-[#e7fff7] shadow-md ring-2 ring-[#1a7e67]'
+                          : 'bg-white hover:bg-[#f2faf7] shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Mini Visual Swatch */}
+                        <div
+                          className={`size-10 shrink-0 rounded-none overflow-hidden relative border ${
+                            isSelected
+                              ? 'border-[#146a56] bg-[#c2ffe1]'
+                              : 'border-gray-200 bg-gray-100'
+                          }`}
+                        >
+                          {frameCoverUrl ? (
+                            <div className="size-full overflow-hidden relative">
+                              <img
+                                src={frameCoverUrl}
+                                alt={frame.name}
+                                className="absolute top-0 left-0 w-full"
+                                style={{
+                                  height: '400%',
+                                  objectFit: 'cover',
+                                  objectPosition: 'top',
+                                }}
+                              />
                             </div>
-                            <div className="w-[60%] h-full bg-black/15" />
-                          </div>
-                        )}
+                          ) : (
+                            <div className="size-full flex items-center justify-between p-0.5">
+                              <div className="w-[35%] h-full bg-[#0e473d] flex items-center justify-center text-[6px] font-black text-white">
+                                SIC
+                              </div>
+                              <div className="w-[60%] h-full bg-black/15" />
+                            </div>
+                          )}
+                        </div>
+
+                        <strong className="block text-[15px] font-bold text-[#113b33] truncate">
+                          {frame.name}
+                        </strong>
                       </div>
 
-                      <strong className="block text-[15px] font-bold text-[#113b33] truncate">
-                        {frame.name}
-                      </strong>
-                    </div>
-
-                    <span className={`shrink-0 rounded-none px-2.5 py-1 text-[11px] font-bold transition ${
-                      isSelected
-                        ? 'bg-[#146a56] text-white shadow-sm'
-                        : 'bg-[#146a56]/10 text-[#146a56]'
-                    }`}>
-                      {isSelected ? '✓ Selected' : 'Choose'}
-                    </span>
-                  </button>
-                );
-              })
-            )}
+                      <span
+                        className={`shrink-0 rounded-none px-2.5 py-1 text-[11px] font-bold transition ${
+                          isSelected
+                            ? 'bg-[#146a56] text-white shadow-sm'
+                            : 'bg-[#146a56]/10 text-[#146a56]'
+                        }`}
+                      >
+                        {isSelected ? '✓ Selected' : 'Choose'}
+                      </span>
+                    </button>
+                  );
+                })}
           </div>
 
           {/* Confirm Action Button */}
@@ -460,8 +478,19 @@ export function FrameSelectScreen() {
               {loading ? (
                 <>
                   <svg className="animate-spin size-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   <span>Confirming frame...</span>
                 </>

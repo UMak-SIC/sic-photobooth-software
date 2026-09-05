@@ -64,8 +64,8 @@ import { useFlipbookStore } from './store/flipbook-store';
 import { useSessionStore } from './store/session-store';
 
 function App() {
-  const [mode, setMode] = useState<'live' | 'sheet'>('live');
-  const [category, setCategory] = useState<Category>('all');
+  const [mode] = useState<'live' | 'sheet'>('live');
+  const [category] = useState<Category>('all');
   const { currentStep } = useFlipbookStore();
   const { activeSession } = useSessionStore();
   if (window.location.pathname.startsWith('/admin/')) {
@@ -77,70 +77,8 @@ function App() {
 
   return (
     <main className="min-h-[100dvh] bg-[#071d1a] text-[#e8fff5]">
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#071d1a]/95 px-5 py-4 backdrop-blur md:px-10">
-        <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <BrandMark />
-            <div>
-              <p className="text-xs font-semibold tracking-[0.22em] text-[#76d2bb]">
-                SIC PHOTOBOOTH
-              </p>
-              <h1 className="text-lg font-bold tracking-tight text-white md:text-xl">
-                {mode === 'live' ? 'Assisted Booth Terminal' : 'Interface design sheet'}
-              </h1>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* View Mode Toggle */}
-            <div className="flex rounded-full border border-white/15 bg-white/5 p-1 text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setMode('live')}
-                className={`rounded-full px-4 py-2 transition ${
-                  mode === 'live'
-                    ? 'bg-[#48c4a1] text-[#062019]'
-                    : 'text-[#b3d9ce] hover:text-white'
-                }`}
-              >
-                Interactive Booth
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('sheet')}
-                className={`rounded-full px-4 py-2 transition ${
-                  mode === 'sheet'
-                    ? 'bg-[#48c4a1] text-[#062019]'
-                    : 'text-[#b3d9ce] hover:text-white'
-                }`}
-              >
-                Design Sheet
-              </button>
-            </div>
-
-            {mode === 'sheet' && (
-              <nav
-                aria-label="Design sheet filters"
-                className="flex rounded-full border border-white/15 bg-white/5 p-1 text-xs font-semibold"
-              >
-                {(['all', 'guest', 'admin'] as Category[]).map((item) => (
-                  <button
-                    className={`rounded-full px-3 py-2 capitalize transition active:scale-[0.98] ${category === item ? 'bg-[#48c4a1] text-[#062019]' : 'text-[#b3d9ce] hover:text-white'}`}
-                    key={item}
-                    onClick={() => setCategory(item)}
-                    type="button"
-                  >
-                    {item}
-                  </button>
-                ))}
-              </nav>
-            )}
-          </div>
-        </div>
-      </header>
-
       {mode === 'live' ? (
-        <section className="flex min-h-[calc(100vh-77px)] w-full flex-col items-stretch">
+        <section className="flex min-h-[100vh] w-full flex-col items-stretch">
           <div className="flex flex-1 w-full overflow-hidden bg-[#0a2924]">
             {activeSession?.type === 'photo_strip' ? (
               <PhotoStripWorkflow />

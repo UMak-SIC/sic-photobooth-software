@@ -79,29 +79,37 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
 
   const outputWidth = template?.outputWidth || 1200;
   const outputHeight = template?.outputHeight || 1800;
-  const isLandscape = (template?.orientation || (outputWidth > outputHeight ? 'landscape' : 'portrait')) === 'landscape';
+  const isLandscape =
+    (template?.orientation || (outputWidth > outputHeight ? 'landscape' : 'portrait')) ===
+    'landscape';
 
-  const placements = template?.placements && template.placements.length > 0 ? template.placements : [
-    { captureIndex: 1, x: 100, y: 120, width: 1000, height: 440, borderRadius: 8, zIndex: 1 },
-    { captureIndex: 2, x: 100, y: 600, width: 1000, height: 440, borderRadius: 8, zIndex: 1 },
-    { captureIndex: 3, x: 100, y: 1080, width: 1000, height: 440, borderRadius: 8, zIndex: 1 },
-  ];
+  const placements =
+    template?.placements && template.placements.length > 0
+      ? template.placements
+      : [
+          { captureIndex: 1, x: 100, y: 120, width: 1000, height: 440, borderRadius: 8, zIndex: 1 },
+          { captureIndex: 2, x: 100, y: 600, width: 1000, height: 440, borderRadius: 8, zIndex: 1 },
+          {
+            captureIndex: 3,
+            x: 100,
+            y: 1080,
+            width: 1000,
+            height: 440,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+        ];
 
   const backgroundUrl = resolveAssetUrl(template?.backgroundPath ?? null);
 
   return (
-    <div className="artboard relative flex h-full min-h-[780px] w-full items-center justify-center gap-12 overflow-hidden bg-[#ecfff8] px-14 py-10 text-[#113b33]">
+    <div className="artboard relative flex h-[100dvh] w-full items-center justify-center gap-8 overflow-hidden bg-[#ecfff8] px-10 py-10 text-[#113b33]">
       <div className="flex flex-col items-center">
-        <div className="w-full text-left">
-          <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">PHOTO STRIP REVIEW</p>
-          <h4 className="mt-2 text-[42px] font-black tracking-[-0.06em]">Keep the good ones.</h4>
-
-          {errorMessage && (
-            <div className="mt-3 rounded-lg bg-red-100 border border-red-300 px-4 py-2 text-xs font-semibold text-red-800 max-w-lg">
-              {errorMessage}
-            </div>
-          )}
-        </div>
+        {errorMessage && (
+          <div className="mb-3 w-full max-w-lg rounded-lg border border-red-300 bg-red-100 px-4 py-2 text-xs font-semibold text-red-800">
+            {errorMessage}
+          </div>
+        )}
 
         {preview ? (
           <div className="review-strip mt-7">
@@ -111,10 +119,12 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
           </div>
         ) : (
           <div
-            className="relative mt-6 rounded-2xl shadow-xl overflow-hidden border-4 border-[#0e473d] bg-[#0c3930]"
+            className="relative overflow-hidden bg-[#0c3930] shadow-xl"
             style={{
               aspectRatio: `${outputWidth} / ${outputHeight}`,
-              width: isLandscape ? '480px' : '310px',
+              width: isLandscape
+                ? 'min(680px, 52vw, calc(150dvh - 180px))'
+                : 'min(560px, 44vw, calc(66.667dvh - 80px))',
               maxWidth: '100%',
             }}
           >
@@ -184,7 +194,7 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
                     top: `${(p.y / outputHeight) * 100}%`,
                     width: `${(p.width / outputWidth) * 100}%`,
                     height: `${(p.height / outputHeight) * 100}%`,
-                    borderRadius: p.borderRadius ? `${(p.borderRadius / outputWidth) * 100}%` : '4px',
+                    borderRadius: `${((p.borderRadius ?? 0) / outputWidth) * 100}%`,
                     transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
                     zIndex: isSelected ? 20 : (p.zIndex ?? 2),
                   }}
@@ -216,40 +226,44 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
           </div>
         )}
 
-        <p className="mt-4 text-[13px] text-[#5b8176]">Tap a photo slot to choose it for a retake.</p>
+        <p className="mt-4 text-[13px] text-[#5b8176]">
+          Tap a photo slot to choose it for a retake.
+        </p>
       </div>
 
-      <aside className="flex flex-col justify-between rounded-2xl bg-[#d9f7ed] p-7 max-w-[340px] w-full shadow-sm">
-        <div>
-          <p className="text-[12px] font-bold tracking-wide text-[#28715f]">SESSION CONTROL</p>
-          <p className="mt-5 text-[25px] font-black text-[#113b33]">
-            {preview ? '4 retakes left' : `${remainingRetakes} retakes left`}
-          </p>
-          <p className="mt-3 text-[14px] leading-6 text-[#53796e]">
-            Retakes replace one image only. Your remaining photos stay safe.
-          </p>
-        </div>
+      <div className="w-full max-w-[340px]">
+        <h4 className="mb-4 text-[42px] font-black tracking-[-0.06em]">Keep the good ones.</h4>
+        <aside className="flex w-full flex-col justify-between rounded-2xl bg-[#d9f7ed] p-7 shadow-sm">
+          <div>
+            <p className="mt-5 text-[25px] font-black text-[#113b33]">
+              {preview ? '4 retakes left' : `${remainingRetakes} retakes left`}
+            </p>
+            <p className="mt-3 text-[14px] leading-6 text-[#53796e]">
+              Retakes replace one image only. Your remaining photos stay safe.
+            </p>
+          </div>
 
-        <div className="mt-12 grid gap-3">
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={isConfirming}
-            className="rounded-xl bg-[#146a56] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] transition hover:bg-[#0f5444] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-          >
-            {isConfirming ? 'Confirming strip...' : 'Confirm strip'}
-          </button>
+          <div className="mt-12 grid gap-3">
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={isConfirming}
+              className="rounded-xl bg-[#146a56] px-6 py-3 text-[14px] font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] transition hover:bg-[#0f5444] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+            >
+              {isConfirming ? 'Confirming strip...' : 'Confirm strip'}
+            </button>
 
-          <button
-            type="button"
-            onClick={handleRetakeClick}
-            disabled={!selectedForRetake || !canRetake}
-            className="rounded-xl border border-[#92c9b9] bg-white px-6 py-3 text-[14px] font-bold text-[#155847] transition hover:bg-[#f2faf7] active:scale-[0.98] disabled:opacity-40 cursor-pointer"
-          >
-            {selectedForRetake ? `Retake Photo #${selectedForRetake}` : 'Retake selected'}
-          </button>
-        </div>
-      </aside>
+            <button
+              type="button"
+              onClick={handleRetakeClick}
+              disabled={!selectedForRetake || !canRetake}
+              className="rounded-xl border border-[#92c9b9] bg-white px-6 py-3 text-[14px] font-bold text-[#155847] transition hover:bg-[#f2faf7] active:scale-[0.98] disabled:opacity-40 cursor-pointer"
+            >
+              {selectedForRetake ? `Retake Photo #${selectedForRetake}` : 'Retake selected'}
+            </button>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 };

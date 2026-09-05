@@ -107,7 +107,19 @@ export function CoverCaptureScreen() {
   }, [isActive, activeError, isCapturing, coverUrls.length, resetCountdown, pauseCountdown]);
 
   return (
-    <div className="relative flex flex-col items-center justify-center w-full min-h-[calc(100vh-77px)] h-full overflow-hidden bg-[#071d1a] p-4 md:p-8">
+    <div className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#071d1a] text-white">
+      {/* Video Feed */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 size-full object-cover"
+      />
+
+      {/* Camera Scene Vignette */}
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
+
       {/* Flash Effect */}
       {flash && (
         <div className="absolute inset-0 bg-white opacity-90 transition-opacity pointer-events-none z-50" />
@@ -117,8 +129,18 @@ export function CoverCaptureScreen() {
       {activeError && (
         <div className="absolute top-6 inset-x-8 z-30 mx-auto flex max-w-4xl items-center justify-between rounded-2xl bg-[#b91c1c]/95 px-6 py-4 text-white backdrop-blur-md shadow-2xl">
           <div className="flex items-center gap-3">
-            <svg className="size-6 text-white shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              className="size-6 text-white shrink-0"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
             <p className="text-sm font-semibold">{activeError}</p>
           </div>
@@ -138,13 +160,7 @@ export function CoverCaptureScreen() {
       {/* Camera Viewport Container (Full window width with proper margin & aspect ratio 2.41 / 1.32) */}
       <div className="relative w-full max-w-[1600px] aspect-[241/132] max-h-[calc(100vh-120px)] overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10">
         {/* Live Camera Video Feed */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="size-full object-cover"
-        />
+        <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
 
         {/* Camera Scene Vignette */}
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
@@ -213,7 +229,13 @@ export function CoverCaptureScreen() {
                     }`}
                   >
                     {isDone ? (
-                      <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                      <svg
+                        className="size-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                        viewBox="0 0 24 24"
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     ) : (

@@ -32,7 +32,9 @@ export function FlipbookCompletionScreen() {
   const qrDisplayUrl = qrUrl || `https://myphotobooth.com/${publicCode}`;
   const motionGifUrl = outputGifUrl
     ? `${outputGifUrl}?variant=motion`
-    : (publicId ? `${API_BASE_URL}/photos/${publicId}?variant=motion` : null);
+    : publicId
+      ? `${API_BASE_URL}/photos/${publicId}?variant=motion`
+      : null;
 
   useEffect(() => {
     let isCurrent = true;
@@ -99,7 +101,7 @@ export function FlipbookCompletionScreen() {
   };
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-6 lg:px-12 py-6 text-center text-[#113b33]">
+    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-6 py-6 text-center text-[#113b33] lg:px-12">
       <div className="text-center max-w-xl">
         <p className="text-[12px] font-bold tracking-[0.14em] text-[#28806c]">FLIPBOOK COMPLETE</p>
         <h4 className="mt-1 text-[34px] md:text-[40px] font-black leading-none tracking-[-0.05em]">
@@ -282,9 +284,7 @@ export function FlipbookCompletionScreen() {
                   <p className="text-[10px] font-black tracking-widest text-[#a8f3dd] uppercase truncate max-w-full">
                     {selectedFrame?.name || 'SOCIETY OF INNOVATIVE COMPUTING'}
                   </p>
-                  <p className="text-[8px] text-[#c5eee1] mt-0.5">
-                    UMak-SIC
-                  </p>
+                  <p className="text-[8px] text-[#c5eee1] mt-0.5">UMak-SIC</p>
                 </div>
               </>
             )}
