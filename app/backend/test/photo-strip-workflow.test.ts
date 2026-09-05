@@ -343,4 +343,79 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       dbRepository.savePhotoCapture(fakeSessionId, 1, '/tmp/1_r5.jpg', true),
     ).rejects.toThrow('Maximum retake limit of 4 reached for this session');
   });
+
+  it('creates and updates normalized template layouts with placements and overlays', async () => {
+    const created = await dbRepository.createTemplate(
+      'Custom Admin Strip',
+      'portrait',
+      1200,
+      1800,
+      'templates/custom.png',
+      2,
+      5,
+      [
+        {
+          captureIndex: 1,
+          x: 50,
+          y: 50,
+          width: 500,
+          height: 400,
+          rotation: 0,
+          borderRadius: 10,
+          zIndex: 1,
+        },
+        {
+          captureIndex: 2,
+          x: 50,
+          y: 500,
+          width: 500,
+          height: 400,
+          rotation: 0,
+          borderRadius: 10,
+          zIndex: 1,
+        },
+      ],
+      [
+        {
+          label: 'Event Watermark',
+          assetPath: 'templates/overlays/watermark.png',
+          x: 0,
+          y: 0,
+          width: 1200,
+          height: 200,
+          rotation: 0,
+          zIndex: 2,
+        },
+      ],
+    );
+
+    expect(created.id).toBeDefined();
+    expect(created.placements).toHaveLength(2);
+    expect(created.overlays).toHaveLength(1);
+
+    // Update layout atomically
+    const updated = await dbRepository.updateTemplateLayout(
+      created.id,
+      [
+        {
+          captureIndex: 1,
+          x: 60,
+          y: 60,
+          width: 520,
+          height: 420,
+          rotation: 5,
+          borderRadius: 12,
+          zIndex: 1,
+        },
+      ],
+      [],
+    );
+    expect(updated).toBe(true);
+
+    const fetched = await dbRepository.getTemplateById(created.id);
+    expect(fetched).not.toBeNull();
+    expect(fetched!.placements).toHaveLength(1);
+    expect(fetched!.placements[0].width).toBe(520);
+    expect(fetched!.overlays).toHaveLength(0);
+  });
 });

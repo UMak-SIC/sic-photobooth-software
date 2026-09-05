@@ -45,6 +45,15 @@ describe('Versioned Database Migrations', () => {
     expect(schema001).toContain('CREATE TABLE IF NOT EXISTS publication_records');
   });
 
+  it('verifies 002_normalize_template_schema.sql defines normalized placement and overlay tables', () => {
+    const dir = findMigrationsDir();
+    const schema002 = fs.readFileSync(path.join(dir, '002_normalize_template_schema.sql'), 'utf8');
+
+    expect(schema002).toContain('CREATE TABLE IF NOT EXISTS template_placements');
+    expect(schema002).toContain('CREATE TABLE IF NOT EXISTS template_overlays');
+    expect(schema002).toContain('ALTER TABLE templates DROP COLUMN IF EXISTS placements');
+  });
+
   it('ensureMigrationTable and getAppliedMigrations handle mock client queries', async () => {
     const queries: string[] = [];
     const mockClient = {

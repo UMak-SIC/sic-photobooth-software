@@ -24,10 +24,43 @@ CREATE TABLE IF NOT EXISTS templates (
   is_active BOOLEAN NOT NULL DEFAULT true,
   required_capture_count INT NOT NULL DEFAULT 3,
   countdown_seconds INT NOT NULL DEFAULT 5 CHECK (countdown_seconds IN (3, 5, 10)),
-  placements JSONB NOT NULL DEFAULT '[]'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 2a. Template Placements Table
+CREATE TABLE IF NOT EXISTS template_placements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+  capture_index INT NOT NULL CHECK (capture_index >= 1),
+  x INT NOT NULL,
+  y INT NOT NULL,
+  width INT NOT NULL CHECK (width > 0),
+  height INT NOT NULL CHECK (height > 0),
+  rotation INT NOT NULL DEFAULT 0,
+  border_radius INT NOT NULL DEFAULT 0 CHECK (border_radius >= 0),
+  z_index INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_placements_template_id ON template_placements(template_id);
+
+-- 2b. Template Overlays Table
+CREATE TABLE IF NOT EXISTS template_overlays (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  template_id UUID NOT NULL REFERENCES templates(id) ON DELETE CASCADE,
+  label VARCHAR(255) NOT NULL,
+  asset_path TEXT NOT NULL,
+  x INT NOT NULL DEFAULT 0,
+  y INT NOT NULL DEFAULT 0,
+  width INT NOT NULL CHECK (width > 0),
+  height INT NOT NULL CHECK (height > 0),
+  rotation INT NOT NULL DEFAULT 0,
+  z_index INT NOT NULL DEFAULT 2,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_template_overlays_template_id ON template_overlays(template_id);
 
 -- 3. Frames Table (Flipbook Overlays)
 CREATE TABLE IF NOT EXISTS frames (
