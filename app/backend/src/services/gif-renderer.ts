@@ -4,6 +4,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
 import * as gifencModule from 'gifenc';
 import sharp from 'sharp';
+import { flipbookConfig } from '../config.js';
 
 // Handle universal CJS/ESM/tsx/vitest interop for gifenc
 interface GifencExports {
@@ -36,19 +37,21 @@ if (ffmpegStatic) {
 }
 
 export interface GifRendererOptions {
-  frameCount?: number; // default 21
-  coverHoldMs?: number; // default 3000 (3.0 seconds)
-  frameDelayMs?: number; // default 500 (0.5 seconds)
-  outputWidth?: number; // default 600
-  outputHeight?: number; // default 400
-  timeoutMs?: number; // default 120000 (2 minutes)
+  frameCount?: number;
+  coverHoldMs?: number;
+  frameDelayMs?: number;
+  outputWidth?: number;
+  outputHeight?: number;
+  timeoutMs?: number;
 }
 
 export class GifRenderer {
-  public static readonly DEFAULT_FRAME_COUNT = 21;
-  public static readonly DEFAULT_COVER_HOLD_MS = 3000;
-  public static readonly DEFAULT_FRAME_DELAY_MS = 500;
-  public static readonly DEFAULT_TIMEOUT_MS = 120000;
+  public static readonly DEFAULT_FRAME_COUNT = flipbookConfig.gifFrameCount;
+  public static readonly DEFAULT_COVER_HOLD_MS = flipbookConfig.gifCoverHoldMs;
+  public static readonly DEFAULT_FRAME_DELAY_MS = flipbookConfig.gifFrameDelayMs;
+  public static readonly DEFAULT_OUTPUT_WIDTH = flipbookConfig.gifOutputWidth;
+  public static readonly DEFAULT_OUTPUT_HEIGHT = flipbookConfig.gifOutputHeight;
+  public static readonly DEFAULT_TIMEOUT_MS = flipbookConfig.gifTimeoutMs;
 
   /**
    * Extracts evenly spaced frames from a video file using ffmpeg.
@@ -63,8 +66,9 @@ export class GifRenderer {
     }
 
     return new Promise((resolve, reject) => {
-      // For a 6.0 second video, fps = frameCount / 6.0 (e.g. 21 / 6 = 3.5 fps)
-      const fps = frameCount / 6.0;
+      // Calculate extraction fps based on video target duration
+      const duration = flipbookConfig.videoRecordingDurationSeconds;
+      const fps = frameCount / (duration > 0 ? duration : 5.0);
       const pattern = path.join(outputDir, 'frame_%03d.png');
 
       ffmpeg(videoPath)

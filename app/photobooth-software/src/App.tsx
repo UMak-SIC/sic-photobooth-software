@@ -55,14 +55,21 @@ const screens: Screen[] = [
   { title: 'Publication queue', route: '/admin/publications', category: 'admin', stage: 'ADMIN' },
 ];
 
+import { WelcomeExperienceScreen } from './components/WelcomeScreen';
+import { FlipbookWorkflow } from './components/flipbook/FlipbookWorkflow';
+import { useFlipbookStore } from './store/flipbook-store';
+
 function App() {
+  const [mode, setMode] = useState<'live' | 'sheet'>('live');
   const [category, setCategory] = useState<Category>('all');
+  const { currentStep } = useFlipbookStore();
+
   const visible =
     category === 'all' ? screens : screens.filter((screen) => screen.category === category);
 
   return (
     <main className="min-h-[100dvh] bg-[#071d1a] text-[#e8fff5]">
-      <header className="sticky top-0 z-10 border-b border-white/10 bg-[#071d1a]/95 px-5 py-4 backdrop-blur md:px-10">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-[#071d1a]/95 px-5 py-4 backdrop-blur md:px-10">
         <div className="mx-auto flex max-w-[1720px] items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <BrandMark />
@@ -71,55 +78,94 @@ function App() {
                 SIC PHOTOBOOTH
               </p>
               <h1 className="text-lg font-bold tracking-tight text-white md:text-xl">
-                Interface design sheet
+                {mode === 'live' ? 'Assisted Booth Terminal' : 'Interface design sheet'}
               </h1>
             </div>
           </div>
-          <nav
-            aria-label="Design sheet filters"
-            className="flex rounded-full border border-white/15 bg-white/5 p-1 text-xs font-semibold"
-          >
-            {(['all', 'guest', 'admin'] as Category[]).map((item) => (
+
+          <div className="flex items-center gap-4">
+            {/* View Mode Toggle */}
+            <div className="flex rounded-full border border-white/15 bg-white/5 p-1 text-xs font-semibold">
               <button
-                className={`rounded-full px-3 py-2 capitalize transition active:scale-[0.98] ${category === item ? 'bg-[#48c4a1] text-[#062019]' : 'text-[#b3d9ce] hover:text-white'}`}
-                key={item}
-                onClick={() => setCategory(item)}
                 type="button"
+                onClick={() => setMode('live')}
+                className={`rounded-full px-4 py-2 transition ${
+                  mode === 'live'
+                    ? 'bg-[#48c4a1] text-[#062019]'
+                    : 'text-[#b3d9ce] hover:text-white'
+                }`}
               >
-                {item}
+                Interactive Booth
               </button>
-            ))}
-          </nav>
+              <button
+                type="button"
+                onClick={() => setMode('sheet')}
+                className={`rounded-full px-4 py-2 transition ${
+                  mode === 'sheet'
+                    ? 'bg-[#48c4a1] text-[#062019]'
+                    : 'text-[#b3d9ce] hover:text-white'
+                }`}
+              >
+                Design Sheet
+              </button>
+            </div>
+
+            {mode === 'sheet' && (
+              <nav
+                aria-label="Design sheet filters"
+                className="flex rounded-full border border-white/15 bg-white/5 p-1 text-xs font-semibold"
+              >
+                {(['all', 'guest', 'admin'] as Category[]).map((item) => (
+                  <button
+                    className={`rounded-full px-3 py-2 capitalize transition active:scale-[0.98] ${category === item ? 'bg-[#48c4a1] text-[#062019]' : 'text-[#b3d9ce] hover:text-white'}`}
+                    key={item}
+                    onClick={() => setCategory(item)}
+                    type="button"
+                  >
+                    {item}
+                  </button>
+                ))}
+              </nav>
+            )}
+          </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-[1720px] px-5 pb-16 pt-10 md:px-10">
-        <div className="mb-10 grid gap-5 border-b border-white/10 pb-8 md:grid-cols-[1.45fr_1fr] md:items-end">
-          <div>
-            <p className="mb-3 text-xs font-semibold tracking-[0.22em] text-[#76d2bb]">
-              SOCIETY OF INNOVATIVE COMPUTING
-            </p>
-            <h2 className="max-w-3xl text-4xl font-black tracking-[-0.05em] text-white md:text-6xl">
-              An assisted booth that feels ready for the moment.
-            </h2>
+      {mode === 'live' ? (
+        <section className="flex min-h-[calc(100vh-77px)] w-full flex-col items-stretch">
+          <div className="flex flex-1 w-full overflow-hidden bg-[#0a2924]">
+            {currentStep === 'welcome' ? <WelcomeExperienceScreen /> : <FlipbookWorkflow />}
           </div>
-          <p className="max-w-xl text-base leading-7 text-[#b3d9ce]">
-            A full visual inventory for the local booth. Guest screens are large, calm, and
-            camera-first. Operator screens are dense enough to run an event without becoming a
-            dashboard maze.
-          </p>
-        </div>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-[1720px] px-5 pb-16 pt-10 md:px-10">
+          <div className="mb-10 grid gap-5 border-b border-white/10 pb-8 md:grid-cols-[1.45fr_1fr] md:items-end">
+            <div>
+              <p className="mb-3 text-xs font-semibold tracking-[0.22em] text-[#76d2bb]">
+                SOCIETY OF INNOVATIVE COMPUTING
+              </p>
+              <h2 className="max-w-3xl text-4xl font-black tracking-[-0.05em] text-white md:text-6xl">
+                An assisted booth that feels ready for the moment.
+              </h2>
+            </div>
+            <p className="max-w-xl text-base leading-7 text-[#b3d9ce]">
+              A full visual inventory for the local booth. Guest screens are large, calm, and
+              camera-first. Operator screens are dense enough to run an event without becoming a
+              dashboard maze.
+            </p>
+          </div>
 
-        <div className="mb-6 flex items-center justify-between text-xs font-semibold tracking-wide text-[#86b9ab]">
-          <span>{visible.length} SCREENS</span>
-          <span>1920 x 1080 DESKTOP ARTBOARDS</span>
-        </div>
-        <div className="grid gap-8 xl:grid-cols-2 2xl:grid-cols-3">
-          {visible.map((screen, index) => (
-            <SheetCard index={index + 1} key={screen.route} screen={screen} />
-          ))}
-        </div>
-      </section>
+          <div className="mb-6 flex items-center justify-between text-xs font-semibold tracking-wide text-[#86b9ab]">
+            <span>{visible.length} SCREENS</span>
+            <span>1920 x 1080 DESKTOP ARTBOARDS</span>
+          </div>
+          <div className="grid gap-8 xl:grid-cols-2 2xl:grid-cols-3">
+            {visible.map((screen, index) => (
+              <SheetCard index={index + 1} key={screen.route} screen={screen} />
+            ))}
+          </div>
+        </section>
+      )}
     </main>
   );
 }

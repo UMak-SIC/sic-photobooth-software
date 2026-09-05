@@ -37,46 +37,46 @@ describe('MediaValidator', () => {
     expect(oversizedResult.error).toContain('File size exceeds maximum');
   });
 
-  it('extracts real container duration and validates within 5.0s to 7.0s bounds for MP4', () => {
-    const valid6sMp4 = createSyntheticMp4(6.0);
-    const result = validator.validateVideo(valid6sMp4);
+  it('extracts real container duration and validates within 4.0s to 6.5s bounds for MP4', () => {
+    const valid5sMp4 = createSyntheticMp4(5.0);
+    const result = validator.validateVideo(valid5sMp4);
     expect(result.isValid).toBe(true);
     expect(result.format).toBe('mp4');
-    expect(result.durationSeconds).toBe(6.0);
+    expect(result.durationSeconds).toBe(5.0);
 
-    const valid5_5sMp4 = createSyntheticMp4(5.5);
-    expect(validator.validateVideo(valid5_5sMp4).isValid).toBe(true);
+    const valid4_8sMp4 = createSyntheticMp4(4.8);
+    expect(validator.validateVideo(valid4_8sMp4).isValid).toBe(true);
 
-    const tooShortMp4 = createSyntheticMp4(3.2);
+    const tooShortMp4 = createSyntheticMp4(2.5);
     const shortResult = validator.validateVideo(tooShortMp4);
     expect(shortResult.isValid).toBe(false);
-    expect(shortResult.error).toContain('Flipbook recordings must be 6 seconds');
+    expect(shortResult.error).toContain('Flipbook recordings must be 5 seconds');
 
     const tooLongMp4 = createSyntheticMp4(15.0);
     const longResult = validator.validateVideo(tooLongMp4);
     expect(longResult.isValid).toBe(false);
-    expect(longResult.error).toContain('Flipbook recordings must be 6 seconds');
+    expect(longResult.error).toContain('Flipbook recordings must be 5 seconds');
   });
 
   it('extracts real container duration and validates within bounds for WebM', () => {
-    const valid6sWebm = createSyntheticWebm(6.0);
-    const result = validator.validateVideo(valid6sWebm);
+    const valid5sWebm = createSyntheticWebm(5.0);
+    const result = validator.validateVideo(valid5sWebm);
     expect(result.isValid).toBe(true);
     expect(result.format).toBe('webm');
-    expect(Math.round(result.durationSeconds ?? 0)).toBe(6);
+    expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
 
     const tooShortWebm = createSyntheticWebm(2.0);
     const shortResult = validator.validateVideo(tooShortWebm);
     expect(shortResult.isValid).toBe(false);
-    expect(shortResult.error).toContain('Flipbook recordings must be 6 seconds');
+    expect(shortResult.error).toContain('Flipbook recordings must be 5 seconds');
   });
 
   it('extracts duration from streamed WebM clusters when explicit Duration header is omitted', () => {
-    const streamedWebm = createSyntheticStreamedWebm(6.0);
+    const streamedWebm = createSyntheticStreamedWebm(5.0);
     const result = validator.validateVideo(streamedWebm);
     expect(result.isValid).toBe(true);
     expect(result.format).toBe('webm');
-    expect(Math.round(result.durationSeconds ?? 0)).toBe(6);
+    expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
   });
 
   it('rejects video files with missing duration headers when duration is required', () => {
