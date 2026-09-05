@@ -1,6 +1,6 @@
 import { flipbookConfig } from '../config.js';
 
-export type SupportedImageFormat = 'png' | 'jpeg';
+export type SupportedImageFormat = 'png' | 'jpeg' | 'svg';
 export type SupportedVideoFormat = 'mp4' | 'mkv' | 'webm';
 
 export interface ImageValidationResult {
@@ -51,6 +51,10 @@ export class MediaValidator {
     if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
       return 'jpeg';
     }
+
+    // SVG has no fixed magic bytes; require an XML/SVG root rather than trusting the filename.
+    const text = buffer.toString('utf8', 0, Math.min(buffer.length, 4096));
+    if (/^\s*(?:<\?xml[^>]*>\s*)?<svg(?:\s|>)/i.test(text)) return 'svg';
 
     return null;
   }
@@ -120,14 +124,41 @@ export class MediaValidator {
   }
 
   /**
+   * Extracts JPEG width and height from SOF marker segments.
+   */
+  public parseJpegDimensions(buffer: Buffer): { width: number; height: number } | null {
+    if (!buffer || buffer.length < 9) return null;
+    let offset = 2;
+    while (offset < buffer.length - 8) {
+      if (buffer[offset] !== 0xff) {
+        offset++;
+        continue;
+      }
+      const marker = buffer[offset + 1];
+      // SOF0 (0xC0), SOF1 (0xC1), SOF2 (0xC2)
+      if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
+        const height = buffer.readUInt16BE(offset + 5);
+        const width = buffer.readUInt16BE(offset + 7);
+        return { width, height };
+      }
+      if (offset + 3 >= buffer.length) break;
+      const length = buffer.readUInt16BE(offset + 2);
+      if (length < 2) break;
+      offset += 2 + length;
+    }
+    return null;
+  }
+
+  /**
    * Validates an uploaded photo buffer.
    */
   public validateImage(
     buffer: Buffer,
-    options?: { maxSizeBytes?: number; require16x9?: boolean },
+    options?: { maxSizeBytes?: number; require16x9?: boolean; maxDimension?: number },
   ): ImageValidationResult {
     const sizeBytes = buffer?.length ?? 0;
     const maxSizeBytes = options?.maxSizeBytes ?? MAX_PHOTO_SIZE_BYTES;
+    const maxDim = options?.maxDimension ?? 8192;
 
     if (!buffer || sizeBytes === 0) {
       return { isValid: false, sizeBytes: 0, error: 'Empty file buffer' };
@@ -146,7 +177,8 @@ export class MediaValidator {
       return {
         isValid: false,
         sizeBytes,
-        error: 'Unsupported or malformed image format. Only valid PNG and JPEG files are accepted.',
+        error:
+          'Unsupported or malformed image format. Only valid PNG, JPEG, and SVG files are accepted.',
       };
     }
 
@@ -158,6 +190,22 @@ export class MediaValidator {
       if (dims) {
         width = dims.width;
         height = dims.height;
+      }
+    } else if (format === 'jpeg') {
+      const dims = this.parseJpegDimensions(buffer);
+      if (dims) {
+        width = dims.width;
+        height = dims.height;
+      }
+    }
+
+    if (width !== undefined && height !== undefined) {
+      if (width > maxDim || height > maxDim) {
+        return {
+          isValid: false,
+          sizeBytes,
+          error: `Image dimensions (${width}x${height}) exceed maximum allowed of ${maxDim}x${maxDim} pixels`,
+        };
       }
     }
 

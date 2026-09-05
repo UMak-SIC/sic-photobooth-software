@@ -18,6 +18,9 @@ describe('MediaValidator', () => {
     expect(validator.detectImageFormat(validPngHeader)).toBe('png');
     expect(validator.detectImageFormat(validJpegHeader)).toBe('jpeg');
     expect(validator.detectImageFormat(Buffer.from('fake-text-file'))).toBeNull();
+    expect(
+      validator.detectImageFormat(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>')),
+    ).toBe('svg');
   });
 
   it('detects valid video formats from magic bytes', () => {
@@ -93,6 +96,21 @@ describe('MediaValidator', () => {
     expect(validator.validateImage(Buffer.alloc(0)).isValid).toBe(false);
     expect(validator.validateVideo(Buffer.alloc(0)).isValid).toBe(false);
     expect(validator.validateImage(Buffer.from('not an image')).isValid).toBe(false);
+  });
+
+  it('rejects images exceeding maximum dimensions of 8192x8192 pixels', () => {
+    // Construct PNG header with dimensions 10000 x 10000 (0x2710)
+    const oversizedDimPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), // PNG signature
+      Buffer.from([0x00, 0x00, 0x00, 0x0d]), // IHDR length
+      Buffer.from('IHDR'), // IHDR type
+      Buffer.from([0x00, 0x00, 0x27, 0x10]), // Width: 10000
+      Buffer.from([0x00, 0x00, 0x27, 0x10]), // Height: 10000
+      Buffer.from([0x08, 0x02, 0x00, 0x00, 0x00]), // 8-bit truecolor
+    ]);
+    const result = validator.validateImage(oversizedDimPng);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Image dimensions (10000x10000) exceed maximum allowed');
   });
 });
 

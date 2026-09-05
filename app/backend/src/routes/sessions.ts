@@ -3,12 +3,13 @@ import path from 'node:path';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { generatePublicId } from '@photobooth/public-output';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository, type TemplatePlacement, type TemplateOverlay } from '../db/repository.js';
 import { sessionStateMachine, type SessionState } from '../services/session-state-machine.js';
 import { storageService } from '../services/storage.js';
 import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
 import { flipbookConfig } from '../config.js';
+import { photoStripRenderer } from '../services/photo-strip-renderer.js';
 import type { SessionType } from '@photobooth/public-output';
 
 const createSessionSchema = z.object({
@@ -26,9 +27,17 @@ const selectFrameSchema = z.object({
   frameId: z.string().min(1),
 });
 
+const selectTemplateSchema = z.object({
+  templateId: z.string().min(1),
+});
+
 const selectFlipbookSchema = z.object({
   coverIndex: z.number().int().min(1).max(3),
   videoIndex: z.number().int().min(1).max(3),
+});
+
+const printSessionSchema = z.object({
+  copies: z.number().int().min(1).default(1),
 });
 
 function isSessionAuthorized(
@@ -59,6 +68,119 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.send({
         success: true,
         data: frames,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'DATABASE_ERROR', message },
+      });
+    }
+  });
+
+  // 0b. List active templates for Photo Strip
+  fastify.get('/api/templates', async (_request, reply) => {
+    try {
+      let templates = await dbRepository.listActiveTemplates();
+      // Seed default templates if none exist
+      if (templates.length === 0) {
+        await dbRepository.createTemplate(
+          'Classic Portrait Strip',
+          'portrait',
+          1200,
+          1800,
+          'templates/classic-portrait.png',
+          3,
+          5,
+          [
+            {
+              captureIndex: 1,
+              x: 100,
+              y: 120,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 2,
+              x: 100,
+              y: 600,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 3,
+              x: 100,
+              y: 1080,
+              width: 1000,
+              height: 440,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+          ],
+        );
+        await dbRepository.createTemplate(
+          'Grid 2x2 Landscape',
+          'landscape',
+          1800,
+          1200,
+          'templates/grid-landscape.png',
+          4,
+          5,
+          [
+            {
+              captureIndex: 1,
+              x: 120,
+              y: 120,
+              width: 720,
+              height: 450,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 2,
+              x: 960,
+              y: 120,
+              width: 720,
+              height: 450,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 3,
+              x: 120,
+              y: 630,
+              width: 720,
+              height: 450,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+            {
+              captureIndex: 4,
+              x: 960,
+              y: 630,
+              width: 720,
+              height: 450,
+              rotation: 0,
+              borderRadius: 8,
+              zIndex: 1,
+            },
+          ],
+        );
+        templates = await dbRepository.listActiveTemplates();
+      }
+      return reply.send({
+        success: true,
+        data: templates,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -246,6 +368,69 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  // 4b. Select Template (Photo Strip)
+  const handleSelectTemplate = async (
+    request: import('fastify').FastifyRequest<{ Params: { id: string } }>,
+    reply: import('fastify').FastifyReply,
+  ) => {
+    const { id } = request.params;
+    const sessionToken = request.headers['x-session-token'];
+
+    const parseResult = selectTemplateSchema.safeParse(request.body);
+    if (!parseResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'INVALID_REQUEST', message: 'Valid templateId is required' },
+      });
+    }
+
+    try {
+      const session = await dbRepository.getSessionById(id);
+      if (!session) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
+        });
+      }
+
+      if (!isSessionAuthorized(sessionToken, session.token)) {
+        return reply.status(403).send({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Invalid or missing session authorization token' },
+        });
+      }
+
+      sessionStateMachine.assertValidTransition(session.type, session.state, 'template_selected');
+
+      const template = await dbRepository.getTemplateById(parseResult.data.templateId);
+      if (!template) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'TEMPLATE_NOT_FOUND', message: 'Selected template does not exist' },
+        });
+      }
+
+      const updated = await dbRepository.selectTemplate(id, template);
+
+      return reply.send({
+        success: true,
+        data: stripToken(updated),
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'WORKFLOW_ERROR', message },
+      });
+    }
+  };
+
+  fastify.post<{ Params: { id: string } }>('/api/sessions/:id/template', handleSelectTemplate);
+  fastify.post<{ Params: { id: string } }>(
+    '/api/sessions/:id/select-template',
+    handleSelectTemplate,
+  );
+
   // 5. Acknowledge Instructions (Flipbook)
   fastify.post<{ Params: { id: string } }>(
     '/api/sessions/:id/instructions/acknowledge',
@@ -326,6 +511,12 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
+        if (session.state === 'template_selected') {
+          sessionStateMachine.assertValidTransition(session.type, session.state, 'capturing');
+          await dbRepository.updateSessionState(id, 'capturing');
+          session.state = 'capturing';
+        }
+
         if (session.state !== 'capturing' && session.state !== 'review') {
           return reply.status(400).send({
             success: false,
@@ -370,9 +561,24 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
+        const snapshot = session.templateSnapshot as Record<string, unknown> | null;
+        const targetCount =
+          typeof snapshot?.requiredCaptureCount === 'number'
+            ? (snapshot.requiredCaptureCount as number)
+            : 3;
+
         const rawIndexStr = getFieldValue(data.fields?.captureIndex);
         const rawIndex = rawIndexStr ? parseInt(rawIndexStr, 10) : 1;
-        const captureIndex = Number.isInteger(rawIndex) && rawIndex >= 1 ? rawIndex : 1;
+        if (!Number.isInteger(rawIndex) || rawIndex < 1 || rawIndex > targetCount) {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'INVALID_SLOT',
+              message: `Capture index must be an integer between 1 and ${targetCount}`,
+            },
+          });
+        }
+        const captureIndex = rawIndex;
 
         const buffer = await data.toBuffer();
         const validation = mediaValidator.validateImage(buffer);
@@ -395,7 +601,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
         // If in capturing mode and target captures reached, transition to review
         let currentState = session.state;
-        if (session.state === 'capturing' && result.captureCount >= 3) {
+        if (session.state === 'capturing' && result.captureCount >= targetCount) {
           sessionStateMachine.assertValidTransition(session.type, session.state, 'review');
           await dbRepository.updateSessionState(id, 'review');
           currentState = 'review';
@@ -865,6 +1071,186 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+
+  // 10b. Confirm Photo Strip Output (generates 300 DPI 4R PNG, public ID, QR, and queues publication)
+  fastify.post<{ Params: { id: string } }>(
+    '/api/sessions/:id/photo-strip/confirm',
+    async (request, reply) => {
+      const { id } = request.params;
+      const sessionToken = request.headers['x-session-token'];
+
+      try {
+        const session = await dbRepository.getSessionById(id);
+        if (!session) {
+          return reply.status(404).send({
+            success: false,
+            error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
+          });
+        }
+
+        if (!isSessionAuthorized(sessionToken, session.token)) {
+          return reply.status(403).send({
+            success: false,
+            error: { code: 'FORBIDDEN', message: 'Invalid or missing session authorization token' },
+          });
+        }
+
+        if (session.type !== 'photo_strip') {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'INVALID_SESSION_TYPE',
+              message: 'Session is not a photo strip session',
+            },
+          });
+        }
+
+        if (session.state !== 'review' && session.state !== 'capturing') {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'INVALID_STATE',
+              message: 'This step is not available yet. Continue the current workflow.',
+            },
+          });
+        }
+
+        const templateSnapshot = session.templateSnapshot as Record<string, unknown> | null;
+        if (!templateSnapshot) {
+          return reply.status(400).send({
+            success: false,
+            error: { code: 'NO_TEMPLATE', message: 'No template selected for this session' },
+          });
+        }
+
+        const captures = await dbRepository.getPhotoCaptures(id);
+        const requiredCount =
+          typeof templateSnapshot.requiredCaptureCount === 'number'
+            ? templateSnapshot.requiredCaptureCount
+            : 3;
+
+        if (captures.length < requiredCount) {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'INCOMPLETE_CAPTURES',
+              message: `Photo strip requires ${requiredCount} photos (received ${captures.length}).`,
+            },
+          });
+        }
+
+        // Generate 7-character base-62 public ID
+        const publicId = generatePublicId();
+        const qrUrl = `https://myphotobooth.com/${publicId}`;
+
+        const width = (templateSnapshot.outputWidth as number) || 1200;
+        const height = (templateSnapshot.outputHeight as number) || 1800;
+        const placements = (templateSnapshot.placements as unknown as TemplatePlacement[]) || [];
+        const overlays = (templateSnapshot.overlays as unknown as TemplateOverlay[]) || [];
+        const bgPath = templateSnapshot.backgroundPath as string | undefined;
+
+        // Render 300 DPI 4R PNG buffer
+        const pngBuffer = await photoStripRenderer.renderStrip({
+          width,
+          height,
+          backgroundPath: bgPath,
+          placements,
+          overlays,
+          captures: captures.map((c) => ({ captureIndex: c.captureIndex, filePath: c.filePath })),
+          publicId,
+          qrUrl,
+        });
+
+        // Save output to session directory
+        const outDir = storageService.getSessionDir(id, 'outputs');
+        const outputPath = path.join(outDir, `${publicId}.png`);
+        fs.writeFileSync(outputPath, pngBuffer);
+
+        // Mirror output to global outputs directory for fast local retrieval
+        await storageService.mirrorToGlobalOutputs(outputPath, publicId, 'png');
+
+        // Record output and queue for cloud publishing
+        const outputId = await dbRepository.saveGeneratedOutput(
+          id,
+          publicId,
+          'image/png',
+          outputPath,
+          width,
+          height,
+        );
+
+        return reply.send({
+          success: true,
+          data: {
+            outputId,
+            publicId,
+            qrUrl,
+            state: 'booth_confirmed',
+          },
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return reply.status(500).send({
+          success: false,
+          error: {
+            code: 'COMPOSITION_FAILED',
+            message: `Could not generate the photo strip. Your original photos are safe. (${message})`,
+          },
+        });
+      }
+    },
+  );
+
+  // 10c. Print Recording (Firefox/CUPS handoff)
+  fastify.post<{ Params: { id: string } }>('/api/sessions/:id/print', async (request, reply) => {
+    const { id } = request.params;
+    const sessionToken = request.headers['x-session-token'];
+
+    const parseResult = printSessionSchema.safeParse(request.body || {});
+    const copies = parseResult.success ? parseResult.data.copies : 1;
+
+    try {
+      const session = await dbRepository.getSessionById(id);
+      if (!session) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
+        });
+      }
+
+      if (!isSessionAuthorized(sessionToken, session.token)) {
+        return reply.status(403).send({
+          success: false,
+          error: { code: 'FORBIDDEN', message: 'Invalid or missing session authorization token' },
+        });
+      }
+
+      if (session.state !== 'booth_confirmed' && session.state !== 'printed') {
+        return reply.status(400).send({
+          success: false,
+          error: {
+            code: 'INVALID_STATE',
+            message: 'Printing is only allowed after booth confirmation.',
+          },
+        });
+      }
+
+      sessionStateMachine.assertValidTransition(session.type, session.state, 'printed');
+
+      const updated = await dbRepository.recordPrintStatus(id, copies);
+
+      return reply.send({
+        success: true,
+        data: stripToken(updated),
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'PRINT_RECORD_ERROR', message },
+      });
+    }
+  });
 
   // 11. Cancel active session
   fastify.post<{ Params: { id: string } }>('/api/sessions/:id/cancel', async (request, reply) => {

@@ -18,6 +18,43 @@ export interface FrameItem {
   isActive: boolean;
 }
 
+export interface TemplatePlacement {
+  captureIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+  borderRadius?: number;
+  zIndex?: number;
+}
+
+export interface TemplateOverlay {
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+  zIndex?: number;
+}
+
+export interface TemplateItem {
+  id: string;
+  name: string;
+  orientation: 'landscape' | 'portrait';
+  outputWidth: number;
+  outputHeight: number;
+  backgroundPath: string;
+  isActive: boolean;
+  requiredCaptureCount: number;
+  countdownSeconds: 3 | 5 | 10;
+  placements: TemplatePlacement[];
+  overlays?: TemplateOverlay[];
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface CaptureItem {
   id: string;
   sessionId: string;
@@ -117,6 +154,110 @@ export class DatabaseRepository {
     [
       '3',
       { id: '3', name: 'Pioneer Grid', overlayPath: 'frames/pioneer-grid.png', isActive: true },
+    ],
+  ]);
+  private inMemoryTemplates: Map<string, TemplateItem> = new Map([
+    [
+      'classic-portrait',
+      {
+        id: 'classic-portrait',
+        name: 'Classic Portrait Strip',
+        orientation: 'portrait',
+        outputWidth: 1200,
+        outputHeight: 1800,
+        backgroundPath: 'templates/classic-portrait.png',
+        isActive: true,
+        requiredCaptureCount: 3,
+        countdownSeconds: 5,
+        placements: [
+          {
+            captureIndex: 1,
+            x: 100,
+            y: 120,
+            width: 1000,
+            height: 440,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 100,
+            y: 600,
+            width: 1000,
+            height: 440,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 3,
+            x: 100,
+            y: 1080,
+            width: 1000,
+            height: 440,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+        ],
+      },
+    ],
+    [
+      'grid-landscape',
+      {
+        id: 'grid-landscape',
+        name: 'Grid 2x2 Landscape',
+        orientation: 'landscape',
+        outputWidth: 1800,
+        outputHeight: 1200,
+        backgroundPath: 'templates/grid-landscape.png',
+        isActive: true,
+        requiredCaptureCount: 4,
+        countdownSeconds: 5,
+        placements: [
+          {
+            captureIndex: 1,
+            x: 120,
+            y: 120,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 960,
+            y: 120,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 3,
+            x: 120,
+            y: 630,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 4,
+            x: 960,
+            y: 630,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+        ],
+      },
     ],
   ]);
   private inMemoryCaptures: Map<string, CaptureItem[]> = new Map();
@@ -513,38 +654,97 @@ export class DatabaseRepository {
   ): Promise<{ captureCount: number; retakeCount: number }> {
     try {
       if (isRetake) {
-        await pool.query(
-          `UPDATE sessions SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        await pool.query('BEGIN');
+        const updateRes = await pool.query(
+          `UPDATE sessions
+           SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP
+           WHERE id = $1 AND retake_count < 4
+           RETURNING retake_count AS "retakeCount"`,
           [sessionId],
         );
+
+        if (updateRes.rowCount === 0) {
+          await pool.query('ROLLBACK');
+          throw new Error('Maximum retake limit of 4 reached for this session');
+        }
+
         await pool.query(
-          `UPDATE session_captures SET file_path = $3, created_at = CURRENT_TIMESTAMP WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+          `UPDATE session_captures
+           SET file_path = $3, created_at = CURRENT_TIMESTAMP
+           WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
           [sessionId, captureIndex, filePath],
         );
+
+        const capRes = await pool.query(
+          `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
+          [sessionId],
+        );
+
+        await pool.query('COMMIT');
+        return {
+          retakeCount: updateRes.rows[0].retakeCount,
+          captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+        };
       } else {
+        await pool.query('BEGIN');
+        await pool.query(
+          `DELETE FROM session_captures WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+          [sessionId, captureIndex],
+        );
         await pool.query(
           `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
-           VALUES ($1, $2, $3, false, true)
-           ON CONFLICT DO NOTHING`,
+           VALUES ($1, $2, $3, false, true)`,
           [sessionId, captureIndex, filePath],
         );
+
+        const [sessRes, capRes] = await Promise.all([
+          pool.query(`SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`, [
+            sessionId,
+          ]),
+          pool.query(
+            `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
+            [sessionId],
+          ),
+        ]);
+
+        await pool.query('COMMIT');
+        return {
+          retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
+          captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+        };
+      }
+    } catch (err: unknown) {
+      try {
+        await pool.query('ROLLBACK');
+      } catch {
+        // ignore rollback error if not in active transaction
       }
 
-      const [sessRes, capRes] = await Promise.all([
-        pool.query(`SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`, [sessionId]),
-        pool.query(
-          `SELECT COUNT(*) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
-          [sessionId],
-        ),
-      ]);
+      if (err instanceof Error && err.message.includes('Maximum retake limit')) {
+        throw err;
+      }
 
-      return {
-        retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
-        captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
-      };
-    } catch {
-      const session = this.inMemorySessions.get(sessionId);
-      if (isRetake && session) {
+      let session = this.inMemorySessions.get(sessionId);
+      if (!session) {
+        session = {
+          id: sessionId,
+          token: 'in-memory-token',
+          eventId: 'in-memory-event',
+          type: 'photo_strip',
+          state: 'capturing',
+          retakeCount: 0,
+          isPrinted: false,
+          copiesPrinted: 0,
+          createdAt: new Date(),
+          lastActivityAt: new Date(),
+        };
+        this.inMemorySessions.set(sessionId, session);
+      }
+
+      if (isRetake) {
+        if (session.retakeCount >= 4) {
+          throw new Error('Maximum retake limit of 4 reached for this session');
+        }
         session.retakeCount = (session.retakeCount || 0) + 1;
       }
       const list = this.inMemoryCaptures.get(sessionId) || [];
@@ -824,6 +1024,316 @@ export class DatabaseRepository {
     } catch {
       return this.inMemoryOutputs.get(publicId) || null;
     }
+  }
+
+  /**
+   * Lists all active templates for Photo Strip sessions.
+   */
+  public async listActiveTemplates(): Promise<TemplateItem[]> {
+    try {
+      const query = `
+        SELECT
+          id,
+          name,
+          orientation,
+          output_width AS "outputWidth",
+          output_height AS "outputHeight",
+          background_path AS "backgroundPath",
+          is_active AS "isActive",
+          required_capture_count AS "requiredCaptureCount",
+          countdown_seconds AS "countdownSeconds",
+          placements,
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM templates
+        WHERE is_active = true
+        ORDER BY created_at ASC
+      `;
+      const res = await pool.query(query);
+      if (res.rows && res.rows.length > 0) {
+        return res.rows;
+      }
+      return Array.from(this.inMemoryTemplates.values()).filter((t) => t.isActive);
+    } catch {
+      return Array.from(this.inMemoryTemplates.values()).filter((t) => t.isActive);
+    }
+  }
+
+  /**
+   * Retrieves a template by ID.
+   */
+  public async getTemplateById(templateId: string): Promise<TemplateItem | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      templateId,
+    );
+    if (isUuid) {
+      try {
+        const query = `
+          SELECT
+            id,
+            name,
+            orientation,
+            output_width AS "outputWidth",
+            output_height AS "outputHeight",
+            background_path AS "backgroundPath",
+            is_active AS "isActive",
+            required_capture_count AS "requiredCaptureCount",
+            countdown_seconds AS "countdownSeconds",
+            placements,
+            created_at AS "createdAt",
+            updated_at AS "updatedAt"
+          FROM templates
+          WHERE id = $1
+        `;
+        const res = await pool.query(query, [templateId]);
+        if (res.rows[0]) return res.rows[0];
+      } catch {
+        // fallback to memory
+      }
+    } else {
+      try {
+        const query = `
+          SELECT
+            id,
+            name,
+            orientation,
+            output_width AS "outputWidth",
+            output_height AS "outputHeight",
+            background_path AS "backgroundPath",
+            is_active AS "isActive",
+            required_capture_count AS "requiredCaptureCount",
+            countdown_seconds AS "countdownSeconds",
+            placements,
+            created_at AS "createdAt",
+            updated_at AS "updatedAt"
+          FROM templates
+          WHERE name ILIKE $1
+          LIMIT 1
+        `;
+        const res = await pool.query(query, [`%${templateId}%`]);
+        if (res.rows[0]) return res.rows[0];
+      } catch {
+        // fallback to memory
+      }
+    }
+
+    if (this.inMemoryTemplates.has(templateId)) {
+      return this.inMemoryTemplates.get(templateId) || null;
+    }
+
+    const all = Array.from(this.inMemoryTemplates.values());
+    const match = all.find(
+      (t) => t.id === templateId || t.name.toLowerCase().includes(templateId.toLowerCase()),
+    );
+    return match || null;
+  }
+
+  /**
+   * Creates a new template in the database (or in-memory).
+   */
+  public async createTemplate(
+    name: string,
+    orientation: 'landscape' | 'portrait',
+    outputWidth: number,
+    outputHeight: number,
+    backgroundPath: string,
+    requiredCaptureCount: number,
+    countdownSeconds: 3 | 5 | 10,
+    placements: TemplatePlacement[],
+  ): Promise<TemplateItem> {
+    try {
+      const query = `
+        INSERT INTO templates (
+          name, orientation, output_width, output_height,
+          background_path, required_capture_count, countdown_seconds, placements
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        RETURNING
+          id, name, orientation,
+          output_width AS "outputWidth",
+          output_height AS "outputHeight",
+          background_path AS "backgroundPath",
+          is_active AS "isActive",
+          required_capture_count AS "requiredCaptureCount",
+          countdown_seconds AS "countdownSeconds",
+          placements,
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+      `;
+      const res = await pool.query(query, [
+        name,
+        orientation,
+        outputWidth,
+        outputHeight,
+        backgroundPath,
+        requiredCaptureCount,
+        countdownSeconds,
+        JSON.stringify(placements),
+      ]);
+      return res.rows[0];
+    } catch {
+      const id = crypto.randomUUID();
+      const template: TemplateItem = {
+        id,
+        name,
+        orientation,
+        outputWidth,
+        outputHeight,
+        backgroundPath,
+        isActive: true,
+        requiredCaptureCount,
+        countdownSeconds,
+        placements,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.inMemoryTemplates.set(id, template);
+      return template;
+    }
+  }
+
+  /**
+   * Associates a template with a Photo Strip session, saves an immutable snapshot,
+   * and advances state to 'template_selected'.
+   */
+  public async selectTemplate(
+    sessionId: string,
+    template: TemplateItem,
+  ): Promise<SessionData | null> {
+    const snapshot = {
+      id: template.id,
+      name: template.name,
+      orientation: template.orientation,
+      outputWidth: template.outputWidth,
+      outputHeight: template.outputHeight,
+      backgroundPath: template.backgroundPath,
+      requiredCaptureCount: template.requiredCaptureCount,
+      countdownSeconds: template.countdownSeconds,
+      placements: template.placements,
+      overlays: template.overlays || [],
+      snapshottedAt: new Date().toISOString(),
+    };
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      template.id,
+    );
+    const dbTemplateId = isUuid ? template.id : null;
+
+    try {
+      const query = `
+        UPDATE sessions
+        SET template_id = $2,
+            template_snapshot = $3::jsonb,
+            state = 'template_selected',
+            last_activity_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING
+          id,
+          token,
+          event_id AS "eventId",
+          type,
+          state,
+          template_id AS "templateId",
+          frame_id AS "frameId",
+          template_snapshot AS "templateSnapshot",
+          retake_count AS "retakeCount",
+          is_printed AS "isPrinted",
+          copies_printed AS "copiesPrinted",
+          created_at AS "createdAt",
+          last_activity_at AS "lastActivityAt",
+          cancelled_at AS "cancelledAt"
+      `;
+      const res = await pool.query(query, [sessionId, dbTemplateId, JSON.stringify(snapshot)]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    const session = this.inMemorySessions.get(sessionId);
+    if (session) {
+      session.templateId = template.id;
+      session.templateSnapshot = snapshot;
+      session.state = 'template_selected';
+      session.lastActivityAt = new Date();
+      return session;
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves all selected photo captures for a session.
+   */
+  public async getPhotoCaptures(sessionId: string): Promise<CaptureItem[]> {
+    try {
+      const query = `
+        SELECT
+          id,
+          session_id AS "sessionId",
+          capture_index AS "captureIndex",
+          file_path AS "filePath",
+          is_cover AS "isCover",
+          is_selected AS "isSelected",
+          created_at AS "createdAt"
+        FROM session_captures
+        WHERE session_id = $1 AND is_cover = false AND is_selected = true
+        ORDER BY capture_index ASC
+      `;
+      const res = await pool.query(query, [sessionId]);
+      return res.rows;
+    } catch {
+      const captures = this.inMemoryCaptures.get(sessionId) || [];
+      return captures
+        .filter((c) => !c.isCover && c.isSelected)
+        .sort((a, b) => a.captureIndex - b.captureIndex);
+    }
+  }
+
+  /**
+   * Records print status for a confirmed session and transitions state to 'printed'.
+   */
+  public async recordPrintStatus(
+    sessionId: string,
+    copiesPrinted: number,
+  ): Promise<SessionData | null> {
+    try {
+      const query = `
+        UPDATE sessions
+        SET is_printed = true,
+            copies_printed = copies_printed + $2,
+            state = 'printed',
+            last_activity_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND state = 'booth_confirmed'
+        RETURNING
+          id,
+          token,
+          event_id AS "eventId",
+          type,
+          state,
+          template_id AS "templateId",
+          frame_id AS "frameId",
+          template_snapshot AS "templateSnapshot",
+          retake_count AS "retakeCount",
+          is_printed AS "isPrinted",
+          copies_printed AS "copiesPrinted",
+          created_at AS "createdAt",
+          last_activity_at AS "lastActivityAt",
+          cancelled_at AS "cancelledAt"
+      `;
+      const res = await pool.query(query, [sessionId, copiesPrinted]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    const session = this.inMemorySessions.get(sessionId);
+    if (session && session.state === 'booth_confirmed') {
+      session.isPrinted = true;
+      session.copiesPrinted += copiesPrinted;
+      session.state = 'printed';
+      session.lastActivityAt = new Date();
+      return session;
+    }
+    return null;
   }
 }
 

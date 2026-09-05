@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AdminEventsPage } from './pages/AdminEventsPage';
+import { AdminRouter } from './admin/admin-router';
 
 type Category = 'all' | 'guest' | 'admin';
 
@@ -58,12 +59,18 @@ const screens: Screen[] = [
 
 import { WelcomeExperienceScreen } from './components/WelcomeScreen';
 import { FlipbookWorkflow } from './components/flipbook/FlipbookWorkflow';
+import { PhotoStripWorkflow } from './components/photostrip/PhotoStripWorkflow';
 import { useFlipbookStore } from './store/flipbook-store';
+import { useSessionStore } from './store/session-store';
 
 function App() {
   const [mode, setMode] = useState<'live' | 'sheet'>('live');
   const [category, setCategory] = useState<Category>('all');
   const { currentStep } = useFlipbookStore();
+  const { activeSession } = useSessionStore();
+  if (window.location.pathname === '/admin/templates' || window.location.pathname.startsWith('/admin/templates/')) {
+    return <AdminRouter />;
+  }
 
   const visible =
     category === 'all' ? screens : screens.filter((screen) => screen.category === category);
@@ -135,7 +142,13 @@ function App() {
       {mode === 'live' ? (
         <section className="flex min-h-[calc(100vh-77px)] w-full flex-col items-stretch">
           <div className="flex flex-1 w-full overflow-hidden bg-[#0a2924]">
-            {currentStep === 'welcome' ? <WelcomeExperienceScreen /> : <FlipbookWorkflow />}
+            {activeSession?.type === 'photo_strip' ? (
+              <PhotoStripWorkflow />
+            ) : currentStep === 'welcome' && !activeSession ? (
+              <WelcomeExperienceScreen />
+            ) : (
+              <FlipbookWorkflow />
+            )}
           </div>
         </section>
       ) : (
