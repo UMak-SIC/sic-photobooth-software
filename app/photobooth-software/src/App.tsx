@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AdminRouter } from './admin/admin-router';
 
 type Category = 'all' | 'guest' | 'admin';
 
@@ -57,6 +58,10 @@ const screens: Screen[] = [
 
 function App() {
   const [category, setCategory] = useState<Category>('all');
+  if (window.location.pathname === '/admin/templates' || window.location.pathname.startsWith('/admin/templates/')) {
+    return <AdminRouter />;
+  }
+
   const visible =
     category === 'all' ? screens : screens.filter((screen) => screen.category === category);
 
