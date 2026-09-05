@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+.next/
+**/next-env.d.ts
+coverage/
+pnpm-lock.yaml
+.github/pull_request_template.md
+docs/PRD.md
+docs/system-architecture.md
+docs/traceability-matrix.md
+docs/superpowers/plans/**
+README.md

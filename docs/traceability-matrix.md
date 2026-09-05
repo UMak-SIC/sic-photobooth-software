@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document provides a single source of truth for tracking project tasks against the product requirements in [`docs/PRD.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/docs/PRD.md), architectural rules in [`docs/system-architecture.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/docs/system-architecture.md), and repository standards in [`AGENTS.md`](file:///C:/dev/UMAK-SIC/sic-photobooth-software/AGENTS.md).
+This document provides a single source of truth for tracking project tasks against the product requirements in [`PRD.md`](PRD.md), architectural rules in [`system-architecture.md`](system-architecture.md), and repository standards in [`../AGENTS.md`](../AGENTS.md).
 
 ### Status Legend
 - `[ ] Planned` — Not yet started
@@ -19,10 +19,10 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0101** | Define monorepo package manifests, root workspace configuration, and package inter-dependencies | Root, `app/*`, `packages/*` | Contract § Delivery Scope | Workspaces resolve cleanly without broken symlinks. | `[ ] Planned` |
-| **TSK-0102** | Configure shared TypeScript base configs (`tsconfig.base.json`) and application-specific extensions | Root, all packages | Contract § Delivery Scope | `tsc --noEmit` passes across all packages. | `[ ] Planned` |
-| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | `agents/coding-preferences.md` | Linter runs without error and enforces repository standards. | `[ ] Planned` |
-| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | `agents/unit-tests.md`, `agents/e2e-tests.md` | Test harness executes and passes sample smoke tests. | `[ ] Planned` |
+| **TSK-0101** | Define monorepo package manifests, root workspace configuration, and package inter-dependencies | Root, `app/*`, `packages/*` | Contract § Delivery Scope | Workspaces resolve cleanly without broken symlinks. | `[x] Completed` |
+| **TSK-0102** | Configure shared TypeScript base configs (`tsconfig.base.json`) and application-specific extensions | Root, all packages | Contract § Delivery Scope | `tsc --noEmit` passes across all packages. | `[x] Completed` |
+| **TSK-0103** | Set up unified linter and code style formatting rules adhering to `agents/coding-preferences.md` | Root | `agents/coding-preferences.md` | Linter runs without error and enforces repository standards. | `[x] Completed` |
+| **TSK-0104** | Configure unit and integration test runner (e.g. Vitest) and E2E runner across workspaces | Root, `app/*`, `packages/*` | `agents/unit-tests.md`, `agents/e2e-tests.md` | Test harness executes and passes sample smoke tests. | `[x] Completed` |
 
 ---
 
@@ -31,9 +31,9 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0201** | Implement cryptographically random 7-character base-62 (`[A-Za-z0-9]`) ID generator | `packages/public-output` | US-12, US-125, US-132, US-138, Contract § Assisted Booth | Generator produces 7-char alphanumeric strings; zero sequential predictability. | `[ ] Planned` |
-| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://myphotobooth.com/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[ ] Planned` |
-| **TSK-0203** | Define shared TypeScript types and schemas for public output metadata and API responses | `packages/public-output` | US-108, US-119, Contract § Publishing and Retrieval | Shared types imported in backend, captive website, and public website. | `[ ] Planned` |
+| **TSK-0201** | Implement cryptographically random 7-character base-62 (`[A-Za-z0-9]`) ID generator | `packages/public-output` | US-12, US-125, US-132, US-138, Contract § Assisted Booth | Generator produces 7-char alphanumeric strings; zero sequential predictability. | `[x] Completed` |
+| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://myphotobooth.com/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[x] Completed` |
+| **TSK-0203** | Define shared TypeScript types and schemas for public output metadata and API responses | `packages/public-output` | US-108, US-119, Contract § Publishing and Retrieval | Shared types imported in backend, captive website, and public website. | `[x] Completed` |
 
 ---
 
@@ -42,9 +42,9 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0301** | Implement shared photo/flipbook media preview component with mobile-responsive viewport | `packages/ui` | US-108, US-119, US-120 | Renders high-resolution image / looping GIF cleanly across mobile and desktop. | `[ ] Planned` |
-| **TSK-0302** | Implement unified download button with asset trigger and loading state | `packages/ui` | US-108, US-120 | Downloads binary asset to client device without page redirect. | `[ ] Planned` |
-| **TSK-0303** | Implement unavailable / expired / processing status alert banners adhering to recovery UX specs | `packages/ui` | US-109, US-110, US-121, Contract § Events/Errors | Displays exact user messages defined in Authoritative Contract. | `[ ] Planned` |
+| **TSK-0301** | Implement shared photo/flipbook media preview component with mobile-responsive viewport | `packages/ui` | US-108, US-119, US-120 | Renders high-resolution image / looping GIF cleanly across mobile and desktop. | `[x] Completed` |
+| **TSK-0302** | Implement unified download button with asset trigger and loading state | `packages/ui` | US-108, US-120 | Downloads binary asset to client device without page redirect. | `[x] Completed` |
+| **TSK-0303** | Implement unavailable / expired / processing status alert banners adhering to recovery UX specs | `packages/ui` | US-109, US-110, US-121, Contract § Events/Errors | Displays exact user messages defined in Authoritative Contract. | `[x] Completed` |
 
 ---
 
@@ -53,12 +53,12 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0401** | Implement PostgreSQL schema and migrations for events, sessions, captures, templates, outputs, and publications | `app/backend` | US-91, US-92, US-100, US-101, US-136 | DB migrations create tables with least-privilege DB role support. | `[ ] Planned` |
-| **TSK-0402** | Implement health check endpoint (`/health`) and backend lifecycle initialization | `app/backend` | US-104 | Returns 200 OK with DB and filesystem status. | `[ ] Planned` |
-| **TSK-0403** | Implement session lifecycle manager (creation, random session tokens, state persistence, cancellation) | `app/backend` | US-1, US-9..13, US-87..90, US-102, US-103, US-129, US-130 | Enforces session isolation; rejects actions on cancelled sessions. | `[ ] Planned` |
-| **TSK-0404** | Implement backend-controlled filesystem storage manager with isolated session folders | `app/backend` | US-78, US-79, US-80, US-93, US-94, US-97, US-135 | Files saved to generated paths only; strict path traversal prevention. | `[ ] Planned` |
-| **TSK-0405** | Implement server-side media validators (magic byte header checks, MIME, size limits, dimensions, video duration) | `app/backend` | US-54, US-55, US-95, US-96, US-98, US-133, US-134 | Rejects renamed malformed files, oversized uploads, and invalid video durations. | `[ ] Planned` |
-| **TSK-0406** | Implement network security controls, origin restriction, and API rate limiters | `app/backend` | US-99, US-114, US-131, US-140 | Enforces request limits and isolates privileged endpoints from guest network. | `[ ] Planned` |
+| **TSK-0401** | Implement PostgreSQL schema and migrations for events, sessions, captures, templates, outputs, and publications | `app/backend` | US-91, US-92, US-100, US-101, US-136 | DB migrations create tables with least-privilege DB role support. | `[x] Completed` |
+| **TSK-0402** | Implement health check endpoint (`/health`) and backend lifecycle initialization | `app/backend` | US-104 | Returns 200 OK with DB and filesystem status. | `[x] Completed` |
+| **TSK-0403** | Implement session lifecycle manager (creation, random session tokens, state persistence, cancellation) | `app/backend` | US-1, US-9..13, US-87..90, US-102, US-103, US-129, US-130 | Enforces session isolation; rejects actions on cancelled sessions. | `[x] Completed` |
+| **TSK-0404** | Implement backend-controlled filesystem storage manager with isolated session folders | `app/backend` | US-78, US-79, US-80, US-93, US-94, US-97, US-135 | Files saved to generated paths only; strict path traversal prevention. | `[x] Completed` |
+| **TSK-0405** | Implement server-side media validators (magic byte header checks, MIME, size limits, dimensions, video duration) | `app/backend` | US-54, US-55, US-95, US-96, US-98, US-133, US-134 | Rejects renamed malformed files, oversized uploads, and invalid video durations. | `[x] Completed` |
+| **TSK-0406** | Implement network security controls, origin restriction, and API rate limiters | `app/backend` | US-99, US-114, US-131, US-140 | Enforces request limits and isolates privileged endpoints from guest network. | `[x] Completed` |
 
 ---
 
@@ -84,13 +84,13 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0601** | Implement Flipbook state machine transitions (Created -> Frame Selected -> Instructions -> Cover Capture -> Video Capture -> Review -> Processing -> Confirmed) | `app/backend` | US-43, US-45, US-46, US-50, Contract § Flipbook | Enforces strict workflow order; validates media requirements at each stage. | `[ ] Planned` |
-| **TSK-0602** | Implement frame selection screen and pre-recording instructions acknowledgment | `app/photobooth-software` | US-41, US-42, US-44, US-45 | Frame previewed; recording does not begin until explicit guest confirmation. | `[ ] Planned` |
-| **TSK-0603** | Implement 3 cover photo capture sequence with 10-second countdown | `app/photobooth-software`, `app/backend` | US-47, US-48, US-49 | Captures exactly 3 cover photos with countdown and progress indicators. | `[ ] Planned` |
-| **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[ ] Planned` |
-| **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[ ] Planned` |
-| **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[ ] Planned` |
-| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
+| **TSK-0601** | Implement Flipbook state machine transitions (Created -> Frame Selected -> Instructions -> Cover Capture -> Video Capture -> Review -> Processing -> Confirmed) | `app/backend` | US-43, US-45, US-46, US-50, Contract § Flipbook | Enforces strict workflow order; validates media requirements at each stage. | `[x] Completed` |
+| **TSK-0602** | Implement frame selection screen and pre-recording instructions acknowledgment | `app/photobooth-software` | US-41, US-42, US-44, US-45 | Frame previewed; recording does not begin until explicit guest confirmation. | `[x] Completed` |
+| **TSK-0603** | Implement 3 cover photo capture sequence with 10-second countdown | `app/photobooth-software`, `app/backend` | US-47, US-48, US-49 | Captures exactly 3 cover photos with countdown and progress indicators. | `[x] Completed` |
+| **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[x] Completed` |
+| **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[x] Completed` |
+| **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[x] Completed` |
+| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[x] Completed` |
 
 ---
 
@@ -126,7 +126,7 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0901** | Implement Event Setup screen with unique (event_name + event_date) constraint enforcement | `app/photobooth-software`, `app/backend` | Contract § Events and Errors | Records event name, date, ID, operator name; prevents duplicate name+date. | `[ ] Planned` |
+| **TSK-0901** | Implement Event Setup screen with unique (event_name + event_date) constraint enforcement | `app/photobooth-software`, `app/backend` | Contract § Events and Errors | Records event name, date, ID, operator name; prevents duplicate name+date. | `[x] Completed` |
 | **TSK-0902** | Implement Photo Strip Template Editor with freeform placements, background transforms, and grid presets | `app/photobooth-software`, `app/backend` | US-61..72, Contract § Template Editor | Supports placement coordinates (`x, y, w, h, rotation, borderRadius, zIndex`) & linked placements. | `[ ] Planned` |
 | **TSK-0903** | Implement Flipbook Frame management (create, upload overlay, activate/deactivate) | `app/photobooth-software`, `app/backend` | US-73, US-74 | Allows operator to upload and configure flipbook frames. | `[ ] Planned` |
 | **TSK-0904** | Implement Publication Administration Dashboard with manual retry for dead-letter queue jobs | `app/photobooth-software`, `app/backend` | Contract § Publishing and Retrieval | Displays queued, in_progress, uploaded, failed jobs with retry action. | `[ ] Planned` |
