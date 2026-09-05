@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react';
 import { templateApi } from './templates/api';
 import { TemplateEditor } from './templates/template-editor';
 import { TemplateLibrary } from './templates/template-library';
-import { layoutPlacements } from './templates/presets';
+import { flipbookPlacements, layoutPlacements } from './templates/presets';
 import { useTemplateStore } from './templates/template-store';
 import { draftFromTemplate, emptyDraft, type Template } from './templates/types';
 import { PublicationDashboard } from './publications/publication-dashboard';
 import { AdminEventsPage } from '../pages/AdminEventsPage';
 
-type Frame = { id: string; name: string; isActive: boolean };
 
 export function AdminRouter() {
   const [path, setPath] = useState(window.location.pathname);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [flipbooks, setFlipbooks] = useState<Template[]>([]);
   const [error, setError] = useState('');
   const store = useTemplateStore();
 
@@ -24,7 +24,9 @@ export function AdminRouter() {
 
   useEffect(() => {
     if (path === '/admin/templates')
-      templateApi.list().then(setTemplates).catch((cause: Error) => setError(cause.message));
+      templateApi.list('photo_strip').then(setTemplates).catch((cause: Error) => setError(cause.message));
+    if (path === '/admin/frames')
+      templateApi.list('flipbook').then(setFlipbooks).catch((cause: Error) => setError(cause.message));
   }, [path]);
 
   const navigate = (nextPath: string) => {
@@ -93,24 +95,26 @@ export function AdminRouter() {
               setError(cause instanceof Error ? cause.message : String(cause));
             }
           }}
+          type="photo_strip"
         />
       </AdminFrame>
     );
 
   if (path === '/admin/events') return <AdminFrame onNavigate={navigate}><AdminEventsPage /></AdminFrame>;
-  if (path === '/admin/frames') return <AdminFrame onNavigate={navigate}><AdminFramesPage /></AdminFrame>;
+  if (path === '/admin/frames') return <AdminFrame onNavigate={navigate}><TemplateLibrary templates={flipbooks} error={error} onCreate={() => { store.reset(); store.setDraft({ ...emptyDraft(), type: 'flipbook', placements: flipbookPlacements() }); navigate('/admin/frames/new'); }} onEdit={(template) => { store.setSaved(template); navigate(`/admin/frames/${template.id}`); }} onActive={async (template) => { await templateApi.setActive(template.id, !template.active); setFlipbooks(await templateApi.list('flipbook')); }} onMove={() => {}} onDuplicate={async (template) => { await templateApi.duplicate(template.id); setFlipbooks(await templateApi.list('flipbook')); }} onDelete={async (template) => { if (window.confirm(`Delete “${template.name}”?`)) { await templateApi.remove(template.id); setFlipbooks(await templateApi.list('flipbook')); } }} onImport={async (file) => { await templateApi.importArchive(file); setFlipbooks(await templateApi.list('flipbook')); }} type="flipbook" /></AdminFrame>;
   if (path === '/admin/publications') return <AdminFrame onNavigate={navigate}><PublicationDashboard /></AdminFrame>;
 
-  const id = path.startsWith('/admin/templates/') ? path.split('/').at(-1) : undefined;
+  const isFlipbookRoute = path.startsWith('/admin/frames/');
+  const id = (path.startsWith('/admin/templates/') || isFlipbookRoute) ? path.split('/').at(-1) : undefined;
   return (
     <AdminFrame onNavigate={navigate}>
       <TemplateEditor
         templateId={id === 'new' ? undefined : id}
         initialTemplate={store.saved}
-        onBack={() => navigate('/admin/templates')}
+        onBack={() => navigate(store.draft.type === 'flipbook' ? '/admin/frames' : '/admin/templates')}
         onSaved={(template) => {
           store.setSaved(template);
-          navigate(`/admin/templates/${template.id}`);
+          navigate(`${template.type === 'flipbook' ? '/admin/frames' : '/admin/templates'}/${template.id}`);
         }}
         onLoad={async (templateId) => {
           const template = await templateApi.get(templateId);
@@ -144,38 +148,5 @@ function AdminFrame({ children, onNavigate }: { children: React.ReactNode; onNav
       </aside>
       <section className="admin-content">{children}</section>
     </main>
-  );
-}
-
-function AdminFramesPage() {
-  const [frames, setFrames] = useState<Frame[]>([]);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    fetch('/api/frames')
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Could not load frames.');
-        const body = (await response.json()) as { data: Frame[] };
-        setFrames(body.data);
-      })
-      .catch((cause: Error) => setError(cause.message));
-  }, []);
-
-  return (
-    <div className="admin-page">
-      <header className="admin-page-header">
-        <div>
-          <p className="admin-eyebrow">FLIPBOOK FRAMES</p>
-          <h1>Frame library</h1>
-          <p className="admin-muted">Frames available for Flipbook sessions.</p>
-        </div>
-      </header>
-      {error && <p className="admin-error" role="alert">{error}</p>}
-      {frames.length === 0 && !error ? <div className="admin-empty"><strong>No frames yet.</strong></div> : (
-        <div className="template-grid">
-          {frames.map((frame) => <article className="template-card" key={frame.id}><div className="template-card-body"><h2>{frame.name}</h2><span className={frame.isActive ? 'status active' : 'status'}>{frame.isActive ? 'Active' : 'Inactive'}</span></div></article>)}
-        </div>
-      )}
-    </div>
   );
 }

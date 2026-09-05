@@ -1,4 +1,5 @@
 export type Orientation = 'portrait' | 'landscape';
+export type TemplateType = 'photo_strip' | 'flipbook';
 
 export type TemplatePlacement = {
   id?: string;
@@ -26,6 +27,7 @@ export type TemplateOverlay = {
 
 export type TemplateDraft = {
   name: string;
+  type?: TemplateType;
   orientation: Orientation;
   background: { x: number; y: number; width: number; height: number };
   placements: TemplatePlacement[];
@@ -39,6 +41,7 @@ export type Template = TemplateDraft & {
   active: boolean;
   requiredCaptureCount: number;
   backgroundPath: string | null;
+  coverPath?: string | null;
   sortOrder: number | null;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +52,7 @@ export const dimensionsFor = (orientation: Orientation) =>
 
 export const emptyDraft = (): TemplateDraft => ({
   name: '',
+  type: 'photo_strip',
   orientation: 'portrait',
   background: { x: 0, y: 0, width: 1200, height: 1800 },
   placements: [],
@@ -58,6 +62,7 @@ export const emptyDraft = (): TemplateDraft => ({
 export function draftFromTemplate(template: Template): TemplateDraft {
   return {
     name: template.name,
+    type: template.type,
     orientation: template.orientation,
     background: { ...template.background },
     placements: template.placements.map(({ id: _id, ...placement }) => placement),

@@ -39,6 +39,8 @@ These routes are implemented by `app/photobooth-software/`:
   New Photo Strip template editor
 /admin/templates/:id
   Existing Photo Strip template editor
+/admin/frames
+  Flipbook frame library and editor for cover and GIF template uploads
 /admin/publications
   Local publication status dashboard and failed-job retry
 ```

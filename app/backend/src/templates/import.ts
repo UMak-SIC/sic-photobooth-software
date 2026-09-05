@@ -3,6 +3,7 @@ import { validateTemplateDraft, type TemplateDraft } from './types.js';
 export type ManifestEntry = {
   template: TemplateDraft;
   backgroundPath: string | null;
+  coverPath: string | null;
   overlays: Array<{ id: string | undefined; label: string; path: string | null }>;
 };
 export type ImportPackage = { version: number; templates: ManifestEntry[] };
@@ -48,6 +49,7 @@ export function parseManifest(entries: Map<string, Buffer>): ImportPackage {
     const record = item as Record<string, unknown>;
     const draft = validateTemplateDraft(stripPaths(record));
     const backgroundPath = typeof record.backgroundPath === 'string' ? record.backgroundPath : null;
+    const coverPath = typeof record.coverPath === 'string' ? record.coverPath : null;
     const overlays = ((record.overlays as Array<Record<string, unknown>> | undefined) ?? []).map(
       (overlay) => ({
         id: typeof overlay.id === 'string' ? overlay.id : undefined,
@@ -55,8 +57,8 @@ export function parseManifest(entries: Map<string, Buffer>): ImportPackage {
         path: typeof overlay.path === 'string' ? overlay.path : null,
       }),
     );
-    assertAssetsExist(entries, [backgroundPath, ...overlays.map((o) => o.path)]);
-    templates.push({ template: draft, backgroundPath, overlays });
+    assertAssetsExist(entries, [backgroundPath, coverPath, ...overlays.map((o) => o.path)]);
+    templates.push({ template: draft, backgroundPath, coverPath, overlays });
   }
 
   return { version: 1, templates };

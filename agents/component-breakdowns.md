@@ -28,6 +28,7 @@ Component and module boundaries derived from the product contract. This is a tem
 - Owns: local template assets, definitions, placements, overlays, editor drafts, and portable template exports.
 - Does not own: session template snapshots or final image composition.
 - Collaborators: Photo Strip template selection and compositor tasks.
+- Flipbook templates use the same editor and archive pipeline with a Flipbook-only cover asset; their uploaded assets are stored separately under local Flipbook storage.
 
 ### Publication Management
 

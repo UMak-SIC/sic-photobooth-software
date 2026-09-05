@@ -70,3 +70,6 @@ export function layoutPlacements(id: string): TemplatePlacement[] {
       return [];
   }
 }
+
+export const flipbookPlacements = (): TemplatePlacement[] =>
+  [150, 540, 930, 1320].map((y, index) => slot(index + 1, 290, y, 620));
