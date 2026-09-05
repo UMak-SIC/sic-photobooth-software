@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import fs from 'node:fs';
 import { isValidPublicId } from '@photobooth/public-output';
 import { storageService } from '../services/storage.js';
+import { dbRepository } from '../db/repository.js';
 
 export const photoRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { id: string } }>('/photos/:id', async (request, reply) => {
@@ -17,10 +18,28 @@ export const photoRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    // Attempt PNG then GIF output retrieval
-    const pngPath = storageService.getOutputPath(id, 'png');
-    const gifPath = storageService.getOutputPath(id, 'gif');
-    const filePath = pngPath || gifPath;
+    // Verify an approved generated output record exists in the database
+    const output = await dbRepository.getApprovedOutputByPublicId(id);
+    if (!output) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'PHOTO_NOT_FOUND',
+          message: 'Photo not found. Check the QR code or enter the full link/code again.',
+        },
+      });
+    }
+
+    let filePath: string | null = null;
+    if (output.filePath && fs.existsSync(output.filePath)) {
+      filePath = output.filePath;
+    } else {
+      const extension = output.mediaType === 'image/gif' ? 'gif' : 'png';
+      const fallbackPath = storageService.getOutputPath(id, extension);
+      if (fallbackPath && fs.existsSync(fallbackPath)) {
+        filePath = fallbackPath;
+      }
+    }
 
     if (!filePath || !fs.existsSync(filePath)) {
       return reply.status(404).send({
@@ -32,7 +51,7 @@ export const photoRoutes: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    const contentType = filePath.endsWith('.gif') ? 'image/gif' : 'image/png';
+    const contentType = output.mediaType || (filePath.endsWith('.gif') ? 'image/gif' : 'image/png');
     const stream = fs.createReadStream(filePath);
 
     return reply.type(contentType).send(stream);

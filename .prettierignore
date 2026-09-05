@@ -9,3 +9,5 @@ pnpm-lock.yaml
 docs/PRD.md
 docs/system-architecture.md
 docs/traceability-matrix.md
+docs/superpowers/plans/**
+README.md

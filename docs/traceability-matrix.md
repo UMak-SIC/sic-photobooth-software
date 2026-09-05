@@ -84,13 +84,13 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0601** | Implement Flipbook state machine transitions (Created -> Frame Selected -> Instructions -> Cover Capture -> Video Capture -> Review -> Processing -> Confirmed) | `app/backend` | US-43, US-45, US-46, US-50, Contract § Flipbook | Enforces strict workflow order; validates media requirements at each stage. | `[ ] Planned` |
-| **TSK-0602** | Implement frame selection screen and pre-recording instructions acknowledgment | `app/photobooth-software` | US-41, US-42, US-44, US-45 | Frame previewed; recording does not begin until explicit guest confirmation. | `[ ] Planned` |
-| **TSK-0603** | Implement 3 cover photo capture sequence with 10-second countdown | `app/photobooth-software`, `app/backend` | US-47, US-48, US-49 | Captures exactly 3 cover photos with countdown and progress indicators. | `[ ] Planned` |
-| **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[ ] Planned` |
-| **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[ ] Planned` |
-| **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[ ] Planned` |
-| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[ ] Planned` |
+| **TSK-0601** | Implement Flipbook state machine transitions (Created -> Frame Selected -> Instructions -> Cover Capture -> Video Capture -> Review -> Processing -> Confirmed) | `app/backend` | US-43, US-45, US-46, US-50, Contract § Flipbook | Enforces strict workflow order; validates media requirements at each stage. | `[x] Completed` |
+| **TSK-0602** | Implement frame selection screen and pre-recording instructions acknowledgment | `app/photobooth-software` | US-41, US-42, US-44, US-45 | Frame previewed; recording does not begin until explicit guest confirmation. | `[x] Completed` |
+| **TSK-0603** | Implement 3 cover photo capture sequence with 10-second countdown | `app/photobooth-software`, `app/backend` | US-47, US-48, US-49 | Captures exactly 3 cover photos with countdown and progress indicators. | `[x] Completed` |
+| **TSK-0604** | Implement 3 video recording sequence with auto-stop at exactly 6 seconds | `app/photobooth-software`, `app/backend` | US-51..56 | Records 3 videos (MKV/MP4); automatically stops at 6s; validates duration on backend. | `[x] Completed` |
+| **TSK-0605** | Implement Flipbook review screen with asset selection and 5-minute auto-default countdown timer | `app/photobooth-software` | US-57, Contract § Flipbook | Defaults to 1st cover and 1st video if timer expires; allows guest manual selection. | `[x] Completed` |
+| **TSK-0606** | Implement 21-frame extraction and looping GIF rendering engine (3s cover hold + 0.5-1.0s video frames) | `app/backend` | US-58, US-59, US-60, Contract § Flipbook | Generates smooth looping GIF with specified timing and overlay frame. | `[x] Completed` |
+| **TSK-0607** | Implement GIF generation 2-minute timeout guard with asset discard and recovery reset | `app/backend`, `app/photobooth-software` | Contract § Flipbook, `agents/recovery.md` | If rendering > 2 mins, discards assets, alerts guest, and restarts at cover capture. | `[x] Completed` |
 
 ---
 

@@ -36,7 +36,7 @@ const PHOTO_STRIP_VALID_TRANSITIONS: Record<PhotoStripState, PhotoStripState[]> 
 };
 
 const FLIPBOOK_VALID_TRANSITIONS: Record<FlipbookState, FlipbookState[]> = {
-  created: ['frame_selected', 'cancelled'],
+  created: ['frame_selected', 'instructions', 'cancelled'],
   frame_selected: ['instructions', 'frame_selected', 'cancelled'],
   instructions: ['cover_capture', 'cancelled'],
   cover_capture: ['video_capture', 'cancelled'],
@@ -134,6 +134,29 @@ export class SessionStateMachine {
       throw new Error(
         `Maximum retake limit reached (${MAX_RETAKES_ALLOWED} retakes allowed). Please proceed to confirm your photos.`,
       );
+    }
+  }
+
+  /**
+   * Asserts that all requirements for Flipbook processing are met.
+   */
+  public assertFlipbookReadyForProcessing(
+    coversCount: number,
+    videosCount: number,
+    selectedCoverIndex: number | null,
+    selectedVideoIndex: number | null,
+  ): void {
+    if (coversCount < 3) {
+      throw new Error(`Flipbook requires exactly 3 cover photos (received ${coversCount}).`);
+    }
+    if (videosCount < 3) {
+      throw new Error(`Flipbook requires exactly 3 video clips (received ${videosCount}).`);
+    }
+    if (selectedCoverIndex === null || selectedCoverIndex < 1 || selectedCoverIndex > 3) {
+      throw new Error('A valid cover photo selection (1..3) is required.');
+    }
+    if (selectedVideoIndex === null || selectedVideoIndex < 1 || selectedVideoIndex > 3) {
+      throw new Error('A valid video clip selection (1..3) is required.');
     }
   }
 }

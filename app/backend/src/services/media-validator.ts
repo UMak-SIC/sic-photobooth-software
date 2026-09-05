@@ -57,18 +57,48 @@ export class MediaValidator {
    * Detects video container format based on magic byte headers.
    */
   public detectVideoFormat(buffer: Buffer): SupportedVideoFormat | null {
-    if (!buffer || buffer.length < 12) {
+    if (!buffer || buffer.length < 8) {
       return null;
     }
 
-    // MKV / WebM: EBML Header 1A 45 DF A3
-    if (buffer[0] === 0x1a && buffer[1] === 0x45 && buffer[2] === 0xdf && buffer[3] === 0xa3) {
+    // 1. MKV / WebM: EBML Header [1A 45 DF A3] in the first 32 bytes
+    for (let i = 0; i <= Math.min(32, buffer.length - 4); i++) {
+      if (
+        buffer[i] === 0x1a &&
+        buffer[i + 1] === 0x45 &&
+        buffer[i + 2] === 0xdf &&
+        buffer[i + 3] === 0xa3
+      ) {
+        const headerSlice = buffer.slice(0, Math.min(128, buffer.length)).toString('latin1');
+        if (headerSlice.includes('webm')) {
+          return 'webm';
+        }
+        return 'mkv';
+      }
+    }
+
+    const headerString = buffer.slice(0, Math.min(128, buffer.length)).toString('latin1');
+    if (headerString.includes('webm')) {
+      return 'webm';
+    }
+    if (headerString.includes('matroska')) {
       return 'mkv';
     }
 
-    // MP4: 'ftyp' box signature at offset 4..7
-    const ftyp = buffer.toString('ascii', 4, 8);
-    if (ftyp === 'ftyp') {
+    // 2. MP4 / QuickTime: 'ftyp', 'moov', 'mdat', 'wide', 'free' boxes
+    if (buffer.length >= 8) {
+      const boxType = buffer.toString('ascii', 4, 8);
+      if (['ftyp', 'moov', 'mdat', 'wide', 'free'].includes(boxType)) {
+        return 'mp4';
+      }
+    }
+
+    // Check for common MP4 brand signatures (isom, mp41, mp42, avc1, qt  )
+    if (
+      headerString.includes('ftyp') ||
+      headerString.includes('isom') ||
+      headerString.includes('mp4')
+    ) {
       return 'mp4';
     }
 
@@ -139,11 +169,128 @@ export class MediaValidator {
   }
 
   /**
+   * Extracts duration in seconds from an MP4 buffer by reading the mvhd box.
+   */
+  public parseMp4Duration(buffer: Buffer): number | null {
+    if (!buffer || buffer.length < 16) {
+      return null;
+    }
+
+    let offset = 0;
+    while (offset + 8 <= buffer.length) {
+      const boxSize = buffer.readUInt32BE(offset);
+      const boxType = buffer.toString('ascii', offset + 4, offset + 8);
+
+      const actualSize = boxSize === 0 ? buffer.length - offset : boxSize;
+      if (actualSize < 8 || offset + actualSize > buffer.length) {
+        break;
+      }
+
+      if (boxType === 'moov') {
+        let moovOffset = offset + 8;
+        const moovEnd = offset + actualSize;
+        while (moovOffset + 8 <= moovEnd) {
+          const childSize = buffer.readUInt32BE(moovOffset);
+          const childType = buffer.toString('ascii', moovOffset + 4, moovOffset + 8);
+          if (childSize < 8 || moovOffset + childSize > moovEnd) {
+            break;
+          }
+
+          if (childType === 'mvhd') {
+            const version = buffer.readUInt8(moovOffset + 8);
+            if (version === 0 && moovOffset + 28 <= moovEnd) {
+              const timescale = buffer.readUInt32BE(moovOffset + 20);
+              const duration = buffer.readUInt32BE(moovOffset + 24);
+              if (timescale > 0) {
+                return duration / timescale;
+              }
+            } else if (version === 1 && moovOffset + 40 <= moovEnd) {
+              const timescale = buffer.readUInt32BE(moovOffset + 28);
+              const durationHigh = buffer.readUInt32BE(moovOffset + 32);
+              const durationLow = buffer.readUInt32BE(moovOffset + 36);
+              const duration = durationHigh * 2 ** 32 + durationLow;
+              if (timescale > 0) {
+                return duration / timescale;
+              }
+            }
+          }
+          moovOffset += childSize;
+        }
+      }
+
+      offset += actualSize;
+    }
+
+    return null;
+  }
+
+  /**
+   * Extracts duration in seconds from a WebM / MKV buffer by reading EBML Info Duration.
+   */
+  public parseWebmDuration(buffer: Buffer): number | null {
+    if (!buffer || buffer.length < 8) {
+      return null;
+    }
+
+    let timecodeScaleNs = 1000000;
+
+    for (let i = 0; i < Math.min(buffer.length - 6, 65536); i++) {
+      // TimecodeScale: [0x2A, 0xD7, 0xB1]
+      if (
+        buffer[i] === 0x2a &&
+        buffer[i + 1] === 0xd7 &&
+        buffer[i + 2] === 0xb1 &&
+        i + 4 < buffer.length
+      ) {
+        const lengthByte = buffer[i + 3];
+        const valLen = lengthByte & 0x7f;
+        if (valLen === 4 && i + 8 <= buffer.length) {
+          timecodeScaleNs = buffer.readUInt32BE(i + 4);
+        }
+      }
+
+      // Duration: [0x44, 0x89]
+      if (buffer[i] === 0x44 && buffer[i + 1] === 0x89 && i + 3 < buffer.length) {
+        const lengthByte = buffer[i + 2];
+        const valLen = lengthByte & 0x7f;
+        if (valLen === 4 && i + 7 <= buffer.length) {
+          const rawDuration = buffer.readFloatBE(i + 3);
+          return (rawDuration * timecodeScaleNs) / 1000000000;
+        } else if (valLen === 8 && i + 11 <= buffer.length) {
+          const rawDuration = buffer.readDoubleBE(i + 3);
+          return (rawDuration * timecodeScaleNs) / 1000000000;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Extracts video duration directly from container binary headers.
+   */
+  public extractVideoDuration(buffer: Buffer): number | null {
+    const format = this.detectVideoFormat(buffer);
+    if (format === 'mp4') {
+      return this.parseMp4Duration(buffer);
+    }
+    if (format === 'webm' || format === 'mkv') {
+      return this.parseWebmDuration(buffer);
+    }
+    return null;
+  }
+
+  /**
    * Validates an uploaded video buffer.
    */
   public validateVideo(
     buffer: Buffer,
-    options?: { maxSizeBytes?: number; reportedDuration?: number },
+    options?: {
+      maxSizeBytes?: number;
+      minDurationSeconds?: number;
+      maxDurationSeconds?: number;
+      requireDuration?: boolean;
+    },
   ): VideoValidationResult {
     const sizeBytes = buffer?.length ?? 0;
     const maxSizeBytes = options?.maxSizeBytes ?? MAX_VIDEO_SIZE_BYTES;
@@ -170,25 +317,44 @@ export class MediaValidator {
       };
     }
 
-    // Duration validation if provided
-    if (options?.reportedDuration !== undefined) {
-      const duration = options.reportedDuration;
-      if (duration < 5.0 || duration > 7.5) {
+    const requireDuration = options?.requireDuration ?? true;
+    if (requireDuration) {
+      const duration = this.extractVideoDuration(buffer);
+      if (duration === null) {
+        return {
+          isValid: false,
+          format,
+          sizeBytes,
+          error:
+            'Could not determine video duration from media headers. Corrupted or incomplete video stream.',
+        };
+      }
+
+      const minDuration = options?.minDurationSeconds ?? 5.0;
+      const maxDuration = options?.maxDurationSeconds ?? 7.0;
+
+      if (duration < minDuration || duration > maxDuration) {
         return {
           isValid: false,
           format,
           sizeBytes,
           durationSeconds: duration,
-          error: `Invalid video duration (${duration.toFixed(1)}s). Flipbook recordings must be 6 seconds.`,
+          error: `Invalid video duration (${duration.toFixed(1)}s). Flipbook recordings must be 6 seconds (allowed: ${minDuration.toFixed(1)}s-${maxDuration.toFixed(1)}s).`,
         };
       }
+
+      return {
+        isValid: true,
+        format,
+        sizeBytes,
+        durationSeconds: duration,
+      };
     }
 
     return {
       isValid: true,
       format,
       sizeBytes,
-      durationSeconds: options?.reportedDuration ?? EXPECTED_VIDEO_DURATION_SECONDS,
     };
   }
 }
