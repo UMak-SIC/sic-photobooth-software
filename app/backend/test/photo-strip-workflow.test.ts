@@ -119,7 +119,11 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       url: '/api/templates',
     });
     const templates = JSON.parse(templatesRes.body).data;
-    const selectedTemplate = templates[0];
+    const selectedTemplate =
+      templates.find(
+        (t: { requiredCaptureCount?: number; placements?: unknown[] }) =>
+          (t.requiredCaptureCount || t.placements?.length) === 3,
+      ) || templates[0];
     expect(selectedTemplate).toBeDefined();
 
     // 3. Attempt template selection without token -> 403 Forbidden
@@ -184,13 +188,17 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(earlyPrintRes.statusCode).toBe(400);
     expect(JSON.parse(earlyPrintRes.body).error.code).toBe('INVALID_STATE');
 
-    // 9. Upload the 3 required captures
+    // 9. Upload the required captures
+    const requiredPhotos =
+      (typeof selectedTemplate.requiredCaptureCount === 'number'
+        ? selectedTemplate.requiredCaptureCount
+        : selectedTemplate.placements?.length) || 3;
     const boundary = '----WebKitFormBoundaryLifecycleTest';
     const samplePng = Buffer.from(
       '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
       'hex',
     );
-    for (let slot = 1; slot <= 3; slot++) {
+    for (let slot = 1; slot <= requiredPhotos; slot++) {
       const payload = Buffer.concat([
         Buffer.from(
           `--${boundary}\r\nContent-Disposition: form-data; name="captureIndex"\r\n\r\n${slot}\r\n`,

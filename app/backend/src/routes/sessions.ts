@@ -1177,7 +1177,6 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       return reply.send({
         success: true,
-        data: stripToken(updated),
         data: {
           ...stripToken(updated),
           jobId: printJobId,

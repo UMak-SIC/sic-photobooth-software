@@ -153,12 +153,9 @@ export const PhotoStripWorkflow: React.FC = () => {
     }
   };
 
-  // 6. Print Recording
-  const handlePrint = async (copies: number) => {
   // 6. Print Recording / Dispatch
   const handlePrint = async (copies: number, recordOnly?: boolean) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
-      await boothApi.recordPrint(sessionId, copies);
       await boothApi.recordPrint(sessionId, copies, recordOnly);
     }
     recordPrintSuccess(copies);

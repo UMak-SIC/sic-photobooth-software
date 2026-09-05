@@ -331,7 +331,6 @@ export class BoothApiClient {
     return body.data;
   }
 
-  public async recordPrint(sessionId: string, copies: number = 1): Promise<void> {
   public async recordPrint(
     sessionId: string,
     copies: number = 1,
@@ -340,7 +339,6 @@ export class BoothApiClient {
     const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/print`, {
       method: 'POST',
       headers: this.getHeaders('application/json'),
-      body: JSON.stringify({ copies }),
       body: JSON.stringify({ copies, recordOnly }),
     });
     const body: ApiResponse = await res.json();
