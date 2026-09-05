@@ -653,73 +653,73 @@ export class DatabaseRepository {
     isRetake: boolean = false,
   ): Promise<{ captureCount: number; retakeCount: number }> {
     try {
-      if (isRetake) {
-        await pool.query('BEGIN');
-        const updateRes = await pool.query(
-          `UPDATE sessions
-           SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP
-           WHERE id = $1 AND retake_count < 4
-           RETURNING retake_count AS "retakeCount"`,
-          [sessionId],
-        );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        if (isRetake) {
+          const updateRes = await client.query(
+            `UPDATE sessions
+             SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND retake_count < 4
+             RETURNING retake_count AS "retakeCount"`,
+            [sessionId],
+          );
 
-        if (updateRes.rowCount === 0) {
-          await pool.query('ROLLBACK');
-          throw new Error('Maximum retake limit of 4 reached for this session');
-        }
+          if (updateRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            throw new Error('Maximum retake limit of 4 reached for this session');
+          }
 
-        await pool.query(
-          `UPDATE session_captures
-           SET file_path = $3, created_at = CURRENT_TIMESTAMP
-           WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
-          [sessionId, captureIndex, filePath],
-        );
+          await client.query(
+            `UPDATE session_captures
+             SET file_path = $3, created_at = CURRENT_TIMESTAMP
+             WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+            [sessionId, captureIndex, filePath],
+          );
 
-        const capRes = await pool.query(
-          `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
-          [sessionId],
-        );
-
-        await pool.query('COMMIT');
-        return {
-          retakeCount: updateRes.rows[0].retakeCount,
-          captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
-        };
-      } else {
-        await pool.query('BEGIN');
-        await pool.query(
-          `DELETE FROM session_captures WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
-          [sessionId, captureIndex],
-        );
-        await pool.query(
-          `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
-           VALUES ($1, $2, $3, false, true)`,
-          [sessionId, captureIndex, filePath],
-        );
-
-        const [sessRes, capRes] = await Promise.all([
-          pool.query(`SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`, [
-            sessionId,
-          ]),
-          pool.query(
+          const capRes = await client.query(
             `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
             [sessionId],
-          ),
-        ]);
+          );
 
-        await pool.query('COMMIT');
-        return {
-          retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
-          captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
-        };
+          await client.query('COMMIT');
+          return {
+            retakeCount: updateRes.rows[0].retakeCount,
+            captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+          };
+        } else {
+          await client.query(
+            `DELETE FROM session_captures WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+            [sessionId, captureIndex],
+          );
+          await client.query(
+            `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
+             VALUES ($1, $2, $3, false, true)`,
+            [sessionId, captureIndex, filePath],
+          );
+
+          const sessRes = await client.query(
+            `SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`,
+            [sessionId],
+          );
+          const capRes = await client.query(
+            `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
+            [sessionId],
+          );
+
+          await client.query('COMMIT');
+          return {
+            retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
+            captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+          };
+        }
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
       }
     } catch (err: unknown) {
-      try {
-        await pool.query('ROLLBACK');
-      } catch {
-        // ignore rollback error if not in active transaction
-      }
-
       if (err instanceof Error && err.message.includes('Maximum retake limit')) {
         throw err;
       }
@@ -764,8 +764,8 @@ export class DatabaseRepository {
       }
       this.inMemoryCaptures.set(sessionId, list);
       return {
-        retakeCount: session?.retakeCount ?? 0,
-        captureCount: list.filter((c) => !c.isCover).length,
+        retakeCount: session.retakeCount ?? 0,
+        captureCount: new Set(list.filter((c) => !c.isCover).map((c) => c.captureIndex)).size,
       };
     }
   }
@@ -871,20 +871,28 @@ export class DatabaseRepository {
     videoIndex: number,
   ): Promise<void> {
     try {
-      await pool.query('BEGIN');
-      await pool.query(
-        `UPDATE session_captures SET is_selected = (capture_index = $2) WHERE session_id = $1 AND is_cover = true`,
-        [sessionId, coverIndex],
-      );
-      await pool.query(
-        `UPDATE session_videos SET is_selected = (video_index = $2) WHERE session_id = $1`,
-        [sessionId, videoIndex],
-      );
-      await pool.query(
-        `UPDATE sessions SET state = 'processing', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
-      await pool.query('COMMIT');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE session_captures SET is_selected = (capture_index = $2) WHERE session_id = $1 AND is_cover = true`,
+          [sessionId, coverIndex],
+        );
+        await client.query(
+          `UPDATE session_videos SET is_selected = (video_index = $2) WHERE session_id = $1`,
+          [sessionId, videoIndex],
+        );
+        await client.query(
+          `UPDATE sessions SET state = 'processing', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       const covers = this.inMemoryCaptures.get(sessionId) || [];
       covers.forEach((c) => {
@@ -909,16 +917,24 @@ export class DatabaseRepository {
    */
   public async resetFlipbookToCoverCapture(sessionId: string): Promise<void> {
     try {
-      await pool.query('BEGIN');
-      await pool.query(`DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`, [
-        sessionId,
-      ]);
-      await pool.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
-      await pool.query(
-        `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
-      await pool.query('COMMIT');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(`DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`, [
+          sessionId,
+        ]);
+        await client.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
+        await client.query(
+          `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       this.inMemoryCaptures.delete(sessionId);
       this.inMemoryVideos.delete(sessionId);
@@ -942,36 +958,44 @@ export class DatabaseRepository {
     height: number,
   ): Promise<string> {
     try {
-      await pool.query('BEGIN');
-      const outputQuery = `
-        INSERT INTO generated_outputs (session_id, public_id, media_type, file_path, width, height)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
-      `;
-      const outputRes = await pool.query(outputQuery, [
-        sessionId,
-        publicId,
-        mediaType,
-        filePath,
-        width,
-        height,
-      ]);
-      const outputId = outputRes.rows[0].id;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const outputQuery = `
+          INSERT INTO generated_outputs (session_id, public_id, media_type, file_path, width, height)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+        const outputRes = await client.query(outputQuery, [
+          sessionId,
+          publicId,
+          mediaType,
+          filePath,
+          width,
+          height,
+        ]);
+        const outputId = outputRes.rows[0].id;
 
-      const pubQuery = `
-        INSERT INTO publication_records (output_id, public_id, status)
-        VALUES ($1, $2, 'queued')
-        ON CONFLICT (public_id) DO NOTHING
-      `;
-      await pool.query(pubQuery, [outputId, publicId]);
+        const pubQuery = `
+          INSERT INTO publication_records (output_id, public_id, status)
+          VALUES ($1, $2, 'queued')
+          ON CONFLICT (public_id) DO NOTHING
+        `;
+        await client.query(pubQuery, [outputId, publicId]);
 
-      await pool.query(
-        `UPDATE sessions SET state = 'booth_confirmed', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
+        await client.query(
+          `UPDATE sessions SET state = 'booth_confirmed', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
 
-      await pool.query('COMMIT');
-      return outputId;
+        await client.query('COMMIT');
+        return outputId;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       const outputId = crypto.randomUUID();
       const output: OutputItem = {
