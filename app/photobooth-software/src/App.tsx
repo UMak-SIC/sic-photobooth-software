@@ -68,7 +68,7 @@ function App() {
   const [category, setCategory] = useState<Category>('all');
   const { currentStep } = useFlipbookStore();
   const { activeSession } = useSessionStore();
-  if (window.location.pathname === '/admin/templates' || window.location.pathname.startsWith('/admin/templates/')) {
+  if (window.location.pathname.startsWith('/admin/')) {
     return <AdminRouter />;
   }
 
