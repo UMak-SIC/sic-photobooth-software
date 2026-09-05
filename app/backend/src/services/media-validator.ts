@@ -1,6 +1,6 @@
 import { flipbookConfig } from '../config.js';
 
-export type SupportedImageFormat = 'png' | 'jpeg';
+export type SupportedImageFormat = 'png' | 'jpeg' | 'svg';
 export type SupportedVideoFormat = 'mp4' | 'mkv' | 'webm';
 
 export interface ImageValidationResult {
@@ -51,6 +51,10 @@ export class MediaValidator {
     if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
       return 'jpeg';
     }
+
+    // SVG has no fixed magic bytes; require an XML/SVG root rather than trusting the filename.
+    const text = buffer.toString('utf8', 0, Math.min(buffer.length, 4096));
+    if (/^\s*(?:<\?xml[^>]*>\s*)?<svg(?:\s|>)/i.test(text)) return 'svg';
 
     return null;
   }
@@ -173,7 +177,8 @@ export class MediaValidator {
       return {
         isValid: false,
         sizeBytes,
-        error: 'Unsupported or malformed image format. Only valid PNG and JPEG files are accepted.',
+        error:
+          'Unsupported or malformed image format. Only valid PNG, JPEG, and SVG files are accepted.',
       };
     }
 

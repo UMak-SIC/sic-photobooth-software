@@ -22,6 +22,13 @@ Component and module boundaries derived from the product contract. This is a tem
 - Event management: lists events and creates events through the backend API; the backend owns uniqueness validation.
 - Camera UI: browser device selection, feed display, countdown, and capture feedback.
 
+### Template Management
+
+- Location: `app/backend/src/templates/`, `app/photobooth-software/src/admin/templates/`
+- Owns: local template assets, definitions, placements, overlays, editor drafts, and portable template exports.
+- Does not own: session template snapshots or final image composition.
+- Collaborators: Photo Strip template selection and compositor tasks.
+
 ## Retrieval Websites
 
 - Public-ID parser: use `packages/public-output/` for shared parsing and validation.

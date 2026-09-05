@@ -18,6 +18,9 @@ describe('MediaValidator', () => {
     expect(validator.detectImageFormat(validPngHeader)).toBe('png');
     expect(validator.detectImageFormat(validJpegHeader)).toBe('jpeg');
     expect(validator.detectImageFormat(Buffer.from('fake-text-file'))).toBeNull();
+    expect(
+      validator.detectImageFormat(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>')),
+    ).toBe('svg');
   });
 
   it('detects valid video formats from magic bytes', () => {

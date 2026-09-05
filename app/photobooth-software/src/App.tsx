@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { AdminEventsPage } from './pages/AdminEventsPage';
+import { AdminRouter } from './admin/admin-router';
 
 type Category = 'all' | 'guest' | 'admin';
 
@@ -67,6 +68,9 @@ function App() {
   const [category, setCategory] = useState<Category>('all');
   const { currentStep } = useFlipbookStore();
   const { activeSession } = useSessionStore();
+  if (window.location.pathname === '/admin/templates' || window.location.pathname.startsWith('/admin/templates/')) {
+    return <AdminRouter />;
+  }
 
   const visible =
     category === 'all' ? screens : screens.filter((screen) => screen.category === category);

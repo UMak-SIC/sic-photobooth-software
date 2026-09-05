@@ -22,12 +22,24 @@ Owner: `app/photobooth-software/`
   /flipbook/videos
   /flipbook/review
   /admin/events
-  /admin/templates
   /admin/frames
   /admin/publications
 ```
 
-The exact URLs are `TBD`; this is the PRD workflow map, not an implemented router contract.
+The remaining entries are `TBD`; this is the PRD workflow map, not an implemented router contract.
+
+### Implemented Local Routes
+
+These routes are implemented by `app/photobooth-software/`:
+
+```text
+/admin/templates
+  Local template library and creation
+/admin/templates/new
+  New Photo Strip template editor
+/admin/templates/:id
+  Existing Photo Strip template editor
+```
 
 ## Captive Website
 
@@ -58,3 +70,10 @@ This app reads public delivery data only. It never contacts the local backend.
 Owner: `app/backend/`
 
 The API is session-oriented. Implemented event setup routes are `GET /api/events` and `POST /api/events`. The API must also cover health, sessions, workflow transitions, templates/frames, media registration, retakes, finalization, local approved-output retrieval, printing records, and publication administration.
+
+### Implemented Template Export
+
+```text
+GET /templates/export
+  Downloads every template definition plus its background and uploaded overlays as a ZIP archive.
+```
