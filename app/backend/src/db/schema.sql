@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS publication_records (
   status VARCHAR(20) NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'in_progress', 'uploaded', 'failed')),
   retry_count INT NOT NULL DEFAULT 0,
   last_attempt_at TIMESTAMPTZ,
+  next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_error TEXT,
   cloudinary_url TEXT,
   cloudinary_public_id TEXT,
@@ -113,3 +114,4 @@ CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 CREATE INDEX IF NOT EXISTS idx_generated_outputs_public_id ON generated_outputs(public_id);
 CREATE INDEX IF NOT EXISTS idx_publication_records_status ON publication_records(status);
 CREATE INDEX IF NOT EXISTS idx_publication_records_public_id ON publication_records(public_id);
+CREATE INDEX IF NOT EXISTS idx_publication_records_due ON publication_records(status, next_attempt_at) WHERE status = 'queued';

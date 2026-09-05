@@ -35,13 +35,13 @@ Component and module boundaries derived from the product contract. This is a tem
 - Location: `app/backend/src/routes/publications.ts`, `app/photobooth-software/src/admin/publications/`
 - Owns: Local publication-record listing and manually requeuing failed records.
 - Does not own: Cloudinary uploads, Supabase registration, or retry scheduling.
-- Collaborators: The future publishing worker and generated-output persistence.
+- Collaborators: `app/backend/src/services/publishing-worker.ts` and generated-output persistence.
 
 ## Retrieval Websites
 
 - Public-ID parser: use `packages/public-output/` for shared parsing and validation.
 - Captive retrieval: local backend lookup for approved output only.
-- Public retrieval: Supabase/Cloudinary lookup for finalized public output only.
+- Public retrieval: `app/public-website/src/app/[id]/page.tsx` validates the public ID and reads finalized output metadata from Supabase only.
 - Shared UI: put a component in `packages/ui/` only when both retrieval websites need the same component unchanged.
 
 ## Update Template
