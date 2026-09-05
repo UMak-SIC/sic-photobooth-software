@@ -706,11 +706,20 @@ export class DatabaseRepository {
           }
 
           await client.query(
+          const updCapRes = await client.query(
             `UPDATE session_captures
              SET file_path = $3, created_at = CURRENT_TIMESTAMP
              WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
             [sessionId, captureIndex, filePath],
           );
+
+          if (updCapRes.rowCount === 0) {
+            await client.query(
+              `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
+               VALUES ($1, $2, $3, false, true)`,
+              [sessionId, captureIndex, filePath],
+            );
+          }
 
           const capRes = await client.query(
             `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,

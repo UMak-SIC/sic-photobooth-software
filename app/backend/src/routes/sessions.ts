@@ -456,21 +456,6 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         };
 
         const query = request.query as { captureIndex?: string; isRetake?: string } | undefined;
-        const isRetake =
-          query?.isRetake === 'true' ||
-          (data.fields?.isRetake && getFieldValue(data.fields.isRetake) === 'true') ||
-          session.state === 'review';
-
-        if (isRetake && session.retakeCount >= 4) {
-          return reply.status(400).send({
-            success: false,
-            error: {
-              code: 'LIMIT_EXCEEDED',
-              message: 'Maximum retake limit of 4 reached for this session',
-            },
-          });
-        }
-
         const snapshot = session.templateSnapshot as Record<string, unknown> | null;
         const targetCount =
           typeof snapshot?.requiredCaptureCount === 'number'
@@ -492,6 +477,23 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
         const captureIndex = rawIndex;
+
+        const existingCaptures = await dbRepository.getPhotoCaptures(id);
+        const slotAlreadyCaptured = existingCaptures.some((c) => c.captureIndex === captureIndex);
+        const isRetake =
+          query?.isRetake === 'true' ||
+          (data.fields?.isRetake && getFieldValue(data.fields.isRetake) === 'true') ||
+          (session.state === 'review' && slotAlreadyCaptured);
+
+        if (isRetake && session.retakeCount >= 4) {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'LIMIT_EXCEEDED',
+              message: 'Maximum retake limit of 4 reached for this session',
+            },
+          });
+        }
 
         const buffer = await data.toBuffer();
         const validation = mediaValidator.validateImage(buffer);
