@@ -42,6 +42,12 @@ describe('parsePublicId', () => {
     expect(parsePublicId('https://myphotobooth.com/')).toBeNull();
   });
 
+  it('should reject nested path URLs', () => {
+    expect(parsePublicId('https://myphotobooth.com/foo/7fK92pQ')).toBeNull();
+    expect(parsePublicId('https://myphotobooth.com/photos/7fK92pQ')).toBeNull();
+    expect(parsePublicId('https://myphotobooth.com/a/b/c/7fK92pQ')).toBeNull();
+  });
+
   it('should reject path traversal and malicious payloads', () => {
     expect(parsePublicId('https://myphotobooth.com/../../etc/passwd')).toBeNull();
     expect(parsePublicId('../../../secret')).toBeNull();

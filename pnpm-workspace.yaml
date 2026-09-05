@@ -4,5 +4,6 @@ packages:
 
 allowBuilds:
   esbuild: true
-  sharp: false
+  ffmpeg-static: true
+  sharp: true
   unrs-resolver: false

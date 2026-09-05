@@ -125,6 +125,25 @@ export class StorageService {
   }
 
   /**
+   * Mirrors a session output file to the global outputs directory for fast publicId retrieval.
+   */
+  public async mirrorToGlobalOutputs(
+    sessionFilePath: string,
+    publicId: string,
+    ext: string = 'gif',
+  ): Promise<string> {
+    const cleanPublicId = this.sanitizeId(publicId);
+    const globalOutputsDir = path.join(this.baseDir, 'outputs');
+    if (!fs.existsSync(globalOutputsDir)) {
+      fs.mkdirSync(globalOutputsDir, { recursive: true });
+    }
+    const cleanExt = ext.replace(/^\./, '').toLowerCase();
+    const publicFilePath = path.join(globalOutputsDir, `${cleanPublicId}.${cleanExt}`);
+    await fs.promises.copyFile(sessionFilePath, publicFilePath);
+    return publicFilePath;
+  }
+
+  /**
    * Returns the file path of a generated public output by public ID if it exists.
    */
   public getOutputPath(publicId: string, ext: 'png' | 'gif' = 'png'): string | null {
