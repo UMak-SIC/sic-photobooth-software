@@ -410,7 +410,7 @@ This section resolves implementation details established after the original user
 * Multiple placements may reference the same `captureIndex`, allowing one capture to appear in multiple printed positions. Each placement remains independently movable and resizable.
 * The editor shows numbered rectangles rather than live image previews. Overlays render as labeled dashed shapes above the placements by `zIndex`.
  * The editor provides manual inputs for every placement field, every overlay field, and for the background image transform: `x`, `y`, `width`, and `height`.
-* Photo placements and overlays have independently editable `width` and `height`; the backend accepts any positive dimensions.
+* Photo placements have independently editable `width` and `height`; the backend accepts any positive dimensions. Overlay images are always rendered as 1:1 squares — the editor keeps `width` equal to `height`, and the backend accepts and enforces a single dimension.
  * Administrators can create, edit, delete, activate, and deactivate templates. A session stores a snapshot of the selected template at selection time, so later edits never change that session’s result.
 
 #### Flipbook Contract
