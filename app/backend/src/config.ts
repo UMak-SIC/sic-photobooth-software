@@ -7,14 +7,35 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+export interface CloudinaryConfig {
+  cloudName: string;
+  apiKey: string;
+  apiSecret: string;
+}
+
+export interface SupabaseConfig {
+  url: string;
+  serviceRoleKey: string;
+}
+
+export interface PublishingConfig {
+  pollIntervalMs: number;
+  concurrency: number;
+  retentionMonths: number;
+}
+
 export interface AppConfig {
   port: number;
   host: string;
   databaseUrl: string;
   storageDir: string;
   nodeEnv: string;
+  /** Empty when unset: the publishing worker then skips the online gate and attempts uploads. */
   publicAppUrl: string;
   corsOrigins: string[];
+  cloudinary: CloudinaryConfig;
+  supabase: SupabaseConfig;
+  publishing: PublishingConfig;
 }
 
 const defaultStorageDir = path.resolve(__dirname, '../../storage');
@@ -26,7 +47,21 @@ export const config: AppConfig = {
     process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/photobooth',
   storageDir: process.env.STORAGE_DIR || defaultStorageDir,
   nodeEnv: process.env.NODE_ENV || 'development',
-  publicAppUrl: process.env.PUBLIC_APP_URL || 'https://myphotobooth.com',
+  publicAppUrl: process.env.PUBLIC_APP_URL || '',
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+    apiKey: process.env.CLOUDINARY_API_KEY || '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET || '',
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  },
+  publishing: {
+    pollIntervalMs: 5000,
+    concurrency: 2,
+    retentionMonths: 2,
+  },
   corsOrigins: process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim())
     : [

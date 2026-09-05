@@ -111,13 +111,13 @@ This document provides a single source of truth for tracking project tasks again
 
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **TSK-0801** | Implement local background publishing worker polling `PUBLIC_APP_URL` and processing queued jobs | `app/backend` | US-14, US-38, US-60, Contract § Publishing | Polls every 5s; attempts uploads only when cloud connectivity is detected. | `[ ] Planned` |
-| **TSK-0802** | Implement Cloudinary delivery asset uploader with server-side credentials isolation | `app/backend` | US-122, US-124, US-127, US-137 | Finalized PNG/GIF uploaded to Cloudinary; API secrets never exposed to clients. | `[ ] Planned` |
-| **TSK-0803** | Implement Supabase public delivery record registration and cloud finalization timestamping | `app/backend` | US-125, US-126, Contract § Publishing | Saves public ID, asset link, event info, and expiry timestamp in Supabase. | `[ ] Planned` |
-| **TSK-0804** | Implement bounded retry queue with exponential backoff, jitter, and dead-letter queue (max 5 retries) | `app/backend` | US-85, Contract § Publishing | Failed jobs retry up to 5 times before transitioning to dead-letter state. | `[ ] Planned` |
-| **TSK-0805** | Implement Vercel-hosted public retrieval website resolving `/:id` via Supabase & Cloudinary | `app/public-website` | US-116..121, US-123, US-128 | Resolves public ID directly against cloud services without contacting local backend. | `[ ] Planned` |
-| **TSK-0806** | Implement public 404 unavailable page for unpublished, expired, or deleted output IDs | `app/public-website` | US-121, Contract § Events/Errors | Displays "This photo has not been published or is no longer available." | `[ ] Planned` |
-| **TSK-0807** | Implement automated 2-month retention cleanup cron on Supabase | Supabase / Script | US-126, US-139, Contract § Publishing | Deletes Cloudinary media and Supabase metadata 2 months after cloud finalization. | `[ ] Planned` |
+| **TSK-0801** | Implement local background publishing worker polling `PUBLIC_APP_URL` and processing queued jobs | `app/backend` | US-14, US-38, US-60, Contract § Publishing | Polls every 5s; attempts uploads only when cloud connectivity is detected. | `[x] Completed` |
+| **TSK-0802** | Implement Cloudinary delivery asset uploader with server-side credentials isolation | `app/backend` | US-122, US-124, US-127, US-137 | Finalized PNG/GIF uploaded to Cloudinary; API secrets never exposed to clients. | `[x] Completed` |
+| **TSK-0803** | Implement Supabase public delivery record registration and cloud finalization timestamping | `app/backend` | US-125, US-126, Contract § Publishing | Saves public ID, asset link, event info, and expiry timestamp in Supabase. | `[/] In Progress` |
+| **TSK-0804** | Implement bounded retry queue with exponential backoff, jitter, and dead-letter queue (max 5 retries) | `app/backend` | US-85, Contract § Publishing | Failed jobs retry up to 5 times before transitioning to dead-letter state. | `[x] Completed` |
+| **TSK-0805** | Implement Vercel-hosted public retrieval website resolving `/:id` via Supabase & Cloudinary | `app/public-website` | US-116..121, US-123, US-128 | Resolves public ID directly against cloud services without contacting local backend. | `[x] Completed` |
+| **TSK-0806** | Implement public 404 unavailable page for unpublished, expired, or deleted output IDs | `app/public-website` | US-121, Contract § Events/Errors | Displays "This photo has not been published or is no longer available." | `[x] Completed` |
+| **TSK-0807** | Implement automated 2-month retention cleanup cron on Supabase | Supabase / Script | US-126, US-139, Contract § Publishing | Deletes Cloudinary media and Supabase metadata 2 months after cloud finalization. | `[/] In Progress` |
 
 ---
 
