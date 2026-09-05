@@ -116,7 +116,7 @@ export function FlipReviewVideoScreen() {
   });
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-8 py-10">
+    <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-8 py-10">
       {/* 5-Minute Auto-select Banner */}
       <div className="flex justify-center z-10">
         <span className="rounded-full bg-white/20 border border-white/10 px-6 py-2.5 text-[13px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">

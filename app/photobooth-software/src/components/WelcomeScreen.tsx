@@ -45,7 +45,7 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
   };
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center gap-14 overflow-hidden bg-[#ecfff8] px-8 py-16 text-[#113b33]">
+    <div className="relative flex min-h-[100vh] w-full flex-col items-center justify-center gap-14 overflow-hidden bg-[#ecfff8] px-8 py-16 text-[#113b33]">
       <div className="text-center">
         <p className="text-xs font-bold tracking-[0.22em] text-[#28806c] mb-3">SIC PHOTOBOOTH</p>
         <h4 className="text-[52px] md:text-[64px] font-black leading-[0.92] tracking-[-0.06em]">

@@ -170,7 +170,7 @@ export const PhotoStripWorkflow: React.FC = () => {
   // RENDER BASED ON CURRENT STEP
   if (currentStep === 'setup') {
     return (
-      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <EventSelectScreen onContinue={handleEventContinue} />
       </div>
     );
@@ -178,7 +178,7 @@ export const PhotoStripWorkflow: React.FC = () => {
 
   if (currentStep === 'template_select') {
     return (
-      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <TemplatePicker onSelectTemplate={handleSelectTemplate} />
       </div>
     );
@@ -190,7 +190,7 @@ export const PhotoStripWorkflow: React.FC = () => {
          new Set(selectedTemplate.placements.map((p) => p.captureIndex)).size)
       : 3;
     return (
-      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#071d1a]">
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#071d1a]">
         <CameraViewfinder
           countdownSeconds={countdownSeconds}
           isCountingDown={isCountingDown}
@@ -206,7 +206,7 @@ export const PhotoStripWorkflow: React.FC = () => {
 
   if (currentStep === 'review') {
     return (
-      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <PhotoStripReview
           template={selectedTemplate ?? undefined}
           captures={captures}
@@ -222,7 +222,7 @@ export const PhotoStripWorkflow: React.FC = () => {
 
   if (currentStep === 'complete') {
     return (
-      <div className="flex flex-1 w-full min-h-[calc(100vh-77px)] bg-[#ecfff8]">
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <PrintModal
           publicId={publicId || 'M7p4XaV'}
           qrUrl={qrUrl || 'https://myphotobooth.com/M7p4XaV'}

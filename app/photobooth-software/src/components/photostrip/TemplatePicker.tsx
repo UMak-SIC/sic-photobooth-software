@@ -172,7 +172,9 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                             top: `${(overlay.y / cardHeight) * 100}%`,
                             width: `${(overlay.width / cardWidth) * 100}%`,
                             height: `${(overlay.height / cardHeight) * 100}%`,
-                            transform: overlay.rotation ? `rotate(${overlay.rotation}deg)` : undefined,
+                            transform: overlay.rotation
+                              ? `rotate(${overlay.rotation}deg)`
+                              : undefined,
                             zIndex: overlay.zIndex ?? 5,
                           }}
                         />
@@ -191,9 +193,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                             top: `${(p.y / cardHeight) * 100}%`,
                             width: `${(p.width / cardWidth) * 100}%`,
                             height: `${(p.height / cardHeight) * 100}%`,
-                            borderRadius: p.borderRadius
-                              ? `${(p.borderRadius / cardWidth) * 100}%`
-                              : '4px',
+                            borderRadius: `${((p.borderRadius ?? 0) / cardWidth) * 100}%`,
                             transform: p.rotation ? `rotate(${p.rotation}deg)` : undefined,
                             zIndex: p.zIndex ?? 1,
                           }}

@@ -50,7 +50,7 @@ export function FrameSelectScreen() {
   const { errorMessage } = useFlipbookStore();
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-8 py-12 text-center text-[#113b33]">
+    <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-8 py-12 text-center text-[#113b33]">
       <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">FLIPBOOK</p>
       <h4 className="mt-2 text-[44px] md:text-[52px] font-black tracking-[-0.06em]">
         Choose a frame.

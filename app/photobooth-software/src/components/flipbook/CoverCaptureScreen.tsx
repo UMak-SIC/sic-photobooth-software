@@ -107,7 +107,7 @@ export function CoverCaptureScreen() {
   }, [isActive, activeError, isCapturing, coverUrls.length, resetCountdown, pauseCountdown]);
 
   return (
-    <div className="relative w-full min-h-[calc(100vh-77px)] h-full overflow-hidden bg-[#071d1a] text-white">
+    <div className="relative w-full min-h-[100vh] h-full overflow-hidden bg-[#071d1a] text-white">
       {/* Video Feed */}
       <video
         ref={videoRef}

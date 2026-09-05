@@ -49,7 +49,7 @@ export function FlipbookCompletionScreen() {
   };
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-8 py-12 text-center text-[#113b33]">
+    <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-8 py-12 text-center text-[#113b33]">
       <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c]">
         YOUR FLIPBOOK IS READY
       </p>
