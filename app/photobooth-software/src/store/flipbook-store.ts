@@ -3,6 +3,7 @@ import type { FrameItem } from '../services/api';
 
 export type FlipbookStep =
   | 'welcome'
+  | 'setup'
   | 'instructions'
   | 'cover_capture'
   | 'video_capture'
@@ -12,10 +13,18 @@ export type FlipbookStep =
   | 'frame_select'
   | 'complete';
 
+export interface FlipbookEventData {
+  id: string;
+  name: string;
+  date: string;
+  operatorName: string;
+}
+
 interface FlipbookState {
   currentStep: FlipbookStep;
   sessionId: string | null;
   sessionToken: string | null;
+  selectedEvent: FlipbookEventData | null;
   selectedFrame: FrameItem | null;
 
   // Captured assets (local object URLs for instant review)
@@ -40,6 +49,7 @@ interface FlipbookState {
 
   // Actions
   setSession: (sessionId: string, token: string) => void;
+  setSelectedEvent: (event: FlipbookEventData | null) => void;
   setStep: (step: FlipbookStep) => void;
   setSelectedFrame: (frame: FrameItem) => void;
   confirmFrameSelection: () => void;
@@ -58,6 +68,7 @@ const initialState = {
   currentStep: 'welcome' as FlipbookStep,
   sessionId: null,
   sessionToken: null,
+  selectedEvent: null,
   selectedFrame: null,
   coverUrls: [],
   coverBlobs: [],
@@ -77,6 +88,8 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
   ...initialState,
 
   setSession: (sessionId, token) => set({ sessionId, sessionToken: token }),
+
+  setSelectedEvent: (selectedEvent) => set({ selectedEvent }),
 
   setStep: (currentStep) => set({ currentStep, errorMessage: null }),
 
@@ -122,16 +135,20 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
 
   resetFlipbook: () =>
     set((state) => {
-      // Revoke all created object URLs
-      state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
-      state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      // Revoke all created object URLs if revokeObjectURL is available
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
+        state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      }
       return initialState;
     }),
 
   resetToCoverCapture: () =>
     set((state) => {
-      state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
-      state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
+        state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      }
       return {
         coverUrls: [],
         coverBlobs: [],

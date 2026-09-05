@@ -193,32 +193,7 @@ export function VideoRecordingScreen() {
   );
 
   return (
-    <div className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#071d1a] text-white">
-      {/* Video Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 size-full object-cover"
-      />
-
-      {/* Camera Scene Vignette */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
-      {/* Top Badges */}
-      <div className="absolute left-9 top-8 flex items-center gap-3">
-        <div className="rounded-full bg-black/40 px-4 py-2 text-[12px] font-bold backdrop-blur-sm">
-          CAMERA 01
-        </div>
-      </div>
-
-      {phase === 'recording' && (
-        <div className="absolute right-9 top-8 flex items-center gap-2 rounded-full bg-[#c2433f] px-5 py-2.5 text-[12px] font-bold text-white backdrop-blur-sm animate-pulse">
-          <span className="size-2.5 rounded-full bg-white" /> RECORDING
-        </div>
-      )}
-
+    <div className="relative flex flex-col items-center justify-center w-full min-h-[100dvh] h-full overflow-hidden bg-[#071d1a] p-4 md:p-8 text-white">
       {/* Error Alert Banner */}
       {activeError && (
         <div className="absolute top-6 inset-x-8 z-30 mx-auto flex max-w-4xl items-center justify-between rounded-2xl bg-[#b91c1c]/95 px-6 py-4 text-white backdrop-blur-md shadow-2xl">
@@ -253,7 +228,7 @@ export function VideoRecordingScreen() {
         </div>
       )}
 
-      {/* Camera Viewport Container (Full window width with proper margin & aspect ratio 2.41 / 1.32) */}
+      {/* Camera Viewport Container (Centered with proper aspect ratio 2.41 / 1.32) */}
       <div className="relative w-full max-w-[1600px] aspect-[241/132] max-h-[calc(100vh-120px)] overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10">
         {/* Live Camera Video Feed */}
         <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />

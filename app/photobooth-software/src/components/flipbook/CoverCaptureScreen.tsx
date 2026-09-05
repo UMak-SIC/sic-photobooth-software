@@ -107,19 +107,7 @@ export function CoverCaptureScreen() {
   }, [isActive, activeError, isCapturing, coverUrls.length, resetCountdown, pauseCountdown]);
 
   return (
-    <div className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#071d1a] text-white">
-      {/* Video Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 size-full object-cover"
-      />
-
-      {/* Camera Scene Vignette */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
+    <div className="relative flex flex-col items-center justify-center w-full min-h-[100dvh] h-full overflow-hidden bg-[#071d1a] p-4 md:p-8 text-white">
       {/* Flash Effect */}
       {flash && (
         <div className="absolute inset-0 bg-white opacity-90 transition-opacity pointer-events-none z-50" />
@@ -157,7 +145,7 @@ export function CoverCaptureScreen() {
         </div>
       )}
 
-      {/* Camera Viewport Container (Full window width with proper margin & aspect ratio 2.41 / 1.32) */}
+      {/* Camera Viewport Container (Centered with proper aspect ratio 2.41 / 1.32) */}
       <div className="relative w-full max-w-[1600px] aspect-[241/132] max-h-[calc(100vh-120px)] overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10">
         {/* Live Camera Video Feed */}
         <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
