@@ -66,7 +66,7 @@ describe('Publishing worker', () => {
 
     expect(cloudinaryV2.uploader.upload).toHaveBeenCalledWith(
       'outputs/worker-happy.png',
-      expect.objectContaining({ resource_type: 'image' }),
+      expect.objectContaining({ resource_type: 'image', timeout: 30_000 }),
     );
     expect(mocks.supabaseUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -145,6 +145,30 @@ describe('Publishing worker', () => {
     expect(pub.lastError).toContain('Supabase publication record failed: database unavailable');
   });
 
+  it('finalizes locally when a completed Supabase upsert times out', async () => {
+    cloudinaryV2.uploader.upload.mockResolvedValue({
+      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrRc1',
+      public_id: 'photobooth/WkrRc1',
+    });
+    mocks.supabaseUpsert.mockResolvedValue({ error: { message: 'request timed out' } });
+    mocks.supabaseMaybeSingle.mockResolvedValue({ data: { public_id: 'WkrRc1' }, error: null });
+    await repo.dbRepository.saveGeneratedOutput(
+      'worker-reconcile-session',
+      'WkrRc1',
+      'image/png',
+      'outputs/worker-reconcile.png',
+      1200,
+      1800,
+    );
+
+    await worker.processQueuedPublications(new Date('2099-09-05T14:15:00.000Z'));
+
+    const pub = (await repo.dbRepository.listPublications()).find(
+      (item: { publicId: string }) => item.publicId === 'WkrRc1',
+    );
+    expect(pub.status).toBe('uploaded');
+  });
+
   it('cleans up a Cloudinary asset when the final Supabase attempt is definitely absent', async () => {
     cloudinaryV2.uploader.upload.mockResolvedValue({
       secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrOr1',
@@ -215,5 +239,17 @@ describe('Publishing worker', () => {
     expect(worker.retryDelayMs(1, () => 1)).toBe(5000);
     expect(worker.retryDelayMs(5, () => 0)).toBe(40000);
     expect(worker.retryDelayMs(5, () => 1)).toBe(80000);
+  });
+
+  it('times out a stalled provider request', async () => {
+    vi.useFakeTimers();
+    try {
+      const timedOut = worker.withTimeout(new Promise<void>(() => {}), 30_000);
+      const assertion = expect(timedOut).rejects.toThrow('Publishing provider request timed out.');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

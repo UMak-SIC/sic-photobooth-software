@@ -195,6 +195,43 @@ describe('TemplateEditor', () => {
     expect(screen.getByText(/BACKGROUND IMAGE/i)).toBeDefined();
   });
 
+  it('zooms with Shift controls and resets the editor preview scroll position', () => {
+    render(
+      <TemplateEditor
+        draft={mockDraft}
+        setDraft={vi.fn()}
+        initialTemplate={null}
+        onBack={vi.fn()}
+        onSaved={vi.fn()}
+        onLoad={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByRole('spinbutton', { name: /Preview Zoom/i }), {
+      target: { value: '150' },
+    });
+    const canvas = document.querySelector('.editor-canvas-real') as HTMLDivElement;
+    expect(canvas.style.transform).toContain('scale(1.5)');
+
+    const viewport = document.querySelector('.canvas-viewport') as HTMLDivElement;
+    fireEvent.keyDown(viewport, { shiftKey: true, key: '+' });
+    expect(canvas.style.transform).toContain('scale(1.6)');
+
+    fireEvent.keyDown(viewport, { shiftKey: true, key: '+' });
+    expect(canvas.style.transform).toContain('scale(1.7)');
+
+    fireEvent.keyDown(viewport, { shiftKey: true, key: '-' });
+    expect(canvas.style.transform).toContain('scale(1.6)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Zoom' }));
+    viewport.scrollLeft = 40;
+    viewport.scrollTop = 20;
+    fireEvent.click(screen.getByRole('button', { name: 'Reset Pan' }));
+    expect(canvas.style.transform).toContain('scale(1)');
+    expect(viewport.scrollLeft).toBe(0);
+    expect(viewport.scrollTop).toBe(0);
+  });
+
   it.each(['photo_strip', 'flipbook'] as const)(
     'warns before unloading an edited %s template',
     (type) => {

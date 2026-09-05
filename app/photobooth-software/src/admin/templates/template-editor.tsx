@@ -31,6 +31,9 @@ export function TemplateEditor({
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [preview, setPreview] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [previewViewport, setPreviewViewport] = useState({ width: 0, height: 0 });
+  const [previewCanvas, setPreviewCanvas] = useState({ width: 0, height: 0 });
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [backgroundPreview, setBackgroundPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -39,6 +42,7 @@ export function TemplateEditor({
   const [overlayPreviews, setOverlayPreviews] = useState<Record<number, string>>({});
   const [savedDraft, setSavedDraft] = useState(() => JSON.stringify(draft));
   const canvasRef = useRef<HTMLDivElement>(null);
+  const canvasViewportRef = useRef<HTMLDivElement>(null);
   const allOverlaysFileInputRef = useRef<HTMLInputElement>(null);
   const drag = useRef<
     | { type: 'placement'; index: number; x: number; y: number }
@@ -76,6 +80,23 @@ export function TemplateEditor({
     window.addEventListener('beforeunload', warnBeforeUnload);
     return () => window.removeEventListener('beforeunload', warnBeforeUnload);
   }, [hasUnsavedEdits]);
+
+  useEffect(() => {
+    const syncPreviewSize = () => {
+      if (canvasRef.current)
+        setPreviewCanvas({ width: canvasRef.current.offsetWidth, height: canvasRef.current.offsetHeight });
+      if (canvasViewportRef.current)
+        setPreviewViewport({
+          width: canvasViewportRef.current.clientWidth,
+          height: canvasViewportRef.current.clientHeight,
+        });
+    };
+    syncPreviewSize();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(syncPreviewSize);
+    if (canvasRef.current) observer?.observe(canvasRef.current);
+    if (canvasViewportRef.current) observer?.observe(canvasViewportRef.current);
+    return () => observer?.disconnect();
+  }, [draft.orientation]);
 
   const updatePlacement = (index: number, changes: Partial<TemplatePlacement>) => {
     const placements = draft.placements.map((item, itemIndex) =>
@@ -207,6 +228,13 @@ export function TemplateEditor({
       });
     }
     drag.current = { ...drag.current, x: nextX, y: nextY };
+  };
+
+  const resetPreviewPan = () => {
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.scrollLeft = 0;
+      canvasViewportRef.current.scrollTop = 0;
+    }
   };
 
   const addOverlay = () => {
@@ -451,20 +479,67 @@ export function TemplateEditor({
                   </button>
                 ))}
               </div></div>}
+              <div className="preview-controls">
+                <NumberField
+                  label="Preview Zoom"
+                  unit="%"
+                  value={previewZoom}
+                  onChange={(value) => setPreviewZoom(Math.max(100, Math.min(500, value)))}
+                />
+                <button className="secondary-button" onClick={() => setPreviewZoom(100)} type="button">
+                  Reset Zoom
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={resetPreviewPan}
+                  type="button"
+                >
+                  Reset Pan
+                </button>
+              </div>
             </div>
 
           <div className="canvas-wrapper">
             <div
-              className={`editor-canvas-real ${draft.orientation}`}
-              ref={canvasRef}
-              onPointerMove={onPointerMove}
-              onPointerUp={() => {
-                drag.current = null;
+              className="canvas-viewport"
+              ref={canvasViewportRef}
+              tabIndex={0}
+              aria-label="Template editor preview"
+              onKeyDown={(event) => {
+                if (!event.shiftKey || (event.key !== '+' && event.key !== '-')) return;
+                event.preventDefault();
+                setPreviewZoom((zoom) =>
+                  Math.max(100, Math.min(500, zoom + (event.key === '+' ? 10 : -10))),
+                );
               }}
-              onPointerLeave={() => {
-                drag.current = null;
+              onWheel={(event) => {
+                if (!event.shiftKey) return;
+                event.preventDefault();
+                setPreviewZoom((zoom) => Math.max(100, Math.min(500, zoom - Math.sign(event.deltaY) * 10)));
               }}
             >
+              <div
+                className="canvas-zoom-stage"
+                style={{
+                  width: Math.max(previewViewport.width, (previewCanvas.width * previewZoom) / 100),
+                  height: Math.max(previewViewport.height, (previewCanvas.height * previewZoom) / 100),
+                }}
+              >
+                <div
+                  className={`editor-canvas-real ${draft.orientation}`}
+                  ref={canvasRef}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={() => {
+                    drag.current = null;
+                  }}
+                  onPointerLeave={() => {
+                    drag.current = null;
+                  }}
+                  style={{
+                    transform: `translate(${Math.max(0, (previewViewport.width - (previewCanvas.width * previewZoom) / 100) / 2)}px, ${Math.max(0, (previewViewport.height - (previewCanvas.height * previewZoom) / 100) / 2)}px) scale(${previewZoom / 100})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
               {backgroundSource && (
                 <img
                   alt=""
@@ -578,6 +653,8 @@ export function TemplateEditor({
               <span className="canvas-meta">
                 {dimensions.width} × {dimensions.height} · {draft.orientation.toUpperCase()}
               </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

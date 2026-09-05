@@ -26,7 +26,7 @@ describe('template persistence boundaries', () => {
   it('accepts relative database asset paths when removing assets', async () => {
     const storage = new TemplateStorage();
 
-    await expect(storage.removeAsset('templates/classic-portrait.png')).resolves.toBeUndefined();
+    await expect(storage.removeAsset('templates/background.png')).resolves.toBeUndefined();
     await expect(storage.removeAsset('../outside.png')).rejects.toThrow(
       'Invalid template asset path',
     );
@@ -339,4 +339,3 @@ describe('template persistence boundaries', () => {
     expect(pkg.templates[1].template.type).toBe('flipbook');
   });
 });
-
