@@ -21,14 +21,13 @@ Confirmed, durable knowledge that helps future agents make correct changes. Do n
 - Session authorization uses a 64-character cryptographic hex token passed via `X-Session-Token` header for state-modifying requests.
 - Local session assets are stored in isolated subdirectories `storage/sessions/:sessionId/{originals,videos,intermediate,outputs}` with strict path traversal rejection.
 - Fastify server exposes `/health`, `/api/sessions`, and `/photos/:id` with rate limiting and CORS origin controls.
-  <<<<<<< Updated upstream
 - 2026-09-05: Flipbook workflow uses Instance A timing parameters (5.0s video recording, 20 extracted motion frames at 250ms frame delay = 4.0 fps, 3.0s front cover hold, 8.0s total GIF loop), centrally defined in `app/backend/src/config.ts` (`flipbookConfig`) and `app/photobooth-software/src/config/flipbook.ts` (`FLIPBOOK_CONFIG`). Source: `app/backend/src/config.ts`, `app/photobooth-software/src/config/flipbook.ts`.
 - 2026-09-05: WebM `MediaRecorder` video streams lack segment duration headers; video duration is validated in `app/backend/src/services/media-validator.ts` by inspecting Cluster `Timecode` (`0xE7`) tags in cluster headers. Source: `app/backend/src/services/media-validator.ts`.
-  \=======
 - 2026-09-05: Photo Strip endpoints are implemented in Fastify backend: `GET /api/templates`, `POST /api/sessions/:id/template` (with immutable snapshotting), `POST /api/sessions/:id/photo-strip/confirm`, and `POST /api/sessions/:id/print`. Source: `app/backend/src/routes/sessions.ts`.
 - 2026-09-05: Photo Strip rendering uses 300 DPI 4R canvas compositor (`1200x1800` portrait / `1800x1200` landscape) in `app/backend/src/services/photo-strip-renderer.ts` with centered cover cropping, border radius masking, and embedded SVG QR code. Source: `app/backend/src/services/photo-strip-renderer.ts`.
-
-> > > > > > > Stashed changes
+- 2026-09-05: Photo Strip frontend workflow in `app/photobooth-software/` is unified across the 5 design sheet stages (Setup/Event selection, Template selection, Photo capture, Photo review, and Complete/Print) sharing components with `App.tsx` artboards and reusing `useCamera` and `useCountdown` hooks. Source: `app/photobooth-software/src/components/photostrip/PhotoStripWorkflow.tsx`.
+- 2026-09-05: Photo Strip printing implements PRD 4R PNG handoff: `@media print` CSS formats borderless 4R output hiding screen UI; Firefox/CUPS handoff triggers via `window.print()`; manual operator confirmation records `is_printed` and `copies_printed` with support for subsequent prints; displays contract recovery banner on CUPS issue. Source: `app/photobooth-software/src/components/photostrip/PrintModal.tsx`, `app/photobooth-software/src/global.css`, `app/backend/src/routes/sessions.ts`.
+- 2026-09-05: Photo Strip printing uses direct Fastify backend CUPS printing via PrinterService (`/usr/bin/lp -d Epson_L3250 -o media=Custom.4x6in -o fit-to-page <file>`), completely eliminating browser window.print() dialogs while preserving manual copy count recording and the exact contract recovery banner if CUPS fails. Source: `app/backend/src/services/printer.ts`, `app/backend/src/routes/sessions.ts`, `app/photobooth-software/src/components/photostrip/PrintModal.tsx`.
 
 ## Update Template
 

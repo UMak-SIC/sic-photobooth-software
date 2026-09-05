@@ -72,6 +72,8 @@ export interface Template extends TemplateDraft {
 }
 
 export interface TemplateDto extends Omit<Template, 'backgroundPath' | 'overlays'> {
+  outputWidth?: number;
+  outputHeight?: number;
   backgroundPath: string | null;
   overlays: Array<Omit<TemplateOverlay, 'path'> & { path: string | null }>;
 }

@@ -34,12 +34,15 @@ export class PhotoStripRenderer {
       qrUrl,
     } = options;
 
+    const canvasWidth = Math.max(1, Math.round(width));
+    const canvasHeight = Math.max(1, Math.round(height));
+
     // 1. Create base 4R canvas
     const baseColor = backgroundColor || '#ffffff';
     const canvas = sharp({
       create: {
-        width,
-        height,
+        width: canvasWidth,
+        height: canvasHeight,
         channels: 4,
         background: baseColor,
       },
@@ -50,7 +53,7 @@ export class PhotoStripRenderer {
     // 2. Add background asset if present
     if (backgroundPath && fs.existsSync(backgroundPath)) {
       const bgBuffer = await sharp(backgroundPath)
-        .resize(width, height, { fit: 'cover', position: 'center' })
+        .resize(canvasWidth, canvasHeight, { fit: 'cover', position: 'center' })
         .toBuffer();
       compositeInputs.push({
         input: bgBuffer,
@@ -65,20 +68,24 @@ export class PhotoStripRenderer {
     for (const placement of sortedPlacements) {
       const capture = captures.find((c) => c.captureIndex === placement.captureIndex);
       let photoBuffer: Buffer;
+      const pWidth = Math.max(1, Math.round(placement.width));
+      const pHeight = Math.max(1, Math.round(placement.height));
+      const pRadius = Math.max(0, Math.round(placement.borderRadius || 0));
+      const pLeft = Math.round(placement.x);
+      const pTop = Math.round(placement.y);
 
       if (capture && fs.existsSync(capture.filePath)) {
         // Read capture original, apply centered cover crop to placement dimensions
-        let img = sharp(capture.filePath).resize(placement.width, placement.height, {
+        let img = sharp(capture.filePath).resize(pWidth, pHeight, {
           fit: 'cover',
           position: 'center',
         });
 
         // Apply border radius mask if specified
-        if (placement.borderRadius && placement.borderRadius > 0) {
-          const r = placement.borderRadius;
+        if (pRadius > 0) {
           const maskSvg = Buffer.from(`
-            <svg width="${placement.width}" height="${placement.height}" xmlns="http://www.w3.org/2000/svg">
-              <rect x="0" y="0" width="${placement.width}" height="${placement.height}" rx="${r}" ry="${r}" fill="#fff"/>
+            <svg width="${pWidth}" height="${pHeight}" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="0" width="${pWidth}" height="${pHeight}" rx="${pRadius}" ry="${pRadius}" fill="#fff"/>
             </svg>
           `);
           const masked = await img
@@ -99,8 +106,8 @@ export class PhotoStripRenderer {
       } else {
         // Synthetic placeholder tile for testing or missing captures
         const phSvg = Buffer.from(`
-          <svg width="${placement.width}" height="${placement.height}" xmlns="http://www.w3.org/2000/svg">
-            <rect width="${placement.width}" height="${placement.height}" rx="${placement.borderRadius || 0}" fill="#e2e8f0"/>
+          <svg width="${pWidth}" height="${pHeight}" xmlns="http://www.w3.org/2000/svg">
+            <rect width="${pWidth}" height="${pHeight}" rx="${pRadius}" fill="#e2e8f0"/>
             <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="24" fill="#64748b">
               Photo ${placement.captureIndex}
             </text>
@@ -111,8 +118,8 @@ export class PhotoStripRenderer {
 
       compositeInputs.push({
         input: photoBuffer,
-        left: Math.round(placement.x),
-        top: Math.round(placement.y),
+        left: pLeft,
+        top: pTop,
       });
     }
 
@@ -124,7 +131,9 @@ export class PhotoStripRenderer {
       const safeLabel = path.basename(overlay.label);
       const overlayPath = path.join(baseStorageDir, safeLabel);
       if (overlayPath.startsWith(baseStorageDir) && fs.existsSync(overlayPath)) {
-        let img = sharp(overlayPath).resize(overlay.width, overlay.height, {
+        const oWidth = Math.max(1, Math.round(overlay.width));
+        const oHeight = Math.max(1, Math.round(overlay.height));
+        let img = sharp(overlayPath).resize(oWidth, oHeight, {
           fit: 'contain',
         });
         if (overlay.rotation) {
@@ -153,17 +162,21 @@ export class PhotoStripRenderer {
       qrX = qrOverlay.x;
       qrY = qrOverlay.y;
       qrSize = Math.min(qrOverlay.width, qrOverlay.height);
-    } else if (height > width) {
+    } else if (canvasHeight > canvasWidth) {
       // Portrait 1200x1800 default: bottom-right footer
       qrSize = 160;
-      qrX = width - qrSize - 80;
-      qrY = height - qrSize - 60;
+      qrX = canvasWidth - qrSize - 80;
+      qrY = canvasHeight - qrSize - 60;
     } else {
       // Landscape 1800x1200 default: bottom-right corner
       qrSize = 160;
-      qrX = width - qrSize - 80;
-      qrY = height - qrSize - 60;
+      qrX = canvasWidth - qrSize - 80;
+      qrY = canvasHeight - qrSize - 60;
     }
+
+    qrSize = Math.max(1, Math.round(qrSize));
+    qrX = Math.round(qrX);
+    qrY = Math.round(qrY);
 
     const qrSvg = generateQrSvg(qrUrl, {
       size: qrSize,
@@ -175,8 +188,8 @@ export class PhotoStripRenderer {
     const qrBuffer = await sharp(Buffer.from(qrSvg)).png().toBuffer();
     compositeInputs.push({
       input: qrBuffer,
-      left: Math.round(qrX),
-      top: Math.round(qrY),
+      left: qrX,
+      top: qrY,
     });
 
     // 6. Composite everything and set 300 DPI metadata
@@ -192,3 +205,4 @@ export class PhotoStripRenderer {
 }
 
 export const photoStripRenderer = new PhotoStripRenderer();
+ 

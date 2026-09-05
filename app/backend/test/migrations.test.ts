@@ -45,6 +45,35 @@ describe('Versioned Database Migrations', () => {
     expect(schema001).toContain('CREATE TABLE IF NOT EXISTS publication_records');
   });
 
+  it('verifies 002_normalize_template_schema.sql defines normalized placement and overlay tables', () => {
+    const dir = findMigrationsDir();
+    const schema002 = fs.readFileSync(path.join(dir, '002_normalize_template_schema.sql'), 'utf8');
+
+    expect(schema002).toContain('CREATE TABLE IF NOT EXISTS template_placements');
+    expect(schema002).toContain('CREATE TABLE IF NOT EXISTS template_overlays');
+    expect(schema002).toContain('ALTER TABLE templates DROP COLUMN IF EXISTS placements');
+    expect(schema002).toContain('ALTER TABLE templates ALTER COLUMN background_path DROP NOT NULL');
+  });
+
+  it('verifies 003_template_sort_order.sql defines sort_order column on templates', () => {
+    const dir = findMigrationsDir();
+    const schema003 = fs.readFileSync(path.join(dir, '003_template_sort_order.sql'), 'utf8');
+
+    expect(schema003).toContain('ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order INT');
+  });
+
+  it('verifies all migration files have unique, monotonically incrementing 3-digit prefixes', () => {
+    const dir = findMigrationsDir();
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+    const prefixes = files.map((f) => f.slice(0, 3));
+    const uniquePrefixes = new Set(prefixes);
+
+    expect(uniquePrefixes.size).toBe(files.length);
+    files.forEach((f) => {
+      expect(f).toMatch(/^\d{3}_[a-z0-9_]+\.sql$/);
+    });
+  });
+
   it('ensureMigrationTable and getAppliedMigrations handle mock client queries', async () => {
     const queries: string[] = [];
     const mockClient = {

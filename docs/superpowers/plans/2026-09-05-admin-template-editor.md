@@ -33,6 +33,7 @@
 - Create: `app/backend/src/templates/storage.ts`
 - Create: `app/backend/src/templates/repository.ts`
 - Create: `app/backend/migrations/0002_templates.sql`
+- Create: `app/backend/src/db/migrations/002_normalize_template_schema.sql`
 - Test: `app/backend/test/templates.integration.test.ts`
 
 **Interfaces:**

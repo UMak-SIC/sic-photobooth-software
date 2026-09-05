@@ -4,36 +4,24 @@ import { usePhotoStripStore } from '../store/photostrip-store';
 import { useSessionStore } from '../store/session-store';
 import { boothApi } from '../services/api';
 
-export function WelcomeExperienceScreen() {
+export interface WelcomeScreenProps {
+  preview?: boolean;
+}
+
+export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
   const { setSession: setFlipbookSession, setStep: setFlipbookStep } = useFlipbookStore();
-  const { setSession: setPhotoStripSession, setStep: setPhotoStripStep } = usePhotoStripStore();
+  const { setStep: setPhotoStripStep } = usePhotoStripStore();
   const { setActiveSession } = useSessionStore();
   const [loading, setLoading] = useState(false);
 
-  const handleStartPhotoStrip = async () => {
-    setLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const session = await boothApi.createSession(
-        'SIC General Assembly',
-        today,
-        'Operator',
-        'photo_strip',
-      );
-      setPhotoStripSession(session.sessionId, session.token);
-      setActiveSession({ id: session.sessionId, type: 'photo_strip', token: session.token });
-      setPhotoStripStep('template_select');
-    } catch {
-      // Offline fallback
-      setPhotoStripSession('mock-photo-strip-session-id', 'mock-token');
-      setActiveSession({ id: 'mock-photo-strip-session-id', type: 'photo_strip' });
-      setPhotoStripStep('template_select');
-    } finally {
-      setLoading(false);
-    }
+  const handleStartPhotoStrip = () => {
+    if (preview) return;
+    setActiveSession({ id: '', type: 'photo_strip' });
+    setPhotoStripStep('setup');
   };
 
   const handleStartFlipbook = async () => {
+    if (preview) return;
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
@@ -99,3 +87,5 @@ export function WelcomeExperienceScreen() {
     </div>
   );
 }
+
+export { WelcomeScreen as WelcomeExperienceScreen };

@@ -1,6 +1,15 @@
-import type { ReviewTemplate } from '../components/PhotoStripReview';
+import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+export const resolveAssetUrl = (relativeUrl: string | null): string | null => {
+  if (!relativeUrl) return null;
+  if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://') || relativeUrl.startsWith('data:')) {
+    return relativeUrl;
+  }
+  return new URL(relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`, API_BASE_URL).toString();
+};
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -9,6 +18,13 @@ export interface ApiResponse<T = unknown> {
     code: string;
     message: string;
   };
+}
+
+export interface EventItem {
+  id: string;
+  name: string;
+  date: string;
+  operatorName: string;
 }
 
 export interface FrameItem {
@@ -89,6 +105,40 @@ export class BoothApiClient {
     }
   }
 
+  public async listEvents(): Promise<EventItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/events`);
+      if (!res.ok) throw new Error('Failed to fetch events');
+      const body = await res.json();
+      if (body.data && Array.isArray(body.data)) {
+        return body.data;
+      }
+      return body;
+    } catch {
+      return [
+        { id: '1', name: 'SIC General Assembly', date: 'May 24, 2026', operatorName: 'Mika Santos' },
+        { id: '2', name: 'College Week 2026', date: 'June 18, 2026', operatorName: 'Mika Santos' },
+      ];
+    }
+  }
+
+  public async createEvent(
+    name: string,
+    date: string,
+    operatorName: string,
+  ): Promise<EventItem> {
+    const res = await fetch(`${API_BASE_URL}/api/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, date, operatorName }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.data) {
+      throw new Error(body.error?.message || 'Could not create event');
+    }
+    return body.data;
+  }
+
   public async listFrames(): Promise<FrameItem[]> {
     const res = await fetch(`${API_BASE_URL}/api/frames`);
     const body: ApiResponse<FrameItem[]> = await res.json();
@@ -108,7 +158,7 @@ export class BoothApiClient {
   }
 
   public async listTemplates(): Promise<ReviewTemplate[]> {
-    const res = await fetch(`${API_BASE_URL}/api/templates`);
+    const res = await fetch(`${API_BASE_URL}/templates?active=true`);
     const body: ApiResponse<ReviewTemplate[]> = await res.json();
     if (!res.ok || !body.success || !body.data) {
       throw new Error(body.error?.message || 'Failed to list templates');
@@ -281,11 +331,15 @@ export class BoothApiClient {
     return body.data;
   }
 
-  public async recordPrint(sessionId: string, copies: number = 1): Promise<void> {
+  public async recordPrint(
+    sessionId: string,
+    copies: number = 1,
+    recordOnly?: boolean,
+  ): Promise<void> {
     const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/print`, {
       method: 'POST',
       headers: this.getHeaders('application/json'),
-      body: JSON.stringify({ copies }),
+      body: JSON.stringify({ copies, recordOnly }),
     });
     const body: ApiResponse = await res.json();
     if (!res.ok || !body.success) {

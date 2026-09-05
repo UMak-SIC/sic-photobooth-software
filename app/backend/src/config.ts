@@ -125,3 +125,18 @@ export const flipbookConfig: FlipbookConfig = {
   // gifTimeoutMs: 120000,
   // enableComparisonVariants: false,
 };
+
+export interface PrinterConfig {
+  printerName: string;
+  mediaSize: string;
+  fitToPage: boolean;
+  enableHardwarePrint: boolean;
+}
+
+export const printerConfig: PrinterConfig = {
+  printerName: process.env.PRINTER_NAME || 'Epson_L3250',
+  mediaSize: process.env.PRINTER_MEDIA_SIZE || 'Custom.4x6in',
+  fitToPage: true,
+  enableHardwarePrint: process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
+};
+
