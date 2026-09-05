@@ -19,6 +19,7 @@ Component and module boundaries derived from the product contract. This is a tem
 - Photo Strip flow: template selection, capture, review, retake selection, confirmation.
 - Flipbook flow: frame selection, instructions, captures, timed review, confirmation.
 - Administrator screens: event, template, frame, and publication management.
+- Event management: lists events and creates events through the backend API; the backend owns uniqueness validation.
 - Camera UI: browser device selection, feed display, countdown, and capture feedback.
 
 ## Retrieval Websites

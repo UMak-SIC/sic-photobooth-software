@@ -52,6 +52,54 @@ export interface OutputItem {
 }
 
 export class DatabaseRepository {
+  public async listEvents(): Promise<EventData[]> {
+    try {
+      const result = await pool.query(`
+        SELECT id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+        FROM events
+        ORDER BY date DESC, name ASC
+      `);
+      return result.rows;
+    } catch {
+      return Array.from(this.inMemoryEvents.values()).sort(
+        (a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name),
+      );
+    }
+  }
+
+  public async createEvent(name: string, date: string, operatorName: string): Promise<EventData> {
+    try {
+      const result = await pool.query(
+        `
+          INSERT INTO events (name, date, operator_name)
+          VALUES ($1, $2, $3)
+          RETURNING id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+        `,
+        [name, date, operatorName],
+      );
+      return result.rows[0];
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+        throw error;
+      }
+      const key = `${name}_${date}`;
+      if (this.inMemoryEvents.has(key)) {
+        const duplicate = new Error('Event already exists');
+        Object.assign(duplicate, { code: '23505' });
+        throw duplicate;
+      }
+      const event: EventData = {
+        id: crypto.randomUUID(),
+        name,
+        date,
+        operatorName,
+        createdAt: new Date(),
+      };
+      this.inMemoryEvents.set(key, event);
+      return event;
+    }
+  }
+
   // In-memory fallback stores when PostgreSQL is offline
   private inMemoryEvents: Map<string, EventData> = new Map();
   private inMemorySessions: Map<string, SessionData> = new Map();
