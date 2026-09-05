@@ -48,12 +48,12 @@ export function parsePublicId(input: unknown, options?: ParsePublicIdOptions): s
 
     // Extract path segments, ignoring empty segments
     const pathSegments = url.pathname.split('/').filter(Boolean);
-    if (pathSegments.length === 0) {
+    if (pathSegments.length !== 1) {
       return null;
     }
 
-    // Terminal path segment is the candidate public ID
-    const candidateId = pathSegments[pathSegments.length - 1];
+    // Canonical path segment is the candidate public ID
+    const candidateId = pathSegments[0];
     if (isValidPublicId(candidateId)) {
       return candidateId;
     }

@@ -69,7 +69,7 @@ This app reads public delivery data only. It never contacts the local backend.
 
 Owner: `app/backend/`
 
-The API is session-oriented. Its route design is `TBD`; it must cover health, event setup, sessions, workflow transitions, templates/frames, media registration, retakes, finalization, local approved-output retrieval, printing records, and publication administration.
+The API is session-oriented. Implemented event setup routes are `GET /api/events` and `POST /api/events`. The API must also cover health, sessions, workflow transitions, templates/frames, media registration, retakes, finalization, local approved-output retrieval, printing records, and publication administration.
 
 ### Implemented Template Export
 
