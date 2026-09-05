@@ -88,6 +88,22 @@ export interface OutputItem {
   eventDate: string;
 }
 
+export type PublicationStatus = 'queued' | 'in_progress' | 'uploaded' | 'failed';
+
+export interface PublicationRecord {
+  id: string;
+  publicId: string;
+  status: PublicationStatus;
+  retryCount: number;
+  lastAttemptAt: Date | null;
+  lastError: string | null;
+  cloudFinalizedAt: Date | null;
+  createdAt: Date;
+  mediaType: string;
+  eventName: string;
+  eventDate: string;
+}
+
 export class DatabaseRepository {
   public async listEvents(): Promise<EventData[]> {
     try {
@@ -263,6 +279,7 @@ export class DatabaseRepository {
   private inMemoryCaptures: Map<string, CaptureItem[]> = new Map();
   private inMemoryVideos: Map<string, VideoItem[]> = new Map();
   private inMemoryOutputs: Map<string, OutputItem> = new Map();
+  private inMemoryPublications: Map<string, PublicationRecord> = new Map();
 
   /**
    * Creates or returns an existing event by name and date.
@@ -1011,6 +1028,20 @@ export class DatabaseRepository {
         eventDate: new Date().toISOString().split('T')[0],
       };
       this.inMemoryOutputs.set(publicId, output);
+      const publicationId = crypto.randomUUID();
+      this.inMemoryPublications.set(publicationId, {
+        id: publicationId,
+        publicId,
+        status: 'queued',
+        retryCount: 0,
+        lastAttemptAt: null,
+        lastError: null,
+        cloudFinalizedAt: null,
+        createdAt: new Date(),
+        mediaType,
+        eventName: output.eventName,
+        eventDate: output.eventDate,
+      });
 
       const session = this.inMemorySessions.get(sessionId);
       if (session) {
@@ -1048,6 +1079,63 @@ export class DatabaseRepository {
     } catch {
       return this.inMemoryOutputs.get(publicId) || null;
     }
+  }
+
+  public async listPublications(): Promise<PublicationRecord[]> {
+    try {
+      const result = await pool.query(`
+        SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+        FROM publication_records p
+        JOIN generated_outputs o ON o.id = p.output_id
+        JOIN sessions s ON s.id = o.session_id
+        JOIN events e ON e.id = s.event_id
+        ORDER BY p.created_at DESC
+      `);
+      return [...result.rows, ...this.inMemoryPublications.values()].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    } catch {
+      return Array.from(this.inMemoryPublications.values()).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+    }
+  }
+
+  public async retryPublication(id: string): Promise<PublicationRecord | null> {
+    let retried: PublicationRecord | undefined;
+    try {
+      const result = await pool.query(
+        `WITH requeued AS (
+          UPDATE publication_records
+          SET status = 'queued', retry_count = 0, last_attempt_at = NULL, last_error = NULL
+          WHERE id = $1 AND status = 'failed'
+          RETURNING *
+        )
+        SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+          p.last_attempt_at AS "lastAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt", p.created_at AS "createdAt",
+          o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+        FROM requeued p
+        JOIN generated_outputs o ON o.id = p.output_id
+        JOIN sessions s ON s.id = o.session_id
+        JOIN events e ON e.id = s.event_id`,
+        [id],
+      );
+      retried = result.rows[0];
+    } catch {
+      retried = undefined;
+    }
+    if (retried) return retried;
+    const publication = this.inMemoryPublications.get(id);
+    if (!publication || publication.status !== 'failed') return null;
+    publication.status = 'queued';
+    publication.retryCount = 0;
+    publication.lastAttemptAt = null;
+    publication.lastError = null;
+    return publication;
   }
 
   /**

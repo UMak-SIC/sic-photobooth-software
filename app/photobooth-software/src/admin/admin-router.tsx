@@ -5,6 +5,7 @@ import { TemplateLibrary } from './templates/template-library';
 import { layoutPlacements } from './templates/presets';
 import { useTemplateStore } from './templates/template-store';
 import { draftFromTemplate, emptyDraft, type Template } from './templates/types';
+import { PublicationDashboard } from './publications/publication-dashboard';
 
 export function AdminRouter() {
   const [path, setPath] = useState(window.location.pathname);
@@ -93,6 +94,8 @@ export function AdminRouter() {
       </AdminFrame>
     );
 
+  if (path === '/admin/publications') return <AdminFrame><PublicationDashboard /></AdminFrame>;
+
   const id = path.startsWith('/admin/templates/') ? path.split('/').at(-1) : undefined;
   return (
     <AdminFrame>
@@ -122,7 +125,7 @@ function AdminFrame({ children }: { children: React.ReactNode }) {
       <aside className="admin-sidebar">
         <div className="admin-brand"><span className="admin-mark">SIC</span><strong>SIC BOOTH</strong></div>
         <p className="admin-eyebrow">OPERATIONS</p>
-        <nav aria-label="Administration"><a href="/admin/templates">Templates</a><span>Events</span><span>Flipbook frames</span><span>Publications</span></nav>
+        <nav aria-label="Administration"><a href="/admin/templates">Templates</a><span>Events</span><span>Flipbook frames</span><a href="/admin/publications">Publications</a></nav>
         <p className="admin-operator">Mika Santos<br /><span>Operator</span></p>
       </aside>
       <section className="admin-content">{children}</section>

@@ -29,6 +29,13 @@ Component and module boundaries derived from the product contract. This is a tem
 - Does not own: session template snapshots or final image composition.
 - Collaborators: Photo Strip template selection and compositor tasks.
 
+### Publication Management
+
+- Location: `app/backend/src/routes/publications.ts`, `app/photobooth-software/src/admin/publications/`
+- Owns: Local publication-record listing and manually requeuing failed records.
+- Does not own: Cloudinary uploads, Supabase registration, or retry scheduling.
+- Collaborators: The future publishing worker and generated-output persistence.
+
 ## Retrieval Websites
 
 - Public-ID parser: use `packages/public-output/` for shared parsing and validation.
