@@ -19,11 +19,13 @@ function VideoItemPreview({
   return (
     <button
       type="button"
+      role="radio"
+      aria-checked={isSelected}
       onClick={onSelect}
-      className={`group relative overflow-hidden rounded-2xl border-4 aspect-[4/3] bg-black/40 transition-all ${
+      className={`group relative overflow-hidden rounded-2xl aspect-[241/132] bg-black/40 transition-all cursor-pointer ${
         isSelected
-          ? 'border-[#a8f3dd] ring-4 ring-[#a8f3dd]/40 scale-[1.02] shadow-2xl'
-          : 'border-white/20 opacity-80 hover:opacity-100 hover:border-white/40'
+          ? 'ring-4 ring-[#a8f3dd] ring-offset-4 ring-offset-[#0e473d] scale-[1.03] shadow-[0_12px_32px_rgba(0,0,0,0.4)]'
+          : 'opacity-70 hover:opacity-100 hover:scale-[1.01] shadow-md'
       }`}
     >
       {url && !hasError ? (
@@ -44,21 +46,27 @@ function VideoItemPreview({
           className="size-full object-cover"
         />
       ) : (
-        <div className="flex size-full items-center justify-center text-sm font-bold text-white/50">
+        <div className="flex size-full items-center justify-center text-sm font-bold text-white/50 bg-[#176754]">
           VIDEO 0{index}
         </div>
       )}
 
-      {/* Badges */}
-      <div
-        className={`absolute bottom-3 left-3 flex items-center gap-2 rounded-lg px-3 py-1 text-xs font-black backdrop-blur-md ${
-          isSelected ? 'bg-[#a8f3dd] text-[#0e473d]' : 'bg-black/50 text-white'
-        }`}
-      >
-        <span>▶ 6 SEC</span>
-        <span>
-          VIDEO 0{index} {isSelected && '✓'}
-        </span>
+      {/* Pick Tile Badge matching design sheet */}
+      <div className="absolute inset-0 p-4 flex flex-col justify-end items-start pointer-events-none bg-gradient-to-t from-black/60 via-transparent to-transparent">
+        <div
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${
+            isSelected
+              ? 'bg-[#a8f3dd] text-[#0e473d] shadow-sm'
+              : 'bg-black/50 text-white backdrop-blur-sm'
+          }`}
+        >
+          <svg className="size-3 fill-current shrink-0" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <span>5 SEC</span>
+          <span>•</span>
+          <span>CLIP 0{index} {isSelected ? '✓' : ''}</span>
+        </div>
       </div>
     </button>
   );
@@ -116,8 +124,8 @@ export function FlipReviewVideoScreen() {
   });
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-8 py-10">
-      {/* 5-Minute Auto-select Banner */}
+    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-6 md:px-12 py-10">
+      {/* 5-Minute Auto-select Banner from Design Sheet */}
       <div className="flex justify-center z-10">
         <span className="rounded-full bg-white/20 border border-white/10 px-6 py-2.5 text-[13px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
           Auto-selects in {formattedMMSS}
@@ -125,12 +133,16 @@ export function FlipReviewVideoScreen() {
       </div>
 
       {/* Main Selection Area */}
-      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto max-w-6xl">
-        <p className="mb-6 text-[15px] font-bold tracking-[0.14em] text-[#a8f3dd]">
-          SELECT A VIDEO CLIP
+      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto max-w-5xl">
+        <p className="mb-6 text-[13px] font-bold tracking-[0.16em] text-[#a8f3dd] uppercase">
+          VIDEO CLIPS
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full">
+        <div
+          role="radiogroup"
+          aria-label="Video Clip Selection"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full"
+        >
           {[1, 2, 3].map((index) => (
             <VideoItemPreview
               key={index}
@@ -143,15 +155,25 @@ export function FlipReviewVideoScreen() {
         </div>
       </div>
 
-      {/* Bottom Action */}
+      {/* Bottom Action Button */}
       <div className="flex justify-center z-10 pt-6">
         <button
           type="button"
           disabled={loading}
           onClick={handleCreateFlipbook}
-          className="rounded-2xl bg-[#a8f3dd] px-12 py-4 text-[16px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] disabled:opacity-50"
+          className="rounded-2xl bg-[#a8f3dd] px-12 py-4 text-[16px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
         >
-          {loading ? 'Submitting...' : `Create flipbook with Video 0${selectedVideoIndex}`}
+          {loading ? (
+            <>
+              <svg className="animate-spin size-5 text-[#0e473d]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span>Creating flipbook...</span>
+            </>
+          ) : (
+            <span>Create flipbook</span>
+          )}
         </button>
       </div>
     </div>

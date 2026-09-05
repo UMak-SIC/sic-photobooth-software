@@ -300,6 +300,43 @@ describe('template persistence boundaries', () => {
     const parts: Buffer[] = [];
     for await (const part of zip(entries())) parts.push(part);
 
-    expect(() => parseManifest(parseZip(Buffer.concat(parts)))).toThrow();
+    expect(() => parseManifest(parseZip(Buffer.concat(parts)))).toThrow(/missing asset/i);
+  });
+
+  it('preserves flipbook type and infers flipbook from coverPath or defaultType', async () => {
+    const manifest = {
+      version: 1,
+      templates: [
+        {
+          name: 'Flipbook Frame 1',
+          type: 'flipbook',
+          orientation: 'portrait',
+          coverPath: 'assets/fb-1/cover.png',
+          background: { x: 0, y: 0, width: 1200, height: 1800 },
+          placements: [placement],
+          overlays: [],
+        },
+        {
+          name: 'Implicit Flipbook Frame 2',
+          orientation: 'portrait',
+          coverPath: 'assets/fb-2/cover.png',
+          background: { x: 0, y: 0, width: 1200, height: 1800 },
+          placements: [placement],
+          overlays: [],
+        },
+      ],
+    };
+    async function* entries() {
+      yield { name: 'manifest.json', content: Buffer.from(JSON.stringify(manifest)) };
+      yield { name: 'assets/fb-1/cover.png', content: Buffer.from([1]) };
+      yield { name: 'assets/fb-2/cover.png', content: Buffer.from([2]) };
+    }
+    const parts: Buffer[] = [];
+    for await (const part of zip(entries())) parts.push(part);
+
+    const pkg = parseManifest(parseZip(Buffer.concat(parts)), 'flipbook');
+    expect(pkg.templates[0].template.type).toBe('flipbook');
+    expect(pkg.templates[1].template.type).toBe('flipbook');
   });
 });
+

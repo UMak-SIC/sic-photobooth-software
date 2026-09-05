@@ -541,3 +541,64 @@ button {
   .card-footer-actions, .slot-actions { grid-template-columns: 1fr; }
   .name-input { width: 100%; }
 }
+
+@page {
+  size: 4in 6in;
+  margin: 0;
+}
+
+@media screen {
+  #flipbook-print-portal {
+    display: none !important;
+  }
+}
+
+@media print {
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html, body {
+    width: 4in !important;
+    height: 6in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+  #root {
+    display: none !important;
+  }
+  #flipbook-print-portal {
+    display: block !important;
+    position: static !important;
+    width: 4in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .print-sheet-4r {
+    display: block !important;
+    width: 4in !important;
+    height: 6in !important;
+    min-width: 4in !important;
+    min-height: 6in !important;
+    max-width: 4in !important;
+    max-height: 6in !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+    background-color: #ffffff !important;
+  }
+  .print-sheet-4r:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+}
+

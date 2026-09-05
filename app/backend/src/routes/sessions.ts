@@ -8,8 +8,9 @@ import { sessionStateMachine, type SessionState } from '../services/session-stat
 import { storageService } from '../services/storage.js';
 import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
-import { flipbookConfig } from '../config.js';
+import { config, flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
+import { templateRepository } from '../templates/repository.js';
 import type { SessionType } from '@photobooth/public-output';
 
 const createSessionSchema = z.object({
@@ -57,6 +58,26 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // 0. List active frames for Flipbook
   fastify.get('/api/frames', async (_request, reply) => {
     try {
+      const templates = await templateRepository.list('flipbook');
+      if (templates.length > 0) {
+        const activeTemplates = templates.filter((t) => t.active);
+        const listToReturn = activeTemplates.length > 0 ? activeTemplates : templates;
+        return reply.send({
+          success: true,
+          data: listToReturn.map((t) => ({
+            id: t.id,
+            name: t.name,
+            type: t.type,
+            coverPath: t.coverPath ? `/templates/${t.id}/cover` : null,
+            backgroundPath: t.backgroundPath ? `/templates/${t.id}/background` : null,
+            overlayPath: t.backgroundPath ? `/templates/${t.id}/background` : null,
+            isActive: t.active,
+            placements: t.placements,
+            overlays: t.overlays,
+          })),
+        });
+      }
+
       let frames = await dbRepository.listActiveFrames();
       // Seed default frames if none exist
       if (frames.length === 0) {
@@ -345,15 +366,20 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       sessionStateMachine.assertValidTransition(session.type, session.state, 'frame_selected');
 
-      const frame = await dbRepository.getFrameById(parseResult.data.frameId);
-      if (!frame) {
-        return reply.status(404).send({
-          success: false,
-          error: { code: 'FRAME_NOT_FOUND', message: 'Selected frame does not exist' },
-        });
+      const template = await templateRepository.get(parseResult.data.frameId);
+      let frameIdToStore = parseResult.data.frameId;
+      if (!template) {
+        const frame = await dbRepository.getFrameById(parseResult.data.frameId);
+        if (!frame) {
+          return reply.status(404).send({
+            success: false,
+            error: { code: 'FRAME_NOT_FOUND', message: 'Selected frame does not exist' },
+          });
+        }
+        frameIdToStore = frame.id;
       }
 
-      const updated = await dbRepository.setSessionFrame(id, frame.id);
+      const updated = await dbRepository.setSessionFrame(id, frameIdToStore);
 
       return reply.send({
         success: true,
@@ -909,11 +935,26 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        let overlayPath: string | null = null;
+        let coverOverlayPath: string | null = null;
+        let motionOverlayPath: string | null = null;
+        let templatePlacements: Array<{ x: number; y: number; width: number; height: number }> | undefined = undefined;
         if (session.frameId) {
-          const frame = await dbRepository.getFrameById(session.frameId);
-          if (frame && frame.overlayPath) {
-            overlayPath = path.resolve(process.cwd(), frame.overlayPath);
+          const template = await templateRepository.get(session.frameId);
+          if (template) {
+            if (template.coverPath) {
+              coverOverlayPath = path.resolve(config.storageDir, template.coverPath);
+            }
+            if (template.backgroundPath) {
+              motionOverlayPath = path.resolve(config.storageDir, template.backgroundPath);
+            }
+            if (template.placements && template.placements.length > 0) {
+              templatePlacements = template.placements;
+            }
+          } else {
+            const frame = await dbRepository.getFrameById(session.frameId);
+            if (frame && frame.overlayPath) {
+              motionOverlayPath = path.resolve(process.cwd(), frame.overlayPath);
+            }
           }
         }
 
@@ -921,12 +962,13 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const intermediateDir = storageService.getSessionDir(id, 'intermediate');
         const outputsDir = storageService.getSessionDir(id, 'outputs');
         const outputPath = path.join(outputsDir, `${publicId}.gif`);
+        const outputMotionPath = path.join(outputsDir, `${publicId}_motion.gif`);
 
-        // Render Primary Active GIF Output
+        // Render Primary Active Downloadable GIF Output (with 3-second cover photo hold)
         await gifRenderer.renderFlipbookGif(
           selectedCover.filePath,
           selectedVideo.filePath,
-          overlayPath,
+          null,
           outputPath,
           path.join(intermediateDir, 'render'),
           {
@@ -936,11 +978,35 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             outputWidth: flipbookConfig.gifOutputWidth,
             outputHeight: flipbookConfig.gifOutputHeight,
             timeoutMs: flipbookConfig.gifTimeoutMs,
+            coverOverlayPath,
+            motionOverlayPath,
+            placements: templatePlacements,
           },
         );
 
-        // Mirror primary output to global outputs directory
+        // Render Pure Motion GIF for Booth Preview (0s cover hold)
+        await gifRenderer.renderFlipbookGif(
+          selectedCover.filePath,
+          selectedVideo.filePath,
+          null,
+          outputMotionPath,
+          path.join(intermediateDir, 'render_motion'),
+          {
+            frameCount: flipbookConfig.gifFrameCount,
+            coverHoldMs: 0,
+            frameDelayMs: flipbookConfig.gifFrameDelayMs,
+            outputWidth: flipbookConfig.gifOutputWidth,
+            outputHeight: flipbookConfig.gifOutputHeight,
+            timeoutMs: flipbookConfig.gifTimeoutMs,
+            coverOverlayPath: null,
+            motionOverlayPath,
+            placements: templatePlacements,
+          },
+        );
+
+        // Mirror outputs to global outputs directory
         await storageService.mirrorToGlobalOutputs(outputPath, publicId, 'gif');
+        await storageService.mirrorToGlobalOutputs(outputMotionPath, `${publicId}_motion`, 'gif');
 
         // If comparison testing is enabled, also render both variants for side-by-side testing
         if (flipbookConfig.enableComparisonVariants) {
@@ -950,7 +1016,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           await gifRenderer.renderFlipbookGif(
             selectedCover.filePath,
             selectedVideo.filePath,
-            overlayPath,
+            null,
             outputPrdPath,
             path.join(intermediateDir, 'prd'),
             {
@@ -958,13 +1024,15 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               coverHoldMs: 3000,
               frameDelayMs: 500,
               timeoutMs: flipbookConfig.gifTimeoutMs,
+              coverOverlayPath,
+              motionOverlayPath,
             },
           );
 
           await gifRenderer.renderFlipbookGif(
             selectedCover.filePath,
             selectedVideo.filePath,
-            overlayPath,
+            null,
             outputCustomPath,
             path.join(intermediateDir, 'custom'),
             {
@@ -972,6 +1040,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               coverHoldMs: 3000,
               frameDelayMs: 250,
               timeoutMs: flipbookConfig.gifTimeoutMs,
+              coverOverlayPath,
+              motionOverlayPath,
             },
           );
 

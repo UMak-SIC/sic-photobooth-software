@@ -60,14 +60,28 @@ When adding a real boundary, record it as:
 ### FlipbookWorkflow
 
 - Location: `app/photobooth-software/src/components/flipbook/`
-- Owns: 8-step client flipbook capture workflow (instructions, 3x cover photos, 3x video clips, cover/video review selectors, frame selector, processing spinner, and QR completion screen).
+- Owns: 8-step client flipbook capture workflow (instructions, 3x cover photos, 3x video clips, cover/video review selectors, frame selector, processing spinner, 3-card booklet preview with `LoopingMotionPreview`, and QR completion screen).
 - Does not own: Backend video validation, frame extraction, or GIF encoding.
 - Collaborators: `app/photobooth-software/src/store/flipbook-store.ts`, `app/photobooth-software/src/hooks/useCamera.ts`, `app/photobooth-software/src/services/api.ts`.
+
+### PhotoStripWorkflow
+
+- Location: `app/photobooth-software/src/components/photostrip/`
+- Owns: 4-step client photo strip workflow (template selection, camera capture sequence with countdown & audio flash, review screen with retake selector enforcing 4-retake max, and composite completion screen with print modal).
+- Does not own: Template placement calculations or backend 300 DPI canvas composition.
+- Collaborators: `app/photobooth-software/src/store/session-store.ts`, `app/photobooth-software/src/hooks/useCamera.ts`, `app/photobooth-software/src/services/api.ts`.
+
+### PhotoStripRenderer
+
+- Location: `app/backend/src/services/photo-strip-renderer.ts`
+- Owns: 300 DPI 4R composition (`1200x1800` portrait / `1800x1200` landscape) using Sharp, centering and cover-cropping captured photos into template slots, applying border radius masks, overlay compositing, and embedding SVG QR codes with public base-62 IDs.
+- Does not own: Session authorization or photo validation.
+- Collaborators: `app/backend/src/services/storage.ts`, `app/backend/src/db/repository.ts`.
 
 ### GifRenderer
 
 - Location: `app/backend/src/services/gif-renderer.ts`
-- Owns: Extraction of video motion frames via ffmpeg, sharp compositing with front cover holds (3.0s) and overlay PNG frames, gifenc palette quantization, and looping animated GIF generation.
+- Owns: Extraction of video motion frames via ffmpeg, sharp compositing with front cover holds (3.0s for downloadable output) and overlay PNG frames, gifenc palette quantization, and looping animated GIF generation.
 - Does not own: Session authorization, route handling, or storage cleanup.
 - Collaborators: `app/backend/src/config.ts`, `app/backend/src/services/storage.ts`.
 

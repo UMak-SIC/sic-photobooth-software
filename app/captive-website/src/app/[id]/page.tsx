@@ -160,7 +160,7 @@ export default async function OutputPage({
                 )}
                 <span>
                   {output.sessionType === 'flipbook'
-                    ? 'Animated Flipbook GIF'
+                    ? 'Animated Flipbook (4" × 1.5" Booklet Format)'
                     : 'High-Res Photo Strip'}
                 </span>
               </div>
