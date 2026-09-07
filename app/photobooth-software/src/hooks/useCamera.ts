@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FLIPBOOK_CONFIG } from '../config/flipbook';
 
+export const SELECTED_CAMERA_STORAGE_KEY = 'sic-photobooth-selected-camera';
+
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -29,13 +31,15 @@ export function useCamera() {
 
       let stream: MediaStream;
       try {
+        const selectedDeviceId = window.localStorage.getItem(SELECTED_CAMERA_STORAGE_KEY);
+
         // High quality 1080p/720p @ 30fps (reliable 16:9 macroblocks, prevents green pixel glitches)
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             frameRate: { ideal: 30, max: 30 },
-            facingMode: 'user',
+            ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'user' }),
           },
           audio: false,
         });
