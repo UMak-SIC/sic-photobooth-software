@@ -17,6 +17,12 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 
 ## Entries
 
+### 2026-09-07: Camera Setup Shows False Permission Error
+
+- Symptom: Camera setup displayed `The fetching process for the media resource was aborted by the user agent at the user's request` even while the live camera preview was visible.
+- Root cause: The setup modal treated transient `HTMLVideoElement.play()` aborts as camera acquisition failures.
+- Prevention: `pnpm --filter photobooth-software typecheck` and `pnpm test`; camera setup now ignores playback aborts when the stream is live.
+
 ### 2026-09-06: Legacy Classic Template Appears in Admin Library
 
 - Symptom: `Classic Portrait Strip` appeared in the template library and requested a missing seeded background asset.
