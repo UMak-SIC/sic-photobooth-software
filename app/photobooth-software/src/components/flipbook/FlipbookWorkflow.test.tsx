@@ -111,4 +111,54 @@ describe('FlipbookWorkflow event selection and navigation', () => {
       token: 'token-flip-999',
     });
   });
+
+  it('navigates from instructions to frame_select on start button click', async () => {
+    vi.spyOn(boothApi, 'acknowledgeInstructions').mockResolvedValue(undefined);
+
+    useFlipbookStore.setState({
+      currentStep: 'instructions',
+      sessionId: 'session-flip-123',
+      sessionToken: 'token-flip-123',
+    });
+
+    render(<FlipbookWorkflow />);
+
+    const startButton = screen.getByRole('button', { name: /Choose Frame|Start/i });
+    expect(startButton).toBeDefined();
+
+    fireEvent.click(startButton);
+
+    await waitFor(() => {
+      const flipbookState = useFlipbookStore.getState();
+      expect(flipbookState.currentStep).toBe('frame_select');
+    });
+  });
+
+  it('navigates back to instructions from frame_select screen', async () => {
+    vi.spyOn(boothApi, 'listFrames').mockResolvedValue([
+      {
+        id: 'frame-1',
+        name: 'Retro Bloom',
+        coverPath: '/frames/frame-1.png',
+        type: 'flipbook',
+        isActive: true,
+      },
+    ]);
+
+    useFlipbookStore.setState({
+      currentStep: 'frame_select',
+      sessionId: 'session-flip-123',
+      sessionToken: 'token-flip-123',
+    });
+
+    render(<FlipbookWorkflow />);
+
+    const backButton = await screen.findByRole('button', { name: /Back/i });
+    expect(backButton).toBeDefined();
+
+    fireEvent.click(backButton);
+
+    const flipbookState = useFlipbookStore.getState();
+    expect(flipbookState.currentStep).toBe('instructions');
+  });
 });

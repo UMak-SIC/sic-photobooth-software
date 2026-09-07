@@ -3,7 +3,14 @@ import { useFlipbookStore } from '../../store/flipbook-store';
 import { useCountdown } from '../../hooks/useCountdown';
 
 export function FlipReviewCoverScreen() {
-  const { coverUrls, selectedCoverIndex, setSelectedCoverIndex, setStep } = useFlipbookStore();
+  const { coverUrls, selectedCoverIndex, setSelectedCoverIndex, setStep, selectedFrame } =
+    useFlipbookStore();
+
+  const primarySlot = selectedFrame?.placements?.[0];
+  const slotWidth = primarySlot?.width || 620;
+  const slotHeight = primarySlot?.height || 348.75;
+  const slotRatio = slotWidth / slotHeight;
+  const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
 
   const handleContinue = useCallback(() => {
     setStep('review_video');
@@ -20,24 +27,24 @@ export function FlipReviewCoverScreen() {
   });
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#0e473d] px-6 py-10 text-white md:px-12">
+    <div className="relative flex h-[100dvh] max-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#0e473d] p-4 md:p-6 text-white">
       {/* 5-Minute Auto-select Banner */}
-      <div className="flex justify-center z-10">
-        <span className="rounded-full bg-white/20 border border-white/10 px-6 py-2.5 text-[13px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
+      <div className="flex justify-center z-10 shrink-0">
+        <span className="rounded-full bg-white/20 border border-white/10 px-5 py-2 text-[12px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
           Auto-selects in {formattedMMSS}
         </span>
       </div>
 
       {/* Main Selection Area */}
-      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto max-w-5xl">
-        <p className="mb-6 text-[13px] font-bold tracking-[0.16em] text-[#a8f3dd] uppercase">
+      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto flex-1 min-h-0 max-w-5xl py-2">
+        <p className="mb-3 text-[12px] font-bold tracking-[0.16em] text-[#a8f3dd] uppercase shrink-0">
           COVER PHOTO
         </p>
 
         <div
           role="radiogroup"
           aria-label="Cover Photo Selection"
-          className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full"
+          className="grid grid-cols-3 gap-4 md:gap-6 w-full items-center justify-items-center"
         >
           {[1, 2, 3].map((index) => {
             const isSelected = selectedCoverIndex === index;
@@ -50,9 +57,15 @@ export function FlipReviewCoverScreen() {
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => setSelectedCoverIndex(index)}
-                className={`group relative overflow-hidden rounded-2xl aspect-[241/132] bg-black/40 transition-all cursor-pointer ${
+                style={{
+                  aspectRatio: slotAspectRatio,
+                  maxHeight: 'calc(100dvh - 200px)',
+                  maxWidth: `min(100%, calc((100dvh - 200px) * ${slotRatio}))`,
+                  width: `min(100%, calc((100dvh - 200px) * ${slotRatio}))`,
+                }}
+                className={`group relative overflow-hidden rounded-2xl bg-black/40 transition-all cursor-pointer ${
                   isSelected
-                    ? 'ring-4 ring-[#a8f3dd] ring-offset-4 ring-offset-[#0e473d] scale-[1.03] shadow-[0_12px_32px_rgba(0,0,0,0.4)]'
+                    ? 'ring-4 ring-[#a8f3dd] ring-offset-4 ring-offset-[#0e473d] scale-[1.02] shadow-[0_12px_32px_rgba(0,0,0,0.4)]'
                     : 'opacity-70 hover:opacity-100 hover:scale-[1.01] shadow-md'
                 }`}
               >
@@ -69,9 +82,9 @@ export function FlipReviewCoverScreen() {
                 )}
 
                 {/* Pick Tile Badge matching design sheet */}
-                <div className="absolute inset-0 p-4 flex flex-col justify-end items-start pointer-events-none bg-gradient-to-t from-black/60 via-transparent to-transparent">
+                <div className="absolute inset-0 p-3 flex flex-col justify-end items-start pointer-events-none bg-gradient-to-t from-black/60 via-transparent to-transparent">
                   <span
-                    className={`rounded-lg px-3 py-1.5 text-xs font-black transition-colors ${
+                    className={`rounded-lg px-2.5 py-1 text-xs font-black transition-colors ${
                       isSelected
                         ? 'bg-[#a8f3dd] text-[#0e473d] shadow-sm'
                         : 'bg-black/50 text-white backdrop-blur-sm'
@@ -87,13 +100,13 @@ export function FlipReviewCoverScreen() {
       </div>
 
       {/* Bottom Action */}
-      <div className="flex justify-center z-10 pt-6">
+      <div className="flex justify-center z-10 pt-2 shrink-0">
         <button
           type="button"
           onClick={handleContinue}
-          className="rounded-2xl bg-[#a8f3dd] px-12 py-4 text-[16px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] cursor-pointer"
+          className="rounded-2xl bg-[#a8f3dd] px-10 py-3.5 text-[15px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] cursor-pointer"
         >
-          Continue
+          Next: Pick Video →
         </button>
       </div>
     </div>

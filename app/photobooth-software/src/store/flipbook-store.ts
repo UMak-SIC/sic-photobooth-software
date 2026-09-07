@@ -95,7 +95,7 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
 
   setSelectedFrame: (selectedFrame) => set({ selectedFrame }),
 
-  confirmFrameSelection: () => set({ currentStep: 'complete' }),
+  confirmFrameSelection: () => set({ currentStep: 'cover_capture' }),
 
   addCoverCapture: (blob) =>
     set((state) => {
@@ -125,7 +125,7 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
       publicId,
       qrUrl,
       outputGifUrl: gifUrl || null,
-      currentStep: 'frame_select',
+      currentStep: 'complete',
       isProcessing: false,
     }),
 
