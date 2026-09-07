@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useFlipbookStore } from '../store/flipbook-store';
 import { usePhotoStripStore } from '../store/photostrip-store';
 import { useSessionStore } from '../store/session-store';
-import { boothApi } from '../services/api';
 import { SELECTED_CAMERA_STORAGE_KEY } from '../hooks/useCamera';
 
 export interface WelcomeScreenProps {
@@ -10,10 +9,9 @@ export interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
-  const { setSession: setFlipbookSession, setStep: setFlipbookStep } = useFlipbookStore();
+  const { setStep: setFlipbookStep } = useFlipbookStore();
   const { setStep: setPhotoStripStep } = usePhotoStripStore();
   const { setActiveSession } = useSessionStore();
-  const [loading, setLoading] = useState(false);
   const [cameraChoice, setCameraChoice] = useState<'photo_strip' | 'flipbook' | null>(null);
 
   const handleStartPhotoStrip = () => {
@@ -21,34 +19,20 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
     setCameraChoice('photo_strip');
   };
 
-  const handleStartFlipbook = async () => {
+  const handleStartFlipbook = () => {
     if (preview) return;
     setCameraChoice('flipbook');
   };
 
-  const handleCameraReady = async () => {
+  const handleCameraReady = () => {
     if (cameraChoice === 'photo_strip') {
       setActiveSession({ id: '', type: 'photo_strip' });
       setPhotoStripStep('setup');
-      setCameraChoice(null);
-      return;
+    } else if (cameraChoice === 'flipbook') {
+      setActiveSession({ id: '', type: 'flipbook' });
+      setFlipbookStep('setup');
     }
-
-    setLoading(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const session = await boothApi.createSession('SIC General Assembly', today, 'Operator', 'flipbook');
-      setFlipbookSession(session.sessionId, session.token);
-      setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
-      setFlipbookStep('instructions');
-    } catch {
-      setFlipbookSession('mock-flipbook-session-id', 'mock-token');
-      setActiveSession({ id: 'mock-flipbook-session-id', type: 'flipbook' });
-      setFlipbookStep('instructions');
-    } finally {
-      setLoading(false);
-      setCameraChoice(null);
-    }
+    setCameraChoice(null);
   };
 
   return (
@@ -64,7 +48,6 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
         {/* Photo Strips */}
         <button
           type="button"
-          disabled={loading}
           onClick={handleStartPhotoStrip}
           className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99] cursor-pointer"
         >
@@ -72,22 +55,21 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
             PHOTO STRIP
           </div>
           <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
-            {loading ? 'Starting...' : 'PHOTO STRIPS'}
+            PHOTO STRIPS
           </h5>
         </button>
 
         {/* Flipbook */}
         <button
           type="button"
-          disabled={loading}
           onClick={handleStartFlipbook}
-          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99]"
+          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99] cursor-pointer"
         >
           <div className="visual-flip size-40 rounded-2xl bg-[#0e473d] flex items-center justify-center font-black text-[#9ef0dc] text-xl shadow-inner">
             FLIPBOOK
           </div>
           <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
-            {loading ? 'Starting...' : 'FLIPBOOK'}
+            FLIPBOOK
           </h5>
         </button>
       </div>
@@ -95,7 +77,6 @@ export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
       {cameraChoice && (
         <CameraSetup
           experience={cameraChoice}
-          busy={loading}
           onCancel={() => setCameraChoice(null)}
           onContinue={handleCameraReady}
         />
@@ -108,12 +89,10 @@ type CameraDevice = { deviceId: string; label: string };
 
 function CameraSetup({
   experience,
-  busy,
   onCancel,
   onContinue,
 }: {
   experience: 'photo_strip' | 'flipbook';
-  busy: boolean;
   onCancel: () => void;
   onContinue: () => void;
 }) {
@@ -217,7 +196,7 @@ function CameraSetup({
           {error && <button type="button" onClick={() => void requestCamera(selectedDeviceId || undefined)} className="mt-4 text-left text-sm font-bold text-[#b91c1c] underline underline-offset-4">Try camera permission again</button>}
           <div className="mt-7 flex gap-3">
             <button type="button" onClick={onCancel} className="rounded-xl border border-[#92c9b9] bg-white px-5 py-3 text-sm font-bold text-[#155847]">Cancel</button>
-            <button type="button" disabled={requesting || !!error || !selectedDeviceId || busy} onClick={onContinue} className="flex-1 rounded-xl bg-[#146a56] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] disabled:cursor-not-allowed disabled:opacity-50">{busy ? 'Starting...' : 'Continue'}</button>
+            <button type="button" disabled={requesting || !!error || !selectedDeviceId} onClick={onContinue} className="flex-1 rounded-xl bg-[#146a56] px-5 py-3 text-sm font-bold text-white shadow-[0_8px_18px_rgba(20,106,86,0.22)] disabled:cursor-not-allowed disabled:opacity-50">Continue</button>
           </div>
         </div>
       </div>

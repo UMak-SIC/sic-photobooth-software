@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { useFlipbookStore } from '../../store/flipbook-store';
+import { useSessionStore } from '../../store/session-store';
 import { boothApi } from '../../services/api';
 import { FlipbookPrintModal } from './FlipbookPrintModal';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
@@ -12,6 +13,7 @@ export function FlipbookCompletionScreen() {
     sessionId,
     publicId,
     qrUrl,
+    selectedEvent,
     coverUrls,
     videoUrls,
     videoFrames,
@@ -19,11 +21,16 @@ export function FlipbookCompletionScreen() {
     selectedVideoIndex,
     selectedFrame,
     outputGifUrl,
+    setSession: setFlipbookSession,
+    setSelectedEvent,
+    setStep: setFlipbookStep,
     resetFlipbook,
   } = useFlipbookStore();
+  const { setActiveSession } = useSessionStore();
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const previewCoverUrl = coverUrls[selectedCoverIndex - 1] || coverUrls[0];
   const selectedVideoUrl = videoUrls[selectedVideoIndex - 1] || videoUrls[0];
@@ -70,8 +77,38 @@ export function FlipbookCompletionScreen() {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    if (isFinishing) return;
+    setIsFinishing(true);
+    const activeEvent = selectedEvent;
     resetFlipbook();
+    try {
+      const eventName = activeEvent?.name || 'SIC General Assembly';
+      const eventDate = activeEvent?.date || new Date().toISOString().split('T')[0];
+      const operatorName = activeEvent?.operatorName || 'Operator';
+      const session = await boothApi.createSession(
+        eventName,
+        eventDate,
+        operatorName,
+        'flipbook',
+      );
+      setFlipbookSession(session.sessionId, session.token);
+      if (activeEvent) {
+        setSelectedEvent(activeEvent);
+      }
+      setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
+      setFlipbookStep('instructions');
+    } catch {
+      const mockId = `mock-flipbook-${Date.now()}`;
+      setFlipbookSession(mockId, 'mock-token');
+      if (activeEvent) {
+        setSelectedEvent(activeEvent);
+      }
+      setActiveSession({ id: mockId, type: 'flipbook' });
+      setFlipbookStep('instructions');
+    } finally {
+      setIsFinishing(false);
+    }
   };
 
   const resolveAssetUrl = (p: string | null | undefined) => {
@@ -321,10 +358,11 @@ export function FlipbookCompletionScreen() {
             </button>
             <button
               type="button"
+              disabled={isFinishing}
               onClick={handleFinish}
-              className="rounded-xl border border-white/25 py-2.5 text-[13px] font-bold hover:bg-white/10 transition cursor-pointer active:scale-[0.98]"
+              className="rounded-xl border border-white/25 py-2.5 text-[13px] font-bold hover:bg-white/10 transition cursor-pointer active:scale-[0.98] disabled:opacity-50"
             >
-              Finish session
+              {isFinishing ? 'Starting new session...' : 'Finish session'}
             </button>
           </div>
         </aside>

@@ -199,6 +199,8 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
   };
 
   const motionSheetUrl = resolveAssetUrl(frame?.backgroundPath);
+  const slotsPerSheet = frame?.placements && frame.placements.length > 0 ? frame.placements.length : 4;
+  const totalSheets = Math.ceil(20 / slotsPerSheet);
 
   // Total 20 frames: Frame 01 (Cover Photo) + Frames 02-20 (19 Motion Frames)
   const allMotionFrames = coverUrl
@@ -217,11 +219,12 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
     }
 
     const p = frame?.placements?.[0];
+    const stripHeight = 1800 / slotsPerSheet;
     const slotX = p ? p.x : 290;
-    const slotYInStrip = p ? (p.y % 450) : (450 - 348.75) / 2;
+    const slotYInStrip = p ? (p.y % stripHeight) : (stripHeight - 348.75) / 2;
     const slotW = p ? p.width : 620;
     const slotH = p ? p.height : 348.75;
-    const totalY = slotIdx * 450 + slotYInStrip;
+    const totalY = slotIdx * stripHeight + slotYInStrip;
 
     return {
       left: `${(slotX / 1200) * 100}%`,
@@ -231,16 +234,20 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
     };
   };
 
-  const sheetTabs = [
-    { num: 1, label: 'Sheet 1 · Frames 01–04' },
-    { num: 2, label: 'Sheet 2 · Frames 05–08' },
-    { num: 3, label: 'Sheet 3 · Frames 09–12' },
-    { num: 4, label: 'Sheet 4 · Frames 13–16' },
-    { num: 5, label: 'Sheet 5 · Frames 17–20' },
-  ];
+  const sheetTabs = Array.from({ length: totalSheets }, (_, i) => {
+    const sheetNum = i + 1;
+    const startFrame = (sheetNum - 1) * slotsPerSheet + 1;
+    const endFrame = Math.min(20, sheetNum * slotsPerSheet);
+    return {
+      num: sheetNum,
+      label: `Sheet ${sheetNum} · Frames ${String(startFrame).padStart(2, '0')}–${String(endFrame).padStart(2, '0')}`,
+    };
+  });
 
   // Helper to render UI preview of active sheet
   const renderGangSheetContent = (sheetNum: number) => {
+    const slotIndices = Array.from({ length: slotsPerSheet }, (_, i) => i);
+
     if (motionSheetUrl) {
       return (
         <div
@@ -254,8 +261,9 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
             className="absolute inset-0 pointer-events-none z-0 m-0 p-0 border-0"
             style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }}
           />
-          {[0, 1, 2, 3].map((slotIdx) => {
-            const frameNumber = (sheetNum - 1) * 4 + slotIdx + 1; // 1 to 20
+          {slotIndices.map((slotIdx) => {
+            const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
+            if (frameNumber > 20) return null; // Trailing unused slot on last sheet
             const frameSnapshot = allMotionFrames[frameNumber - 1];
             return (
               <div
@@ -285,21 +293,34 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
       );
     }
 
-    // Default Clean Fallback Layout (4 horizontal strips)
+    // Default Clean Fallback Layout (dynamic horizontal strips)
+    const stripHeightPercent = `${100 / slotsPerSheet}%`;
     return (
       <div
         className="flex flex-col m-0 p-0 border-0"
         style={{ width: '100%', height: '100%' }}
       >
-        {[0, 1, 2, 3].map((slotIdx) => {
-          const frameNumber = (sheetNum - 1) * 4 + slotIdx + 1; // 1 to 20
-          const frameSnapshot = allMotionFrames[frameNumber - 1];
+        {slotIndices.map((slotIdx) => {
+          const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
+          const frameSnapshot = frameNumber <= 20 ? allMotionFrames[frameNumber - 1] : undefined;
+
+          if (frameNumber > 20) {
+            return (
+              <div
+                key={slotIdx}
+                className="relative bg-[#c2ffe1]/40 overflow-hidden flex items-center justify-center m-0 p-0 border-0"
+                style={{ width: '100%', height: stripHeightPercent }}
+              >
+                <span className="text-[7px] text-[#28806c]/50 font-mono">EMPTY SLOT</span>
+              </div>
+            );
+          }
 
           return (
             <div
               key={slotIdx}
               className="relative bg-[#c2ffe1] overflow-hidden flex items-center justify-between m-0 p-0 border-0"
-              style={{ width: '100%', height: '25%' }}
+              style={{ width: '100%', height: stripHeightPercent }}
             >
               {/* Left Spine Branding */}
               <div
@@ -448,7 +469,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
 
         {/* Content Info */}
         <p className="mt-4 text-xs text-[#a8f3dd]/80">
-          Renders 300 DPI PNG gang sheets (1200 × 1800 px) packaged into a multi-page 4R PDF with 0 margins. <strong>Sheets 1–5</strong> contain the 20 individual motion frames (Frame 01 Cover Photo + 19 Video Frames). Front &amp; Back covers are excluded.
+          Renders 300 DPI PNG gang sheets (1200 × 1800 px) packaged into a multi-page 4R PDF with 0 margins. <strong>{totalSheets === 1 ? 'Sheet 1' : `Sheets 1–${totalSheets}`}</strong> contain the 20 individual motion frames (Frame 01 Cover Photo + 19 Video Frames). Front &amp; Back covers are excluded.
         </p>
 
         {/* Sheet Selector Tabs */}
@@ -469,7 +490,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
           ))}
         </div>
 
-        {/* 4R (4" x 6") Sheet Preview (Aspect ratio 2:3 vertically, 0 gap, 4 strips of 4"x1.5") */}
+        {/* 4R (4" x 6") Sheet Preview (Aspect ratio 2:3 vertically, 0 gap) */}
         <div className="my-5 flex items-center justify-center bg-black/40 p-4 rounded-none relative">
           <div className="w-full max-w-[400px] aspect-[2/3] bg-[#ecfff8] rounded-none p-0 shadow-2xl flex flex-col justify-between overflow-hidden text-[#113b33] border border-white/20 relative">
             {renderGangSheetContent(activeSheet)}
@@ -503,7 +524,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
                       : 'text-white/70 hover:bg-white/10'
                   }`}
                 >
-                  All Sheets (1–5)
+                  {totalSheets === 1 ? 'Sheet 1' : `All Sheets (1–${totalSheets})`}
                 </button>
                 <button
                   type="button"
@@ -572,7 +593,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
                   : hasPrinted
                   ? 'Print Again'
                   : printScope === 'all'
-                  ? `Print 5-Page PDF (${copies * 5} pgs)`
+                  ? `Print ${totalSheets}-Page PDF (${copies * totalSheets} pgs)`
                   : `Print Sheet ${activeSheet} PDF (${copies} pgs)`}
               </span>
             </button>

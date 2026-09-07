@@ -151,8 +151,33 @@ export class GifRenderer {
     const frameCount = options.frameCount ?? GifRenderer.DEFAULT_FRAME_COUNT;
     const coverHoldMs = options.coverHoldMs ?? GifRenderer.DEFAULT_COVER_HOLD_MS;
     const frameDelayMs = options.frameDelayMs ?? GifRenderer.DEFAULT_FRAME_DELAY_MS;
-    const width = options.outputWidth ?? GifRenderer.DEFAULT_OUTPUT_WIDTH;
-    const height = options.outputHeight ?? GifRenderer.DEFAULT_OUTPUT_HEIGHT;
+
+    let width = options.outputWidth;
+    let height = options.outputHeight;
+    if (!width || !height) {
+      if (options.placements && options.placements.length > 0) {
+        const p = options.placements[0];
+        let w = Math.round(p.width || 620);
+        let h = Math.round(p.height || 349);
+        const maxDim = 800;
+        if (w > maxDim || h > maxDim) {
+          const ratio = w / h;
+          if (w >= h) {
+            w = maxDim;
+            h = Math.round(maxDim / ratio);
+          } else {
+            h = maxDim;
+            w = Math.round(maxDim * ratio);
+          }
+        }
+        width = w;
+        height = h;
+      } else {
+        width = GifRenderer.DEFAULT_OUTPUT_WIDTH;
+        height = GifRenderer.DEFAULT_OUTPUT_HEIGHT;
+      }
+    }
+
     const timeoutMs = options.timeoutMs ?? GifRenderer.DEFAULT_TIMEOUT_MS;
     const coverOverlay = options.coverOverlayPath ?? overlayPath;
     const motionOverlay = options.motionOverlayPath ?? overlayPath;
@@ -186,42 +211,15 @@ export class GifRenderer {
       const coverOverlayBuffer = await this.prepareOverlayBuffer(coverOverlay, width, height);
       const motionOverlayBuffer = await this.prepareOverlayBuffer(motionOverlay, width, height);
 
-      // Helper to process individual frame to exact dimensions
-      const processFrame = async (imgSrc: string, frameBgBuf: Buffer | null): Promise<Uint8ClampedArray> => {
-        if (frameBgBuf) {
-          const p = options.placements?.[0] ?? {
-            x: 290,
-            y: 150,
-            width: 620,
-            height: 348.75,
-          };
-          const scaleX = width / 1200;
-          const scaleY = height / 450;
-          const slotW = Math.max(1, Math.round(p.width * scaleX));
-          const slotH = Math.max(1, Math.round(p.height * scaleY));
-          const slotX = Math.round(p.x * scaleX);
-          const slotY = Math.round((p.y % 450) * scaleY);
-
-          const photoSlotBuffer = await sharp(imgSrc)
-            .resize(slotW, slotH, { fit: 'cover', position: 'center' })
+      // Helper to process individual frame to exact slot dimensions
+      const processFrame = async (imgSrc: string, overlayBuf: Buffer | null = null): Promise<Uint8ClampedArray> => {
+        let pipeline = sharp(imgSrc).resize(width, height, { fit: 'cover', position: 'center' });
+        if (overlayBuf) {
+          const resizedOverlay = await sharp(overlayBuf)
+            .resize(width, height, { fit: 'cover', position: 'center' })
             .toBuffer();
-
-          const pipeline = sharp(frameBgBuf)
-            .resize(width, height, { fit: 'fill' })
-            .composite([
-              {
-                input: photoSlotBuffer,
-                left: slotX,
-                top: slotY,
-                blend: 'over',
-              },
-            ]);
-
-          const { data } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-          return new Uint8ClampedArray(data);
+          pipeline = pipeline.composite([{ input: resizedOverlay, blend: 'over' }]);
         }
-
-        const pipeline = sharp(imgSrc).resize(width, height, { fit: 'cover', position: 'center' });
         const { data } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
         return new Uint8ClampedArray(data);
       };

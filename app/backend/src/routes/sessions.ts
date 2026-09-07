@@ -589,6 +589,12 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
+        if (session.state === 'frame_selected' || session.state === 'instructions') {
+          sessionStateMachine.assertValidTransition(session.type, session.state, 'cover_capture');
+          await dbRepository.updateSessionState(id, 'cover_capture');
+          session.state = 'cover_capture';
+        }
+
         if (session.state !== 'cover_capture') {
           return reply.status(400).send({
             success: false,
@@ -866,10 +872,24 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             }
           } else {
             const frame = await dbRepository.getFrameById(session.frameId);
-            if (frame && frame.overlayPath) {
-              motionOverlayPath = path.resolve(process.cwd(), frame.overlayPath);
+            if (frame) {
+              if (frame.overlayPath) {
+                motionOverlayPath = path.resolve(process.cwd(), frame.overlayPath);
+              }
+              if (frame.placements && frame.placements.length > 0) {
+                templatePlacements = frame.placements;
+              }
             }
           }
+        }
+
+        if (!templatePlacements || templatePlacements.length === 0) {
+          templatePlacements = [
+            { x: 290, y: 150, width: 620, height: 348.75 },
+            { x: 290, y: 540, width: 620, height: 348.75 },
+            { x: 290, y: 930, width: 620, height: 348.75 },
+            { x: 290, y: 1320, width: 620, height: 348.75 },
+          ];
         }
 
         const publicId = generatePublicId();
@@ -877,6 +897,28 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const outputsDir = storageService.getSessionDir(id, 'outputs');
         const outputPath = path.join(outputsDir, `${publicId}.gif`);
         const outputMotionPath = path.join(outputsDir, `${publicId}_motion.gif`);
+
+        let dynamicOutputWidth = flipbookConfig.gifOutputWidth;
+        let dynamicOutputHeight = flipbookConfig.gifOutputHeight;
+
+        if (templatePlacements && templatePlacements.length > 0) {
+          const p = templatePlacements[0];
+          let w = Math.round(p.width || 620);
+          let h = Math.round(p.height || 349);
+          const maxDim = 800;
+          if (w > maxDim || h > maxDim) {
+            const ratio = w / h;
+            if (w >= h) {
+              w = maxDim;
+              h = Math.round(maxDim / ratio);
+            } else {
+              h = maxDim;
+              w = Math.round(maxDim * ratio);
+            }
+          }
+          dynamicOutputWidth = w;
+          dynamicOutputHeight = h;
+        }
 
         // Render Primary Active Downloadable GIF Output (with 3-second cover photo hold)
         await gifRenderer.renderFlipbookGif(
@@ -889,11 +931,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             frameCount: flipbookConfig.gifFrameCount,
             coverHoldMs: flipbookConfig.gifCoverHoldMs,
             frameDelayMs: flipbookConfig.gifFrameDelayMs,
-            outputWidth: flipbookConfig.gifOutputWidth,
-            outputHeight: flipbookConfig.gifOutputHeight,
+            outputWidth: dynamicOutputWidth,
+            outputHeight: dynamicOutputHeight,
             timeoutMs: flipbookConfig.gifTimeoutMs,
-            coverOverlayPath,
-            motionOverlayPath,
             placements: templatePlacements,
           },
         );
@@ -909,11 +949,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             frameCount: flipbookConfig.gifFrameCount,
             coverHoldMs: 0,
             frameDelayMs: flipbookConfig.gifFrameDelayMs,
-            outputWidth: flipbookConfig.gifOutputWidth,
-            outputHeight: flipbookConfig.gifOutputHeight,
+            outputWidth: dynamicOutputWidth,
+            outputHeight: dynamicOutputHeight,
             timeoutMs: flipbookConfig.gifTimeoutMs,
-            coverOverlayPath: null,
-            motionOverlayPath,
             placements: templatePlacements,
           },
         );

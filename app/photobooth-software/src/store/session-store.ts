@@ -4,7 +4,7 @@ import type { ActiveSession } from '@/types/session';
 
 interface SessionState {
   activeSession: ActiveSession | null;
-  setActiveSession: (activeSession: ActiveSession) => void;
+  setActiveSession: (activeSession: ActiveSession | null) => void;
   clearActiveSession: () => void;
 }
 

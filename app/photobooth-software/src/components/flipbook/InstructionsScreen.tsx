@@ -6,9 +6,9 @@ export function InstructionsScreen() {
   const { sessionId, setStep, errorMessage, setError } = useFlipbookStore();
   const [loading, setLoading] = useState(false);
 
-  const handleStartCovers = async () => {
+  const handleStart = async () => {
     if (!sessionId) {
-      setStep('cover_capture');
+      setStep('frame_select');
       return;
     }
 
@@ -16,10 +16,12 @@ export function InstructionsScreen() {
     setError(null);
     try {
       await boothApi.acknowledgeInstructions(sessionId);
-      setStep('cover_capture');
+      setStep('frame_select');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
+      // Fallback navigate
+      setStep('frame_select');
     } finally {
       setLoading(false);
     }
@@ -46,25 +48,25 @@ export function InstructionsScreen() {
       <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-7 text-left w-full max-w-5xl">
         <div className="rounded-3xl bg-[#d9f7ed] p-8 shadow-sm">
           <span className="text-[14px] font-black text-[#20745f]">01</span>
-          <h5 className="mt-6 text-[22px] font-black">Hold your pose</h5>
+          <h5 className="mt-6 text-[22px] font-black">Choose your frame</h5>
           <p className="mt-3 text-[15px] leading-6 text-[#56796f]">
-            A ten-second countdown starts before every capture.
+            Select a custom design for your booklet covers and pages.
           </p>
         </div>
 
         <div className="rounded-3xl bg-[#d9f7ed] p-8 shadow-sm">
           <span className="text-[14px] font-black text-[#20745f]">02</span>
-          <h5 className="mt-6 text-[22px] font-black">Move with intent</h5>
+          <h5 className="mt-6 text-[22px] font-black">Hold your pose &amp; move</h5>
           <p className="mt-3 text-[15px] leading-6 text-[#56796f]">
-            Each video records for six seconds automatically.
+            Capture 3 still cover photos, followed by 3 short video recordings.
           </p>
         </div>
 
         <div className="rounded-3xl bg-[#d9f7ed] p-8 shadow-sm">
           <span className="text-[14px] font-black text-[#20745f]">03</span>
-          <h5 className="mt-6 text-[22px] font-black">Choose your favorite</h5>
+          <h5 className="mt-6 text-[22px] font-black">Pick your favorites</h5>
           <p className="mt-3 text-[15px] leading-6 text-[#56796f]">
-            Pick one cover and one clip at the end.
+            Choose your favorite cover and video clip to create your animated flipbook.
           </p>
         </div>
       </div>
@@ -73,10 +75,10 @@ export function InstructionsScreen() {
         <button
           type="button"
           disabled={loading}
-          onClick={handleStartCovers}
-          className="rounded-2xl bg-[#146a56] px-12 py-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(20,106,86,0.25)] transition hover:bg-[#115746] active:scale-[0.98]"
+          onClick={handleStart}
+          className="rounded-2xl bg-[#146a56] px-12 py-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(20,106,86,0.25)] transition hover:bg-[#115746] active:scale-[0.98] cursor-pointer"
         >
-          {loading ? 'Starting...' : 'Start covers'}
+          {loading ? 'Starting...' : 'Choose Frame →'}
         </button>
       </div>
     </div>

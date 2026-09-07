@@ -17,7 +17,7 @@ function formatElapsed(seconds: number): string {
 }
 
 export function VideoRecordingScreen() {
-  const { sessionId, videoUrls, addVideoCapture, setStep, errorMessage, setError } =
+  const { sessionId, videoUrls, addVideoCapture, setStep, errorMessage, setError, selectedFrame } =
     useFlipbookStore();
   const {
     videoRef,
@@ -33,6 +33,15 @@ export function VideoRecordingScreen() {
   const [recordingElapsed, setRecordingElapsed] = useState(0);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const primarySlot = selectedFrame?.placements?.[0];
+  const slotWidth = primarySlot?.width || 620;
+  const slotHeight = primarySlot?.height || 348.75;
+  const slotRatio = slotWidth / slotHeight;
+  const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
+  const slotBadgeText = primarySlot
+    ? `${(slotWidth / 300).toFixed(2)}" × ${(slotHeight / 300).toFixed(2)}"`
+    : '2.41" × 1.32"';
+
   // Start video recording when countdown finishes
   const handleCountdownExpire = useCallback(async () => {
     if (phase !== 'countdown') return;
@@ -41,8 +50,6 @@ export function VideoRecordingScreen() {
 
     const sampledFrames: string[] = [];
     const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = 1280;
-    sampleCanvas.height = 700;
     const sampleCtx = sampleCanvas.getContext('2d');
 
     // Track elapsed recording time in 50ms intervals
@@ -64,24 +71,13 @@ export function VideoRecordingScreen() {
         const video = videoRef.current;
         const vWidth = video.videoWidth > 0 ? video.videoWidth : 1280;
         const vHeight = video.videoHeight > 0 ? video.videoHeight : 720;
-        const targetRatio = 2.41 / 1.32;
-        const sourceRatio = vWidth / vHeight;
-
-        let sx = 0;
-        let sy = 0;
-        let sw = vWidth;
-        let sh = vHeight;
-
-        if (sourceRatio > targetRatio) {
-          sw = vHeight * targetRatio;
-          sx = (vWidth - sw) / 2;
-        } else {
-          sh = vWidth / targetRatio;
-          sy = (vHeight - sh) / 2;
+        if (sampleCanvas.width !== vWidth || sampleCanvas.height !== vHeight) {
+          sampleCanvas.width = vWidth;
+          sampleCanvas.height = vHeight;
         }
 
         try {
-          sampleCtx.drawImage(video, sx, sy, sw, sh, 0, 0, sampleCanvas.width, sampleCanvas.height);
+          sampleCtx.drawImage(video, 0, 0, vWidth, vHeight);
           sampledFrames.push(sampleCanvas.toDataURL('image/jpeg', 0.95));
         } catch {
           // ignore sample error
@@ -193,32 +189,7 @@ export function VideoRecordingScreen() {
   );
 
   return (
-    <div className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#071d1a] text-white">
-      {/* Video Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 size-full object-cover"
-      />
-
-      {/* Camera Scene Vignette */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
-      {/* Top Badges */}
-      <div className="absolute left-9 top-8 flex items-center gap-3">
-        <div className="rounded-full bg-black/40 px-4 py-2 text-[12px] font-bold backdrop-blur-sm">
-          CAMERA 01
-        </div>
-      </div>
-
-      {phase === 'recording' && (
-        <div className="absolute right-9 top-8 flex items-center gap-2 rounded-full bg-[#c2433f] px-5 py-2.5 text-[12px] font-bold text-white backdrop-blur-sm animate-pulse">
-          <span className="size-2.5 rounded-full bg-white" /> RECORDING
-        </div>
-      )}
-
+    <div className="relative flex flex-col items-center justify-center w-full h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#071d1a] p-4 md:p-6 text-white">
       {/* Error Alert Banner */}
       {activeError && (
         <div className="absolute top-6 inset-x-8 z-30 mx-auto flex max-w-4xl items-center justify-between rounded-2xl bg-[#b91c1c]/95 px-6 py-4 text-white backdrop-blur-md shadow-2xl">
@@ -253,8 +224,17 @@ export function VideoRecordingScreen() {
         </div>
       )}
 
-      {/* Camera Viewport Container (Full window width with proper margin & aspect ratio 2.41 / 1.32) */}
-      <div className="relative w-full max-w-[1600px] aspect-[241/132] max-h-[calc(100vh-120px)] overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10">
+      {/* Camera Viewport Container (Centered with dynamic slot aspect ratio) */}
+      <div
+        className="relative overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10 flex items-center justify-center"
+        style={{
+          aspectRatio: slotAspectRatio,
+          maxHeight: 'calc(100dvh - 64px)',
+          maxWidth: 'calc(100vw - 64px)',
+          width: `min(calc(100vw - 64px), calc((100dvh - 64px) * ${slotRatio}))`,
+          height: `min(calc(100dvh - 64px), calc((100vw - 64px) / ${slotRatio}))`,
+        }}
+      >
         {/* Live Camera Video Feed */}
         <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
 
@@ -267,7 +247,7 @@ export function VideoRecordingScreen() {
             CAMERA 01
           </div>
           <div className="rounded-full bg-[#145a49]/70 px-4 py-2 text-[12px] font-bold text-[#a8f3dd] backdrop-blur-sm border border-[#a8f3dd]/30">
-            2.41&quot; × 1.32&quot;
+            {slotBadgeText}
           </div>
         </div>
 

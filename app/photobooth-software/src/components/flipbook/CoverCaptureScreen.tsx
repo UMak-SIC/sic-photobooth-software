@@ -6,7 +6,7 @@ import { boothApi } from '../../services/api';
 import { FLIPBOOK_CONFIG } from '../../config/flipbook';
 
 export function CoverCaptureScreen() {
-  const { sessionId, coverUrls, addCoverCapture, setStep, errorMessage, setError } =
+  const { sessionId, coverUrls, addCoverCapture, setStep, errorMessage, setError, selectedFrame } =
     useFlipbookStore();
   const {
     videoRef,
@@ -20,6 +20,15 @@ export function CoverCaptureScreen() {
   const currentCoverNum = coverUrls.length + 1; // 1, 2, 3
   const [isCapturing, setIsCapturing] = useState(false);
   const [flash, setFlash] = useState(false);
+
+  const primarySlot = selectedFrame?.placements?.[0];
+  const slotWidth = primarySlot?.width || 620;
+  const slotHeight = primarySlot?.height || 348.75;
+  const slotRatio = slotWidth / slotHeight;
+  const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
+  const slotBadgeText = primarySlot
+    ? `${(slotWidth / 300).toFixed(2)}" × ${(slotHeight / 300).toFixed(2)}"`
+    : '2.41" × 1.32"';
 
   // Trigger snapshot when countdown reaches 0
   const triggerCapture = useCallback(async () => {
@@ -107,19 +116,7 @@ export function CoverCaptureScreen() {
   }, [isActive, activeError, isCapturing, coverUrls.length, resetCountdown, pauseCountdown]);
 
   return (
-    <div className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#071d1a] text-white">
-      {/* Video Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 size-full object-cover"
-      />
-
-      {/* Camera Scene Vignette */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
+    <div className="relative flex flex-col items-center justify-center w-full h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#071d1a] p-4 md:p-6 text-white">
       {/* Flash Effect */}
       {flash && (
         <div className="absolute inset-0 bg-white opacity-90 transition-opacity pointer-events-none z-50" />
@@ -157,8 +154,17 @@ export function CoverCaptureScreen() {
         </div>
       )}
 
-      {/* Camera Viewport Container (Full window width with proper margin & aspect ratio 2.41 / 1.32) */}
-      <div className="relative w-full max-w-[1600px] aspect-[241/132] max-h-[calc(100vh-120px)] overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10">
+      {/* Camera Viewport Container (Centered with dynamic slot aspect ratio) */}
+      <div
+        className="relative overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10 flex items-center justify-center"
+        style={{
+          aspectRatio: slotAspectRatio,
+          maxHeight: 'calc(100dvh - 64px)',
+          maxWidth: 'calc(100vw - 64px)',
+          width: `min(calc(100vw - 64px), calc((100dvh - 64px) * ${slotRatio}))`,
+          height: `min(calc(100dvh - 64px), calc((100vw - 64px) / ${slotRatio}))`,
+        }}
+      >
         {/* Live Camera Video Feed */}
         <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
 
@@ -171,7 +177,7 @@ export function CoverCaptureScreen() {
             CAMERA 01
           </div>
           <div className="rounded-full bg-[#145a49]/70 px-4 py-2 text-[12px] font-bold text-[#a8f3dd] backdrop-blur-sm border border-[#a8f3dd]/30">
-            2.41&quot; × 1.32&quot;
+            {slotBadgeText}
           </div>
         </div>
 
