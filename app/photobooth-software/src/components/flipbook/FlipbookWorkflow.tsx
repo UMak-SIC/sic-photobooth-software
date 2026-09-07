@@ -77,7 +77,7 @@ export function FlipbookWorkflow() {
     case 'processing':
       return <ProcessingScreen />;
     case 'frame_select':
-      return <FrameSelectScreen />;
+      return <FrameSelectScreen onBack={() => setStep('instructions')} />;
     case 'complete':
       return <FlipbookCompletionScreen />;
     default:

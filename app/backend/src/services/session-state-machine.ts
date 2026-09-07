@@ -38,13 +38,13 @@ const PHOTO_STRIP_VALID_TRANSITIONS: Record<PhotoStripState, PhotoStripState[]> 
 
 const FLIPBOOK_VALID_TRANSITIONS: Record<FlipbookState, FlipbookState[]> = {
   created: ['instructions', 'frame_selected', 'cancelled'],
-  instructions: ['cover_capture', 'cancelled'],
+  instructions: ['frame_selected', 'cover_capture', 'cancelled'],
   cover_capture: ['video_capture', 'cancelled'],
   video_capture: ['review', 'cancelled'],
   review: ['processing', 'cancelled'],
   processing: ['frame_selected', 'booth_confirmed', 'cover_capture', 'cancelled'], // cover_capture on 2-min timeout recovery
-  frame_selected: ['booth_confirmed', 'frame_selected', 'instructions', 'cancelled'],
-  booth_confirmed: ['printed', 'frame_selected'],
+  frame_selected: ['cover_capture', 'booth_confirmed', 'frame_selected', 'instructions', 'cancelled'],
+  booth_confirmed: ['printed', 'frame_selected', 'instructions'],
   printed: [],
   cancelled: [],
 };

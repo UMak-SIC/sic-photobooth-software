@@ -84,6 +84,7 @@ export async function renderGangSheetToPng(
 
   const { frame, allMotionFrames, motionSheetUrl } = options;
   const frameName = frame?.name || 'SIC Seal';
+  const slotsPerSheet = frame?.placements && frame.placements.length > 0 ? frame.placements.length : 4;
 
   if (motionSheetUrl) {
     // 1. Draw Background Template Layer
@@ -94,18 +95,26 @@ export async function renderGangSheetToPng(
       console.warn('Failed to load motion template background image, using fallback:', err);
     }
 
-    // 2. Draw 4 Motion Frame Slots on the sheet
-    for (let slotIdx = 0; slotIdx < 4; slotIdx++) {
-      const frameNumber = (sheetNum - 1) * 4 + slotIdx + 1; // 1 to 20
+    // 2. Draw Motion Frame Slots on the sheet
+    for (let slotIdx = 0; slotIdx < slotsPerSheet; slotIdx++) {
+      const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
+      if (frameNumber > 20) {
+        // Trailing slots left empty with clean template background per contract
+        continue;
+      }
+
       const frameSnapshot = allMotionFrames[frameNumber - 1];
 
       const specificP = frame?.placements?.[slotIdx];
       const p = specificP || frame?.placements?.[0];
+      const stripHeight = 1800 / slotsPerSheet;
       const slotX = specificP ? specificP.x : (p ? p.x : 290);
-      const slotYInStrip = specificP ? (specificP.y % 450) : (p ? (p.y % 450) : (450 - 348.75) / 2);
+      const slotYInStrip = specificP
+        ? (specificP.y % stripHeight)
+        : (p ? (p.y % stripHeight) : (stripHeight - 348.75) / 2);
       const slotW = specificP ? specificP.width : (p ? p.width : 620);
       const slotH = specificP ? specificP.height : (p ? p.height : 348.75);
-      const slotY = specificP ? specificP.y : (slotIdx * 450 + slotYInStrip);
+      const slotY = specificP ? specificP.y : (slotIdx * stripHeight + slotYInStrip);
 
       if (frameSnapshot) {
         try {
@@ -131,39 +140,44 @@ export async function renderGangSheetToPng(
       }
     }
   } else {
-    // Clean Default Fallback (4 strips of 1200 x 450 px)
-    for (let slotIdx = 0; slotIdx < 4; slotIdx++) {
-      const frameNumber = (sheetNum - 1) * 4 + slotIdx + 1;
+    // Clean Default Fallback
+    const stripHeight = 1800 / slotsPerSheet;
+    for (let slotIdx = 0; slotIdx < slotsPerSheet; slotIdx++) {
+      const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1;
+      if (frameNumber > 20) {
+        continue;
+      }
+
       const frameSnapshot = allMotionFrames[frameNumber - 1];
-      const stripY = slotIdx * 450;
+      const stripY = slotIdx * stripHeight;
 
       // Base strip background
       ctx.fillStyle = '#c2ffe1';
-      ctx.fillRect(0, stripY, 1200, 450);
+      ctx.fillRect(0, stripY, 1200, stripHeight);
 
       // Left Spine Branding (36% width = 432 px)
       const spineWidth = 432;
       ctx.fillStyle = '#0e473d';
-      ctx.fillRect(spineWidth / 2 - 35, stripY + 120, 70, 70);
+      ctx.fillRect(spineWidth / 2 - 35, stripY + Math.max(10, (stripHeight - 70) / 2), 70, 70);
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 24px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('SIC', spineWidth / 2, stripY + 155);
+      ctx.fillText('SIC', spineWidth / 2, stripY + Math.max(10, (stripHeight - 70) / 2) + 35);
 
       ctx.fillStyle = '#145a49';
-      ctx.font = 'bold 26px Arial, sans-serif';
-      ctx.fillText(frameName.toUpperCase(), spineWidth / 2, stripY + 230);
+      ctx.font = 'bold 24px Arial, sans-serif';
+      ctx.fillText(frameName.toUpperCase(), spineWidth / 2, stripY + stripHeight - 40);
 
       ctx.fillStyle = '#28806c';
-      ctx.font = 'bold 22px monospace';
-      ctx.fillText(`FRAME ${String(frameNumber).padStart(2, '0')}`, spineWidth / 2, stripY + 280);
+      ctx.font = 'bold 20px monospace';
+      ctx.fillText(`FRAME ${String(frameNumber).padStart(2, '0')}`, spineWidth / 2, stripY + stripHeight - 15);
 
       // Right Photo Slot (64% width = 768 px)
       const slotX = spineWidth;
       const slotY = stripY;
       const slotW = 1200 - spineWidth;
-      const slotH = 450;
+      const slotH = stripHeight;
 
       if (frameSnapshot) {
         try {
@@ -200,7 +214,13 @@ export async function generateFlipbookPdf(
   options: GenerateFlipbookPdfOptions,
   onProgress?: (current: number, total: number) => void
 ): Promise<{ blob: Blob; url: string; filename: string }> {
-  const targetSheets = options.scope === 'all' ? [1, 2, 3, 4, 5] : [options.activeSheet];
+  const slotsPerSheet = options.frame?.placements && options.frame.placements.length > 0
+    ? options.frame.placements.length
+    : 4;
+  const totalSheets = Math.ceil(20 / slotsPerSheet);
+  const targetSheets = options.scope === 'all'
+    ? Array.from({ length: totalSheets }, (_, i) => i + 1)
+    : [options.activeSheet];
   const uniqueSheetCount = targetSheets.length;
 
   // 1. Render required 300 DPI PNG gang sheets
@@ -256,7 +276,7 @@ export async function generateFlipbookPdf(
   const pdfBytes = await pdfDoc.save();
   const blob = new Blob([new Uint8Array(pdfBytes).buffer as ArrayBuffer], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
-  const scopeTag = options.scope === 'all' ? '5sheets' : `sheet${options.activeSheet}`;
+  const scopeTag = options.scope === 'all' ? `${totalSheets}sheets` : `sheet${options.activeSheet}`;
   const filename = `flipbook_${options.publicId || 'export'}_4R_${scopeTag}_${copiesCount}copies.pdf`;
 
   return { blob, url, filename };

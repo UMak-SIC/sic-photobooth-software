@@ -82,6 +82,54 @@ describe('GifRenderer Service', () => {
     expect(fileBuffer.length).toBeGreaterThan(1000);
   });
 
+  it('renders a valid animated GIF dynamically sized from template placements aspect ratio', async () => {
+    const dynamicOutputPath = path.join(tempDir, 'output-dynamic.gif');
+    await gifRenderer.renderFlipbookGif(
+      coverPath,
+      mockVideoPath,
+      null,
+      dynamicOutputPath,
+      path.join(tempDir, 'intermediate-dynamic'),
+      {
+        frameCount: 5,
+        coverHoldMs: 1000,
+        frameDelayMs: 250,
+        placements: [{ x: 100, y: 100, width: 640, height: 360 }], // 16:9 slot
+        timeoutMs: 10000,
+      },
+    );
+
+    expect(fs.existsSync(dynamicOutputPath)).toBe(true);
+
+    const metadata = await sharp(dynamicOutputPath).metadata();
+    expect(metadata.width).toBe(640);
+    expect(metadata.height).toBe(360);
+  });
+
+  it('proportionally scales down oversized template slots to max dimension 800px', async () => {
+    const scaledOutputPath = path.join(tempDir, 'output-scaled.gif');
+    await gifRenderer.renderFlipbookGif(
+      coverPath,
+      mockVideoPath,
+      null,
+      scaledOutputPath,
+      path.join(tempDir, 'intermediate-scaled'),
+      {
+        frameCount: 5,
+        coverHoldMs: 1000,
+        frameDelayMs: 250,
+        placements: [{ x: 0, y: 0, width: 1200, height: 675 }], // 1200x675 oversized slot
+        timeoutMs: 10000,
+      },
+    );
+
+    expect(fs.existsSync(scaledOutputPath)).toBe(true);
+
+    const metadata = await sharp(scaledOutputPath).metadata();
+    expect(metadata.width).toBe(800);
+    expect(metadata.height).toBe(450);
+  });
+
   it('times out and throws contract error when rendering exceeds deadline', async () => {
     await expect(
       gifRenderer.renderFlipbookGif(

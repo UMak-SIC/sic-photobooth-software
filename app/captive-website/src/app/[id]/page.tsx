@@ -160,7 +160,7 @@ export default async function OutputPage({
                 )}
                 <span>
                   {output.sessionType === 'flipbook'
-                    ? 'Animated Flipbook (4" × 1.5" Booklet Format)'
+                    ? 'Animated Flipbook'
                     : 'High-Res Photo Strip'}
                 </span>
               </div>
@@ -186,11 +186,11 @@ export default async function OutputPage({
               {/* Backlight Glow */}
               <div className="absolute -inset-4 rounded-3xl bg-[#48c4a1]/15 blur-2xl pointer-events-none" />
 
-              <div className="relative w-full overflow-hidden rounded-3xl border-4 border-[#146a56] shadow-[0_25px_60px_rgba(0,0,0,0.7)] bg-black/90 aspect-[4/3] flex items-center justify-center">
+              <div className="relative flex items-center justify-center overflow-hidden rounded-3xl border-4 border-[#146a56] shadow-[0_25px_60px_rgba(0,0,0,0.7)] bg-black/90 p-2 sm:p-3">
                 <img
                   src={output.mediaUrl}
                   alt={output.sessionType === 'flipbook' ? 'Animated Flipbook' : 'Photo Strip'}
-                  className="size-full object-contain"
+                  className="w-auto h-auto max-h-[70vh] max-w-full rounded-2xl object-contain shadow-md"
                 />
 
                 {/* Live Format Badge */}

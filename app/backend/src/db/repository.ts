@@ -16,6 +16,7 @@ export interface FrameItem {
   name: string;
   overlayPath: string;
   isActive: boolean;
+  placements?: TemplatePlacement[];
 }
 
 export interface TemplatePlacement {
@@ -180,18 +181,62 @@ export class DatabaseRepository {
     }
   }
 
+  // Default 4-strip placements for canonical flipbook templates/frames
+  private defaultFlipbookPlacements: TemplatePlacement[] = [
+    { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+    { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+    { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+    { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+  ];
+
   // In-memory fallback stores when PostgreSQL is offline
   private inMemoryEvents: Map<string, EventData> = new Map();
   private inMemorySessions: Map<string, SessionData> = new Map();
   private inMemoryFrames: Map<string, FrameItem> = new Map([
-    ['1', { id: '1', name: 'SIC Seal', overlayPath: 'frames/sic-seal.png', isActive: true }],
+    [
+      '1',
+      {
+        id: '1',
+        name: 'SIC Seal',
+        overlayPath: 'frames/sic-seal.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
+    ],
     [
       '2',
-      { id: '2', name: 'Emerald Motion', overlayPath: 'frames/emerald-motion.png', isActive: true },
+      {
+        id: '2',
+        name: 'Emerald Motion',
+        overlayPath: 'frames/emerald-motion.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
     ],
     [
       '3',
-      { id: '3', name: 'Pioneer Grid', overlayPath: 'frames/pioneer-grid.png', isActive: true },
+      {
+        id: '3',
+        name: 'Pioneer Grid',
+        overlayPath: 'frames/pioneer-grid.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
     ],
   ]);
   private inMemoryTemplates: Map<string, TemplateItem> = new Map([
@@ -477,7 +522,10 @@ export class DatabaseRepository {
       `;
       const res = await pool.query(query);
       if (res.rows && res.rows.length > 0) {
-        return res.rows;
+        return res.rows.map((row: FrameItem) => ({
+          ...row,
+          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+        }));
       }
       return Array.from(this.inMemoryFrames.values()).filter((f) => f.isActive);
     } catch {
@@ -498,7 +546,13 @@ export class DatabaseRepository {
           WHERE id = $1
         `;
         const res = await pool.query(query, [frameId]);
-        if (res.rows[0]) return res.rows[0];
+        if (res.rows[0]) {
+          const row = res.rows[0];
+          return {
+            ...row,
+            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+          };
+        }
       } catch {
         // ignore database errors in in-memory fallback
       }
@@ -511,7 +565,13 @@ export class DatabaseRepository {
           LIMIT 1
         `;
         const res = await pool.query(query, [`%${frameId}%`]);
-        if (res.rows[0]) return res.rows[0];
+        if (res.rows[0]) {
+          const row = res.rows[0];
+          return {
+            ...row,
+            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+          };
+        }
       } catch {
         // ignore database errors
       }
@@ -527,7 +587,13 @@ export class DatabaseRepository {
         LIMIT 1
       `;
       const fbRes = await pool.query(fallbackQuery);
-      if (fbRes.rows[0]) return fbRes.rows[0];
+      if (fbRes.rows[0]) {
+        const row = fbRes.rows[0];
+        return {
+          ...row,
+          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+        };
+      }
     } catch {
       // ignore
     }
