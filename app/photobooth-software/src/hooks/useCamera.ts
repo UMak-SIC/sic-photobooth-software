@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FLIPBOOK_CONFIG } from '../config/flipbook';
 
+export const SELECTED_CAMERA_STORAGE_KEY = 'sic-photobooth-selected-camera';
+
 export function useCamera() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -29,13 +31,15 @@ export function useCamera() {
 
       let stream: MediaStream;
       try {
-        // High quality 720p @ 30fps (reliable 16:9 macroblocks, prevents green pixel glitches)
+        const selectedDeviceId = window.localStorage.getItem(SELECTED_CAMERA_STORAGE_KEY);
+
+        // High quality 1080p/720p @ 30fps (reliable 16:9 macroblocks, prevents green pixel glitches)
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
             frameRate: { ideal: 30, max: 30 },
-            facingMode: 'user',
+            ...(selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: 'user' }),
           },
           audio: false,
         });
@@ -97,7 +101,7 @@ export function useCamera() {
     };
   }, [stopCamera]);
 
-  // Capture static photo snapshot from active video stream cropped to exact 2.41:1.32 aspect ratio
+  // Capture static photo snapshot from active video stream at maximum available native resolution
   const capturePhoto = useCallback(async (): Promise<Blob> => {
     if (!videoRef.current || !streamRef.current) {
       console.error('capturePhoto failed: videoRef or streamRef is null');
@@ -105,30 +109,12 @@ export function useCamera() {
     }
 
     const video = videoRef.current;
-    const vWidth = video.videoWidth > 0 ? video.videoWidth : 1280;
-    const vHeight = video.videoHeight > 0 ? video.videoHeight : 720;
-
-    const targetRatio = 2.41 / 1.32; // 241 / 132
-    const sourceRatio = vWidth / vHeight;
-
-    let sx = 0;
-    let sy = 0;
-    let sw = vWidth;
-    let sh = vHeight;
-
-    if (sourceRatio > targetRatio) {
-      // Wider than target -> crop excess width
-      sw = Math.round(vHeight * targetRatio);
-      sx = Math.round((vWidth - sw) / 2);
-    } else {
-      // Taller than target (e.g. standard 16:9 or 4:3) -> keep 100% full width, crop minimal excess height
-      sh = Math.round(vWidth / targetRatio);
-      sy = Math.round((vHeight - sh) / 2);
-    }
+    const vWidth = video.videoWidth > 0 ? video.videoWidth : 1920;
+    const vHeight = video.videoHeight > 0 ? video.videoHeight : 1080;
 
     const canvas = document.createElement('canvas');
-    canvas.width = Math.max(sw, 482);
-    canvas.height = Math.max(sh, 264);
+    canvas.width = vWidth;
+    canvas.height = vHeight;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) {
@@ -137,26 +123,24 @@ export function useCamera() {
     }
 
     try {
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, vWidth, vHeight);
     } catch (drawErr) {
       console.error('capturePhoto failed during ctx.drawImage:', drawErr);
       throw new Error('Camera capture failed. Check the camera feed and retake this photo.');
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
         (blob) => {
           if (blob && blob.size > 0) {
             resolve(blob);
           } else {
             console.error('capturePhoto failed: canvas.toBlob returned null or empty blob');
-            reject(
-              new Error('Camera capture failed. Check the camera feed and retake this photo.'),
-            );
+            reject(new Error('Camera capture failed: empty photo blob'));
           }
         },
         'image/jpeg',
-        0.92,
+        0.95,
       );
     });
   }, []);

@@ -165,18 +165,34 @@ export class BoothApiClient {
   }
 
   public async listFrames(): Promise<FrameItem[]> {
+    const defaultPlacements = [
+      { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75 },
+    ];
     const res = await fetch(`${API_BASE_URL}/api/frames`);
     const body: ApiResponse<FrameItem[]> = await res.json();
     if (!res.ok || !body.success || !body.data) {
       return [
-        { id: '1', name: 'SIC Seal', overlayPath: 'frames/sic-seal.png', isActive: true },
+        {
+          id: '1',
+          name: 'SIC Seal',
+          overlayPath: 'frames/sic-seal.png',
+          isActive: true,
+          placements: defaultPlacements,
+        },
         {
           id: '2',
           name: 'Emerald Motion',
           overlayPath: 'frames/emerald-motion.png',
           isActive: true,
+          placements: defaultPlacements,
         },
-        { id: '3', name: 'Pioneer Grid', overlayPath: 'frames/pioneer-grid.png', isActive: true },
+        {
+          id: '3',
+          name: 'Pioneer Grid',
+          overlayPath: 'frames/pioneer-grid.png',
+          isActive: true,
+          placements: defaultPlacements,
+        },
       ];
     }
     return body.data;

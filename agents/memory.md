@@ -46,10 +46,19 @@ Confirmed, durable knowledge that helps future agents make correct changes. Do n
 - 2026-09-06: Flipbook camera capture viewfinders (`CoverCaptureScreen.tsx` and `VideoRecordingScreen.tsx`) center the viewfinder in the viewport using `flex flex-col items-center justify-center` with a single bound video stream within the `aspect-[241/132]` container. Source: `app/photobooth-software/src/components/flipbook/CoverCaptureScreen.tsx`, `VideoRecordingScreen.tsx`.
 - 2026-09-05: Admin suite is implemented: Event Selection & Creation (`/admin/events`), Template Library & Editor with custom background/slots/rotation/export ZIP (`/admin/templates`, `/admin/templates/:id`), Frame Management (`/admin/frames`), and Publication Queue Dashboard with dead-letter retry (`/admin/publications`).
 - 2026-09-05: Captive Portal (`app/captive-website`) provides offline guest retrieval with mobile QR camera scanning (jsQR), manual code entry, media preview, direct download, and Web Share API.
-- 2026-09-05: WebM `MediaRecorder` video streams lack segment duration headers in Chromium; video duration is validated in `app/backend/src/services/media-validator.ts` by inspecting Cluster `Timecode` (`0xE7`) tags. Source: `app/backend/src/services/media-validator.ts`.
+- 2026-09-07: Flipbook workflow order and dynamic frame slot sizing:
+  - **Step Progression**: `Welcome` -> `Setup` (Event Select) -> `Instructions` -> `Frame Selection` (`frame_select`) -> `Cover Capture` (3 photos) -> `Video Capture` (3 clips) -> `Review Cover` -> `Review Video` -> `Processing` (GIF generation) -> `Complete` (Print/QR/Download).
+  - **Full Sensor Capture & Dynamic Slot Viewfinder**: Cover photos and video clips are captured/recorded at the maximum native resolution of the camera stream (`video.videoWidth` $\times$ `video.videoHeight`, ideal 1080p/720p). Live viewfinders (`CoverCaptureScreen.tsx`, `VideoRecordingScreen.tsx`) are visually framed to the template slot aspect ratio (`min(100vw - 64px, (100dvh - 64px) * slotRatio)` with `object-cover`) to guide guest posing accurately.
+  - **Downstream Slot Fitting**: All downstream surfaces (Review screens, Booklet preview, PDF Print Compositor with `drawImageCover`, and Backend GIF renderer with `sharp.resize({ fit: 'cover', position: 'center' })`) automatically adjust and center-crop the full-resolution captures to the template placement slot.
+  - **Zero-Scroll Review Layouts**: Review screens (`FlipReviewCoverScreen.tsx`, `FlipReviewVideoScreen.tsx`) are strictly bounded to `100dvh` with `overflow-hidden` and `calc(100dvh - 200px)` viewport constraints to guarantee no page scrolling.
+  - **Dynamic GIF Output**: `gif-renderer.ts` scales the output canvas dynamically from the template placement slot dimensions ($W \times H$, e.g. $620 \times 349$), preventing static dimension mismatches.
+  - **Captive Portal Natural Aspect Ratio**: `app/captive-website/src/app/[id]/page.tsx` renders the guest media card at its natural aspect ratio (`w-auto h-auto max-h-[70vh] object-contain`) eliminating letterbox/pillarbox bars.
+  - **Dynamic Printing & Sheet Count**: Printing and PDF generation adapt to any slot count per sheet ($N = \text{template.placements.length} || 4$), calculating total sheets as $\lceil 20 / N \rceil$. `drawImageCover` centers and scales captures into placement bounding boxes without stretching.
+  - Source: `app/photobooth-software/src/components/flipbook/`, `app/photobooth-software/src/services/flipbook-pdf.ts`, `app/photobooth-software/src/store/flipbook-store.ts`, `app/backend/src/services/gif-renderer.ts`, `app/captive-website/src/app/[id]/page.tsx`.
 
 ## Update Template
 
 ```md
 - YYYY-MM-DD: Confirmed fact. Source: `path`, issue, or decision.
 ```
+

@@ -6,7 +6,11 @@ import { LoopingMotionPreview } from './LoopingMotionPreview';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-export function FrameSelectScreen() {
+interface FrameSelectScreenProps {
+  onBack?: () => void;
+}
+
+export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
   const {
     sessionId,
     coverUrls,
@@ -27,21 +31,29 @@ export function FrameSelectScreen() {
   const [fetchingFrames, setFetchingFrames] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     setFetchingFrames(true);
     boothApi
       .listFrames()
       .then((data) => {
+        if (!isMounted) return;
         setFrames(data);
         if (data.length > 0) {
           setSelectedId(data[0].id);
         }
       })
       .catch((err) => {
+        if (!isMounted) return;
         setError(err.message);
       })
       .finally(() => {
-        setFetchingFrames(false);
+        if (isMounted) {
+          setFetchingFrames(false);
+        }
       });
+    return () => {
+      isMounted = false;
+    };
   }, [setError]);
 
   const selectedFrame = frames.find((f) => f.id === selectedId) || frames[0];
@@ -96,6 +108,8 @@ export function FrameSelectScreen() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
+      // Even if network fails, proceed locally
+      confirmFrameSelection();
     } finally {
       setLoading(false);
     }
@@ -208,8 +222,10 @@ export function FrameSelectScreen() {
                           className="size-full object-cover transition-opacity duration-200"
                         />
                       ) : (
-                        <div className="size-full flex items-center justify-center text-[9px] font-bold text-[#145a49]">
-                          COVER PHOTO
+                        <div className="size-full flex flex-col items-center justify-center text-center p-1 bg-black/15">
+                          <span className="text-[8px] font-bold text-[#145a49] opacity-80 uppercase tracking-wider">
+                            Your Photo Here
+                          </span>
                         </div>
                       )}
                     </div>
@@ -235,8 +251,10 @@ export function FrameSelectScreen() {
                           className="size-full object-cover transition-opacity duration-200"
                         />
                       ) : (
-                        <div className="size-full flex items-center justify-center text-[9px] font-bold text-[#145a49]">
-                          COVER PHOTO
+                        <div className="size-full flex flex-col items-center justify-center text-center p-1 bg-black/15">
+                          <span className="text-[8px] font-bold text-[#145a49] opacity-80 uppercase tracking-wider">
+                            Your Photo Here
+                          </span>
                         </div>
                       )}
                     </div>
@@ -268,11 +286,19 @@ export function FrameSelectScreen() {
                       className="absolute rounded-none overflow-hidden bg-black/20 z-10 shadow-sm"
                       style={getStripSlotStyle(selectedFrame)}
                     >
-                      <LoopingMotionPreview
-                        frames={selectedMotionFrames.slice(0, 19)}
-                        motionGifUrl={motionGifUrl}
-                        fallbackUrl={previewCoverUrl}
-                      />
+                      {selectedMotionFrames.length > 0 || motionGifUrl ? (
+                        <LoopingMotionPreview
+                          frames={selectedMotionFrames.slice(0, 19)}
+                          motionGifUrl={motionGifUrl}
+                          fallbackUrl={previewCoverUrl}
+                        />
+                      ) : (
+                        <div className="size-full flex flex-col items-center justify-center text-center p-1 bg-black/15">
+                          <span className="text-[8px] font-bold text-[#145a49] opacity-80 uppercase tracking-wider">
+                            Your Motion Here
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </>
                 ) : (
@@ -289,11 +315,19 @@ export function FrameSelectScreen() {
 
                     {/* Right Slot: 19 Looping Motion Frames */}
                     <div className="w-[60%] h-full rounded-none overflow-hidden bg-black/20 relative">
-                      <LoopingMotionPreview
-                        frames={selectedMotionFrames.slice(0, 19)}
-                        motionGifUrl={motionGifUrl}
-                        fallbackUrl={previewCoverUrl}
-                      />
+                      {selectedMotionFrames.length > 0 || motionGifUrl ? (
+                        <LoopingMotionPreview
+                          frames={selectedMotionFrames.slice(0, 19)}
+                          motionGifUrl={motionGifUrl}
+                          fallbackUrl={previewCoverUrl}
+                        />
+                      ) : (
+                        <div className="size-full flex flex-col items-center justify-center text-center p-1 bg-black/15">
+                          <span className="text-[8px] font-bold text-[#145a49] opacity-80 uppercase tracking-wider">
+                            Your Motion Here
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -344,11 +378,22 @@ export function FrameSelectScreen() {
 
         {/* Right Column: Header, Timer Badge, Frame Selector & Action Button */}
         <div className="lg:col-span-6 flex flex-col gap-4 w-full">
-          {/* Top Row: Category Label + Auto-select Timer Badge */}
+          {/* Top Row: Category Label + Auto-select Timer Badge + Optional Back */}
           <div className="flex items-center justify-between w-full">
-            <p className="text-[12px] font-bold tracking-[0.14em] text-[#28806c] uppercase">
-              FLIPBOOK
-            </p>
+            <div className="flex items-center gap-2">
+              {onBack && (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="rounded-lg bg-white/70 hover:bg-white px-2.5 py-1 text-[11px] font-bold text-[#146a56] transition shadow-xs cursor-pointer flex items-center gap-1"
+                >
+                  ← Back
+                </button>
+              )}
+              <p className="text-[12px] font-bold tracking-[0.14em] text-[#28806c] uppercase">
+                FLIPBOOK
+              </p>
+            </div>
             <span className="rounded-none bg-[#146a56]/10 border border-[#146a56]/20 px-3.5 py-1 text-[12px] font-bold text-[#146a56] shadow-sm">
               Auto-selects in {formattedMMSS}
             </span>
