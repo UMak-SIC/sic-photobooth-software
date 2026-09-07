@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PhotoStripWorkflow } from './PhotoStripWorkflow';
 import { usePhotoStripStore } from '../../store/photostrip-store';
 import { useSessionStore } from '../../store/session-store';
-import { boothApi, type SessionInfo, type EventItem } from '../../services/api';
+import { boothApi } from '../../services/api';
 
 describe('PhotoStripWorkflow flow: layout confirmation and instructions screen', () => {
   afterEach(() => {
@@ -106,17 +106,7 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
       },
     });
 
-    const transitionSpy = vi.spyOn(boothApi, 'transition').mockResolvedValue({
-      id: 'session-photo-123',
-      state: 'capturing',
-      type: 'photo_strip',
-      eventId: 'evt-1',
-      retakeCount: 0,
-      isPrinted: false,
-      copiesPrinted: 0,
-      createdAt: new Date().toISOString(),
-      lastActivityAt: new Date().toISOString(),
-    });
+    const transitionSpy = vi.spyOn(boothApi, 'transition').mockResolvedValue();
 
     render(<PhotoStripWorkflow />);
 
@@ -148,17 +138,7 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
       },
     });
 
-    vi.spyOn(boothApi, 'transition').mockResolvedValue({
-      id: 'session-photo-123',
-      state: 'capturing',
-      type: 'photo_strip',
-      eventId: 'evt-1',
-      retakeCount: 0,
-      isPrinted: false,
-      copiesPrinted: 0,
-      createdAt: new Date().toISOString(),
-      lastActivityAt: new Date().toISOString(),
-    });
+    vi.spyOn(boothApi, 'transition').mockResolvedValue();
 
     render(<PhotoStripWorkflow />);
 

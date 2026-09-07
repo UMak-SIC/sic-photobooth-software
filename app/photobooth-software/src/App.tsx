@@ -78,8 +78,8 @@ function App() {
   return (
     <main className="min-h-[100dvh] bg-[#071d1a] text-[#e8fff5]">
       {mode === 'live' ? (
-        <section className="flex min-h-[100vh] w-full flex-col items-stretch">
-          <div className="flex flex-1 w-full overflow-hidden bg-[#0a2924]">
+        <section className="flex h-[100dvh] w-full flex-col items-stretch overflow-hidden">
+          <div className="flex flex-1 w-full h-full overflow-hidden bg-[#0a2924]">
             {activeSession?.type === 'photo_strip' ? (
               <PhotoStripWorkflow />
             ) : currentStep === 'welcome' && !activeSession ? (

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import type { ReviewTemplate } from './PhotoStripReview';
-import { resolveAssetUrl } from '../../services/api';
 
 export interface PhotoStripInstructionsScreenProps {
   template?: ReviewTemplate | null;

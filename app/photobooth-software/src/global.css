@@ -1,8 +1,72 @@
 @import 'tailwindcss';
 
-:root {
-  font-family: Arial, Helvetica, sans-serif;
+@font-face {
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
 }
+
+@font-face {
+  font-family: 'Arcade Gamer';
+  src: url('/fonts/PressStart2P.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PressStart2P';
+  src: url('/fonts/PressStart2P.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --color-sic-green: #276d4e;
+  --sic-green: #276d4e;
+  --brand-green: #276d4e;
+  --color-brand-green: #276d4e;
+  --color-primary: #276d4e;
+  font-family: 'Nunito', Arial, Helvetica, sans-serif;
+}
+
+.text-sic-green {
+  color: #276d4e;
+}
+.bg-sic-green {
+  background-color: #276d4e;
+}
+.border-sic-green {
+  border-color: #276d4e;
+}
+
+.pixel-title-stroke {
+  color: #ffffff;
+  text-shadow:
+    -3px -3px 0 #276d4e,
+     0   -3px 0 #276d4e,
+     3px -3px 0 #276d4e,
+     3px  0   0 #276d4e,
+     3px  3px 0 #276d4e,
+     0    3px 0 #276d4e,
+    -3px  3px 0 #276d4e,
+    -3px  0   0 #276d4e,
+    -4px  0   0 #13422e,
+     4px  0   0 #13422e,
+     0   -4px 0 #13422e,
+     0    4px 0 #13422e,
+     4px  4px 0 #13422e,
+    -2px -2px 0 #276d4e,
+     2px -2px 0 #276d4e,
+    -2px  2px 0 #276d4e,
+     2px  2px 0 #276d4e;
+  letter-spacing: 0.05em;
+  image-rendering: pixelated;
+}
+
 * {
   box-sizing: border-box;
 }
