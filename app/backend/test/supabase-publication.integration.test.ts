@@ -29,7 +29,7 @@ describeIntegration('Supabase public output integration', () => {
       .eq('client_hash', createHash('sha256').update(clientAddress).digest('hex'));
   });
 
-  it('upserts a published output, exposes it through RLS, and limits lookups', async () => {
+  it('upserts a published output, prevents anonymous reads, and limits lookups', async () => {
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const { error: upsertError } = await service.from('public_outputs').upsert(
       {
@@ -47,13 +47,13 @@ describeIntegration('Supabase public output integration', () => {
     );
     expect(upsertError).toBeNull();
 
-    const { data: publicOutput, error: publicReadError } = await publicClient
+    const { data: publicOutputs, error: publicReadError } = await publicClient
       .from('public_outputs')
       .select('public_id, cloudinary_url')
       .eq('public_id', publicId)
-      .maybeSingle();
-    expect(publicReadError).toBeNull();
-    expect(publicOutput?.public_id).toBe(publicId);
+      .limit(1);
+    expect(publicReadError || publicOutputs).toBeTruthy();
+    expect(publicOutputs ?? []).toEqual([]);
 
     for (let request = 1; request <= 30; request += 1) {
       const { data, error } = await service.rpc('consume_public_output_lookup', {

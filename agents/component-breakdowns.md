@@ -44,6 +44,13 @@ Component and module boundaries derived from the product contract. This is a tem
 - Public retrieval: `app/public-website/src/app/[id]/page.tsx` validates the public ID and reads finalized output metadata from Supabase only.
 - Shared UI: put a component in `packages/ui/` only when both retrieval websites need the same component unchanged.
 
+### PublicRetrieval
+
+- Location: `app/public-website/src/app/`, `app/public-website/src/lib/public-output.ts`
+- Owns: the public QR/code recovery page, published-output presentation, unavailable state, and server-only Supabase lookup boundary.
+- Does not own: Cloudinary uploads, public-output creation, retention scheduling, or local booth retrieval.
+- Collaborators: `packages/public-output`, Supabase `public_outputs`, and Cloudinary public delivery URLs.
+
 ## Update Template
 
 When adding a real boundary, record it as:

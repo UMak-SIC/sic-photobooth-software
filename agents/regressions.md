@@ -17,6 +17,12 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 
 ## Entries
 
+### 2026-09-09: Public Download Opens Cloudinary Instead
+
+- Symptom: Selecting Save photo strip opened the cross-origin Cloudinary asset instead of downloading it.
+- Root cause: Browser support for an anchor's `download` attribute is not guaranteed for cross-origin resources.
+- Prevention: `app/public-website/src/app/[id]/download/route.ts` streams the published media with `Content-Disposition: attachment`.
+
 ### 2026-09-07: Camera Setup Shows False Permission Error
 
 - Symptom: Camera setup displayed `The fetching process for the media resource was aborted by the user agent at the user's request` even while the live camera preview was visible.

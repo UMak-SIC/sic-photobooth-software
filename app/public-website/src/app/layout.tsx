@@ -13,8 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Photobooth Gallery',
-  description: 'View published photobooth outputs.',
+  title: 'UMak SIC Photobooth',
+  description: 'View and save your published UMak SIC Photobooth output.',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({
@@ -26,9 +27,8 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable}`}
-      suppressHydrationWarning
     >
-      <body suppressHydrationWarning>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
