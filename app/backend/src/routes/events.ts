@@ -4,6 +4,7 @@ import { dbRepository } from '../db/repository.js';
 
 const eventSchema = z.object({
   name: z.string().trim().min(1).max(255),
+  description: z.string().trim().max(1000).optional().nullable(),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -45,6 +46,7 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
         result.data.name,
         result.data.date,
         result.data.operatorName,
+        result.data.description ?? undefined,
       );
       return reply.status(201).send({ success: true, data: event });
     } catch (error: unknown) {
@@ -65,6 +67,25 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(500).send({
         success: false,
         error: { code: 'DATABASE_ERROR', message: 'Could not create event.' },
+      });
+    }
+  });
+
+  fastify.delete('/api/events/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    try {
+      const deleted = await dbRepository.deleteEvent(id);
+      if (!deleted) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'EVENT_NOT_FOUND', message: 'Event not found.' },
+        });
+      }
+      return reply.send({ success: true, data: { id } });
+    } catch {
+      return reply.status(500).send({
+        success: false,
+        error: { code: 'DATABASE_ERROR', message: 'Could not delete event.' },
       });
     }
   });

@@ -95,7 +95,7 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
 
   setSelectedFrame: (selectedFrame) => set({ selectedFrame }),
 
-  confirmFrameSelection: () => set({ currentStep: 'cover_capture' }),
+  confirmFrameSelection: () => set({ currentStep: 'instructions' }),
 
   addCoverCapture: (blob) =>
     set((state) => {

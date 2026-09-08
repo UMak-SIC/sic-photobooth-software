@@ -1,5 +1,8 @@
 export * from './CameraViewfinder';
 export * from './WelcomeScreen';
+export * from './WelcomeSplashScreen';
+export * from './ExperienceChoiceScreen';
+export * from './CameraSetupModal';
 export * from './events/EventSelectScreen';
 export * from './events/EventRow';
 export * from './events/CreateEventForm';
@@ -9,4 +12,3 @@ export * from './photostrip/PhotoStripReview';
 export * from './photostrip/TemplatePicker';
 export * from './photostrip/PrintModal';
 export * from './flipbook/FlipbookWorkflow';
-

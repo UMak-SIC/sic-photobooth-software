@@ -9,10 +9,27 @@ export type PhotoStripStep =
   | 'review'
   | 'complete';
 
+export interface PoolPhotoItem {
+  id: string;
+  blob: Blob;
+  dataUrl: string;
+  label: string;
+  letter?: string;
+  createdAt: number;
+  isRetake?: boolean;
+}
+
 export interface PhotoCaptureItem {
   captureIndex: number;
   dataUrl: string;
   blob: Blob;
+  photoId?: string;
+  originalDataUrl?: string;
+  originalBlob?: Blob;
+  retakeDataUrl?: string;
+  retakeBlob?: Blob;
+  activeVersion?: 'original' | 'retake';
+  retakeOrder?: number;
 }
 
 export interface PhotoStripEvent {
@@ -29,6 +46,8 @@ export interface PhotoStripState {
   selectedEvent: PhotoStripEvent | null;
   selectedTemplate: ReviewTemplate | null;
   captures: PhotoCaptureItem[];
+  photoPool: PoolPhotoItem[];
+  slotAssignments: Record<number, string>;
   retakeCount: number;
   activeSlotIndex: number;
   isRetaking: boolean;
@@ -50,6 +69,9 @@ export interface PhotoStripState {
   stopCountdown: () => void;
   addCapture: (blob: Blob, slotIndex?: number) => void;
   startRetake: (captureIndex: number) => void;
+  assignPhotoToSlot: (slotIndex: number, photoId: string) => void;
+  toggleCaptureVersion: (captureIndex: number) => void;
+  setCaptureVersion: (captureIndex: number, version: 'original' | 'retake') => void;
   setConfirmedOutput: (publicId: string, qrUrl: string, outputImageUrl: string) => void;
   setIsConfirming: (isConfirming: boolean) => void;
   setError: (error: string | null) => void;
@@ -64,6 +86,8 @@ const initialState = {
   selectedEvent: null,
   selectedTemplate: null,
   captures: [] as PhotoCaptureItem[],
+  photoPool: [] as PoolPhotoItem[],
+  slotAssignments: {} as Record<number, string>,
   retakeCount: 0,
   activeSlotIndex: 1,
   isRetaking: false,
@@ -77,6 +101,8 @@ const initialState = {
   isPrinted: false,
   copiesPrinted: 0,
 };
+
+const RETAKE_LETTERS = ['A', 'B', 'C', 'D'];
 
 export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
   ...initialState,
@@ -97,6 +123,9 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
     set({
       selectedTemplate,
       captures: [],
+      photoPool: [],
+      slotAssignments: {},
+      retakeCount: 0,
       activeSlotIndex: 1,
       isRetaking: false,
       countdownSeconds: (selectedTemplate.countdownSeconds as 3 | 5 | 10) || 5,
@@ -112,21 +141,47 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
     const dataUrl = URL.createObjectURL(blob);
     const targetSlot = slotIndex ?? state.activeSlotIndex;
 
-    let updatedCaptures: PhotoCaptureItem[];
-    const existingIndex = state.captures.findIndex((c) => c.captureIndex === targetSlot);
-
-    if (existingIndex >= 0) {
-      URL.revokeObjectURL(state.captures[existingIndex].dataUrl);
-      updatedCaptures = [...state.captures];
-      updatedCaptures[existingIndex] = { captureIndex: targetSlot, dataUrl, blob };
-    } else {
-      updatedCaptures = [...state.captures, { captureIndex: targetSlot, dataUrl, blob }];
-    }
-
     if (state.isRetaking) {
+      const retakeNumber = state.retakeCount + 1;
+      const letter = RETAKE_LETTERS[state.retakeCount] || `Take ${retakeNumber}`;
+      const photoId = `retake-${letter}-${Date.now()}`;
+      const newPoolItem: PoolPhotoItem = {
+        id: photoId,
+        blob,
+        dataUrl,
+        label: `Take ${letter}`,
+        letter,
+        createdAt: Date.now(),
+        isRetake: true,
+      };
+
+      const newPool = [...state.photoPool, newPoolItem];
+      const newAssignments = {
+        ...state.slotAssignments,
+        [targetSlot]: photoId,
+      };
+
+      const updatedCaptures = state.captures.map((c) => {
+        if (c.captureIndex === targetSlot) {
+          return {
+            ...c,
+            photoId,
+            dataUrl,
+            blob,
+            retakeDataUrl: dataUrl,
+            retakeBlob: blob,
+            activeVersion: 'retake' as const,
+            retakeOrder: retakeNumber,
+          };
+        }
+        return c;
+      });
+
       set({
+        photoPool: newPool,
+        slotAssignments: newAssignments,
         captures: updatedCaptures,
-        retakeCount: state.retakeCount + 1,
+        retakeCount: retakeNumber,
         isRetaking: false,
         isCountingDown: false,
         currentStep: 'review',
@@ -134,18 +189,59 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       return;
     }
 
+    // Initial capture round
+    const photoId = `shot-${targetSlot}-${Date.now()}`;
+    const newPoolItem: PoolPhotoItem = {
+      id: photoId,
+      blob,
+      dataUrl,
+      label: `Frame ${targetSlot}`,
+      createdAt: Date.now(),
+      isRetake: false,
+    };
+
+    const newPool = [...state.photoPool, newPoolItem];
+    const newAssignments = {
+      ...state.slotAssignments,
+      [targetSlot]: photoId,
+    };
+
+    const newCapture: PhotoCaptureItem = {
+      captureIndex: targetSlot,
+      dataUrl,
+      blob,
+      photoId,
+      originalDataUrl: dataUrl,
+      originalBlob: blob,
+      activeVersion: 'original',
+    };
+
+    const existingIndex = state.captures.findIndex((c) => c.captureIndex === targetSlot);
+    let updatedCaptures: PhotoCaptureItem[];
+    if (existingIndex >= 0) {
+      updatedCaptures = [...state.captures];
+      updatedCaptures[existingIndex] = newCapture;
+    } else {
+      updatedCaptures = [...state.captures, newCapture];
+    }
+
     const totalNeeded = state.selectedTemplate
       ? (state.selectedTemplate.requiredCaptureCount ??
          new Set(state.selectedTemplate.placements.map((p) => p.captureIndex)).size)
       : 3;
+
     if (targetSlot < totalNeeded) {
       set({
+        photoPool: newPool,
+        slotAssignments: newAssignments,
         captures: updatedCaptures,
         activeSlotIndex: targetSlot + 1,
         isCountingDown: false,
       });
     } else {
       set({
+        photoPool: newPool,
+        slotAssignments: newAssignments,
         captures: updatedCaptures,
         isCountingDown: false,
         currentStep: 'review',
@@ -168,6 +264,70 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
     });
   },
 
+  assignPhotoToSlot: (slotIndex: number, photoId: string) => {
+    const state = get();
+    const poolItem = state.photoPool.find((p) => p.id === photoId);
+    if (!poolItem) return;
+
+    const newAssignments = {
+      ...state.slotAssignments,
+      [slotIndex]: photoId,
+    };
+
+    const updatedCaptures = state.captures.map((c) => {
+      if (c.captureIndex === slotIndex) {
+        return {
+          ...c,
+          photoId,
+          dataUrl: poolItem.dataUrl,
+          blob: poolItem.blob,
+        };
+      }
+      return c;
+    });
+
+    set({
+      slotAssignments: newAssignments,
+      captures: updatedCaptures,
+    });
+  },
+
+  toggleCaptureVersion: (captureIndex: number) => {
+    set((state) => {
+      const updatedCaptures = state.captures.map((c) => {
+        if (c.captureIndex === captureIndex && c.retakeDataUrl && c.originalDataUrl) {
+          const nextVersion: 'original' | 'retake' =
+            c.activeVersion === 'original' ? 'retake' : 'original';
+          return {
+            ...c,
+            activeVersion: nextVersion,
+            dataUrl: nextVersion === 'retake' ? c.retakeDataUrl : c.originalDataUrl,
+            blob: nextVersion === 'retake' ? c.retakeBlob! : c.originalBlob!,
+          };
+        }
+        return c;
+      });
+      return { captures: updatedCaptures };
+    });
+  },
+
+  setCaptureVersion: (captureIndex: number, version: 'original' | 'retake') => {
+    set((state) => {
+      const updatedCaptures = state.captures.map((c) => {
+        if (c.captureIndex === captureIndex && c.retakeDataUrl && c.originalDataUrl) {
+          return {
+            ...c,
+            activeVersion: version,
+            dataUrl: version === 'retake' ? c.retakeDataUrl : c.originalDataUrl,
+            blob: version === 'retake' ? c.retakeBlob! : c.originalBlob!,
+          };
+        }
+        return c;
+      });
+      return { captures: updatedCaptures };
+    });
+  },
+
   setConfirmedOutput: (publicId, qrUrl, outputImageUrl) =>
     set({
       publicId,
@@ -183,7 +343,15 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
 
   resetPhotoStrip: () => {
     const { captures } = get();
-    captures.forEach((c) => URL.revokeObjectURL(c.dataUrl));
+    captures.forEach((c) => {
+      if (c.dataUrl) URL.revokeObjectURL(c.dataUrl);
+      if (c.originalDataUrl && c.originalDataUrl !== c.dataUrl) {
+        URL.revokeObjectURL(c.originalDataUrl);
+      }
+      if (c.retakeDataUrl && c.retakeDataUrl !== c.dataUrl) {
+        URL.revokeObjectURL(c.retakeDataUrl);
+      }
+    });
     set(initialState);
   },
 }));

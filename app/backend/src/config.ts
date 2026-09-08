@@ -111,7 +111,7 @@ export const flipbookConfig: FlipbookConfig = {
   // ACTIVE SETTINGS: 2.41" x 1.32" (482x264) Motion GIF Output
   // =========================================================================
   videoRecordingDurationSeconds: 5.0,
-  videoDurationMinSeconds: 4.0,
+  videoDurationMinSeconds: 3.5,
   videoDurationMaxSeconds: 6.5,
   gifFrameCount: 19, // 19 video motion frames (Frame 01 is cover photo, Frames 02-20 are video frames)
   gifCoverHoldMs: 3000, // 3 seconds static cover photo hold in GIF

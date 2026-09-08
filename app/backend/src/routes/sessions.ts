@@ -508,6 +508,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const isRetake =
           query?.isRetake === 'true' ||
           (data.fields?.isRetake && getFieldValue(data.fields.isRetake) === 'true') ||
+          slotAlreadyCaptured ||
           (session.state === 'review' && slotAlreadyCaptured);
 
         if (isRetake && session.retakeCount >= 4) {
@@ -541,10 +542,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
         // If in capturing mode and target captures reached, transition to review
         let currentState = session.state;
-        if (session.state === 'capturing' && result.captureCount >= targetCount) {
-          sessionStateMachine.assertValidTransition(session.type, session.state, 'review');
-          await dbRepository.updateSessionState(id, 'review');
-          currentState = 'review';
+        if (result.captureCount >= targetCount && session.state !== 'review') {
+          if (sessionStateMachine.isValidTransition(session.type, session.state, 'review')) {
+            await dbRepository.updateSessionState(id, 'review');
+            currentState = 'review';
+          }
         }
 
         return reply.status(201).send({
@@ -1125,6 +1127,21 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               message: 'Session is not a photo strip session',
             },
           });
+        }
+
+        if (session.state === 'booth_confirmed') {
+          const latestOutput = await dbRepository.getLatestOutputForSession(id);
+          if (latestOutput) {
+            return reply.send({
+              success: true,
+              data: {
+                outputId: latestOutput.id,
+                publicId: latestOutput.publicId,
+                qrUrl: `https://myphotobooth.com/${latestOutput.publicId}`,
+                state: 'booth_confirmed',
+              },
+            });
+          }
         }
 
         if (session.state !== 'review' && session.state !== 'capturing') {

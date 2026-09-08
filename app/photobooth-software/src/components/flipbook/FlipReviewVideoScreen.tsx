@@ -3,84 +3,72 @@ import { useFlipbookStore } from '../../store/flipbook-store';
 import { useCountdown } from '../../hooks/useCountdown';
 import { boothApi } from '../../services/api';
 
-function VideoItemPreview({
+function VideoCardItem({
   url,
   index,
   isSelected,
   onSelect,
-  aspectRatio = '241 / 132',
-  slotRatio = 241 / 132,
 }: {
   url?: string;
   index: number;
   isSelected: boolean;
   onSelect: () => void;
-  aspectRatio?: string;
-  slotRatio?: number;
 }) {
   const [hasError, setHasError] = useState(false);
 
   return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={isSelected}
-      onClick={onSelect}
-      style={{
-        aspectRatio,
-        maxHeight: 'calc(100dvh - 200px)',
-        maxWidth: `min(100%, calc((100dvh - 200px) * ${slotRatio}))`,
-        width: `min(100%, calc((100dvh - 200px) * ${slotRatio}))`,
-      }}
-      className={`group relative overflow-hidden rounded-2xl bg-black/40 transition-all cursor-pointer ${
-        isSelected
-          ? 'ring-4 ring-[#a8f3dd] ring-offset-4 ring-offset-[#0e473d] scale-[1.02] shadow-[0_12px_32px_rgba(0,0,0,0.4)]'
-          : 'opacity-70 hover:opacity-100 hover:scale-[1.01] shadow-md'
-      }`}
-    >
-      {url && !hasError ? (
-        <video
-          src={url}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          onLoadedData={(e) => {
-            const el = e.currentTarget;
-            el.muted = true;
-            el.currentTime = 0.001;
-            el.play().catch(() => {});
-          }}
-          onError={() => setHasError(true)}
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center text-sm font-bold text-white/50 bg-[#176754]">
-          VIDEO 0{index}
-        </div>
-      )}
+    <div className="flex flex-col items-center w-full">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isSelected}
+        onClick={onSelect}
+        className={`group relative w-full aspect-[4/3] overflow-hidden rounded-2xl bg-black transition-all duration-200 cursor-pointer text-left outline-none ${
+          isSelected
+            ? 'border-2 border-[#058d51] ring-4 ring-[#058d51]/40 shadow-xl scale-[1.03]'
+            : 'border border-gray-200 hover:border-gray-400 shadow-md opacity-90 hover:opacity-100 hover:scale-[1.01]'
+        }`}
+      >
+        {url && !hasError ? (
+          <video
+            src={url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            onLoadedData={(e) => {
+              const el = e.currentTarget;
+              el.muted = true;
+              el.currentTime = 0.001;
+              el.play().catch(() => {});
+            }}
+            onError={() => setHasError(true)}
+            className="size-full object-cover pointer-events-none"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-sm font-bold text-white/50 bg-[#176754]">
+            VIDEO {index}
+          </div>
+        )}
 
-      {/* Pick Tile Badge matching design sheet */}
-      <div className="absolute inset-0 p-3 flex flex-col justify-end items-start pointer-events-none bg-gradient-to-t from-black/60 via-transparent to-transparent">
-        <div
-          className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-black transition-colors ${
-            isSelected
-              ? 'bg-[#a8f3dd] text-[#0e473d] shadow-sm'
-              : 'bg-black/50 text-white backdrop-blur-sm'
-          }`}
-        >
-          <svg className="size-3 fill-current shrink-0" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-          <span>5 SEC</span>
-          <span>•</span>
-          <span>
-            CLIP 0{index} {isSelected ? '✓' : ''}
-          </span>
-        </div>
-      </div>
-    </button>
+        {/* Selected Checkmark Overlay */}
+        {isSelected && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
+            <img
+              src="/assets/images/check-mark.svg"
+              alt="Selected"
+              className="size-10 sm:size-12 drop-shadow-md"
+            />
+          </div>
+        )}
+      </button>
+
+      {/* Large Digit Number Below */}
+      <span className="text-[38px] sm:text-[48px] md:text-[56px] font-bold text-[#1e293b] leading-none mt-3.5 select-none">
+        {index}
+      </span>
+    </div>
   );
 }
 
@@ -94,14 +82,7 @@ export function FlipReviewVideoScreen() {
     setStep,
     setError,
     setProcessing,
-    selectedFrame,
   } = useFlipbookStore();
-
-  const primarySlot = selectedFrame?.placements?.[0];
-  const slotWidth = primarySlot?.width || 620;
-  const slotHeight = primarySlot?.height || 348.75;
-  const slotRatio = slotWidth / slotHeight;
-  const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
 
   const [loading, setLoading] = useState(false);
 
@@ -132,82 +113,78 @@ export function FlipReviewVideoScreen() {
     setError,
   ]);
 
-  // 5-minute countdown auto-defaulting to Video 1 if no choice is made
-  const { formattedMMSS } = useCountdown({
-    seconds: 300,
+  // 60-second countdown auto-defaulting to selection if unattended
+  const { timeLeft } = useCountdown({
+    seconds: 60,
     autoStart: true,
     onExpire: () => {
-      setSelectedVideoIndex(1);
       handleCreateFlipbook();
     },
   });
 
   return (
-    <div className="relative flex h-[100dvh] max-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#0e473d] p-4 md:p-6 text-white">
-      {/* 5-Minute Auto-select Banner */}
-      <div className="flex justify-center z-10 shrink-0">
-        <span className="rounded-full bg-white/20 border border-white/10 px-5 py-2 text-[12px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
-          Auto-selects in {formattedMMSS}
-        </span>
+    <div className="relative flex h-full min-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#f4f6f5] px-6 py-4 sm:px-10 sm:py-6 text-[#1e293b] select-none font-['Nunito',sans-serif]">
+      {/* Top Header Row: Progress Bar & Arcade Countdown Timer */}
+      <div className="flex items-center justify-between w-full max-w-5xl shrink-0 gap-6 pt-1">
+        {/* Progress Bar (Step 2 of 2 Review Stages: 50% / Green fill) */}
+        <div className="flex-1 h-3.5 sm:h-4.5 bg-[#e2e8f0] rounded-full overflow-hidden shadow-inner">
+          <div className="w-1/2 h-full bg-[#1b6b55] rounded-full" />
+        </div>
+
+        {/* Arcade Gamer Green Countdown Timer */}
+        <div className="flex items-center shrink-0">
+          <span
+            className="font-['PressStart2P','Arcade_Gamer',monospace] text-[28px] sm:text-[34px] md:text-[38px] font-bold text-[#008037] leading-none tracking-normal drop-shadow-xs"
+            aria-live="polite"
+            aria-label={`Auto continue in ${timeLeft} seconds`}
+          >
+            {timeLeft}
+          </span>
+        </div>
       </div>
 
-      {/* Main Selection Area */}
-      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto flex-1 min-h-0 max-w-5xl py-2">
-        <p className="mb-3 text-[12px] font-bold tracking-[0.16em] text-[#a8f3dd] uppercase shrink-0">
-          VIDEO CLIPS
-        </p>
+      {/* Main Content Area */}
+      <div className="flex flex-col items-center justify-center w-full max-w-4xl my-auto py-2">
+        {/* Title */}
+        <h1 className="text-[28px] sm:text-[36px] md:text-[42px] font-bold tracking-tight text-[#1e293b] text-center">
+          Pick the one you like as your GIF
+        </h1>
 
+        {/* 3 Video Cards in 3 Columns */}
         <div
           role="radiogroup"
           aria-label="Video Clip Selection"
-          className="grid grid-cols-3 gap-4 md:gap-6 w-full items-center justify-items-center"
+          className="grid grid-cols-3 gap-6 sm:gap-8 w-full mt-8 sm:mt-12 items-start"
         >
           {[1, 2, 3].map((index) => (
-            <VideoItemPreview
+            <VideoCardItem
               key={index}
               index={index}
               url={videoUrls[index - 1]}
               isSelected={selectedVideoIndex === index}
               onSelect={() => setSelectedVideoIndex(index)}
-              aspectRatio={slotAspectRatio}
-              slotRatio={slotRatio}
             />
           ))}
         </div>
       </div>
 
-      {/* Bottom Action Button */}
-      <div className="flex justify-center z-10 pt-2 shrink-0">
+      {/* Bottom Action Button: I LIKE THIS */}
+      <div className="flex justify-end w-full max-w-5xl shrink-0 pb-1">
         <button
           type="button"
           disabled={loading}
           onClick={handleCreateFlipbook}
-          className="rounded-2xl bg-[#a8f3dd] px-10 py-3.5 text-[15px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+          className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-[#1b6b55] hover:bg-[#155644] text-white text-lg sm:text-xl font-bold tracking-wide shadow-[0_6px_20px_rgba(27,107,85,0.32)] transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer disabled:opacity-50"
         >
-          {loading ? (
-            <>
-              <svg className="animate-spin size-5 text-[#0e473d]" fill="none" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <span>Creating flipbook...</span>
-            </>
-          ) : (
-            <span>Complete &amp; Create GIF →</span>
-          )}
+          <span>{loading ? 'Creating...' : 'I LIKE THIS'}</span>
+          <img
+            src="/assets/images/like-icon.svg"
+            alt=""
+            className="size-6 sm:size-7 object-contain pointer-events-none drop-shadow-xs"
+          />
         </button>
       </div>
     </div>
   );
 }
+

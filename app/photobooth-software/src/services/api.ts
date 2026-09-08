@@ -23,6 +23,7 @@ export interface ApiResponse<T = unknown> {
 export interface EventItem {
   id: string;
   name: string;
+  description?: string;
   date: string;
   operatorName: string;
 }
@@ -141,8 +142,20 @@ export class BoothApiClient {
       return body;
     } catch {
       return [
-        { id: '1', name: 'SIC General Assembly', date: 'May 24, 2026', operatorName: 'Mika Santos' },
-        { id: '2', name: 'College Week 2026', date: 'June 18, 2026', operatorName: 'Mika Santos' },
+        {
+          id: '1',
+          name: 'SIC General Assembly',
+          description: 'Official photobooth for the SIC General Assembly',
+          date: 'May 24, 2026',
+          operatorName: 'Mika Santos',
+        },
+        {
+          id: '2',
+          name: 'College Week 2026',
+          description: 'Annual college week celebration and exhibits',
+          date: 'June 18, 2026',
+          operatorName: 'Mika Santos',
+        },
       ];
     }
   }
@@ -151,17 +164,34 @@ export class BoothApiClient {
     name: string,
     date: string,
     operatorName: string,
+    description?: string,
   ): Promise<EventItem> {
     const res = await fetch(`${API_BASE_URL}/api/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, date, operatorName }),
+      body: JSON.stringify({
+        name,
+        date,
+        operatorName,
+        description: description?.trim() || undefined,
+      }),
     });
     const body = await res.json();
     if (!res.ok || !body.data) {
       throw new Error(body.error?.message || 'Could not create event');
     }
     return body.data;
+  }
+
+  public async deleteEvent(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/events/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    const body: ApiResponse = await res.json().catch(() => ({ success: res.ok }));
+    if (!res.ok || body.success === false) {
+      throw new Error(body.error?.message || 'Could not delete event');
+    }
   }
 
   public async listFrames(): Promise<FrameItem[]> {
@@ -333,17 +363,25 @@ export class BoothApiClient {
     isRetake: boolean = false,
   ): Promise<{ captureIndex: number; retakeCount: number; state: string }> {
     const formData = new FormData();
-    formData.append('file', photoBlob, `photo_${captureIndex}.jpg`);
     formData.append('captureIndex', String(captureIndex));
     if (isRetake) {
       formData.append('isRetake', 'true');
     }
+    formData.append('file', photoBlob, `photo_${captureIndex}.jpg`);
 
-    const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/captures/photo`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: formData,
+    const queryParams = new URLSearchParams({
+      captureIndex: String(captureIndex),
+      ...(isRetake ? { isRetake: 'true' } : {}),
     });
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/sessions/${sessionId}/captures/photo?${queryParams.toString()}`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: formData,
+      },
+    );
     const body: ApiResponse<{ captureIndex: number; retakeCount: number; state: string }> =
       await res.json();
     if (!res.ok || !body.success || !body.data) {

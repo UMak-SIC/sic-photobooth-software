@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FlipbookCompletionScreen } from './FlipbookCompletionScreen';
 import { useFlipbookStore } from '../../store/flipbook-store';
 import { useSessionStore } from '../../store/session-store';
-import { boothApi, type SessionInfo } from '../../services/api';
+import { boothApi } from '../../services/api';
 
 vi.mock('qrcode', () => ({
   default: {
@@ -12,7 +12,12 @@ vi.mock('qrcode', () => ({
   },
 }));
 
-describe('FlipbookCompletionScreen finish session lifecycle', () => {
+vi.mock('../../services/flipbook-pdf', () => ({
+  generateFlipbookPdf: vi.fn().mockResolvedValue('blob:mock-pdf'),
+  printPdfBlobUrl: vi.fn(),
+}));
+
+describe('FlipbookCompletionScreen layout and session lifecycle', () => {
   afterEach(() => {
     cleanup();
   });
@@ -45,73 +50,94 @@ describe('FlipbookCompletionScreen finish session lifecycle', () => {
     boothApi.setToken('old-token-abc');
   });
 
-  it('resets previous session assets, creates a new flipbook session, and transitions to instructions step', async () => {
-    const newSession: SessionInfo = {
-      sessionId: 'new-session-456',
-      token: 'new-token-xyz',
-      type: 'flipbook',
-      state: 'created',
-      eventId: 'evt-1',
-      eventName: 'SIC General Assembly',
-      eventDate: '2026-09-06',
-      createdAt: new Date().toISOString(),
-    };
-
-    const createSessionSpy = vi
-      .spyOn(boothApi, 'createSession')
-      .mockResolvedValue(newSession);
-
+  it('renders logo, SIC PHOTOBOOTH branding, headline, QR section, public code, and action buttons matching PrintModal layout', async () => {
     render(<FlipbookCompletionScreen />);
 
-    const finishButton = screen.getByRole('button', { name: /Finish session/i });
-    expect(finishButton).toBeDefined();
+    // Logo
+    const logoImg = screen.getByAltText(/SIC Photobooth Logo/i);
+    expect(logoImg).toBeDefined();
+    expect(logoImg.getAttribute('src')).toBe('/assets/images/logo.svg');
 
-    fireEvent.click(finishButton);
+    // Branding & Headline
+    expect(screen.getByText('SIC PHOTOBOOTH')).toBeDefined();
+    expect(screen.getByText(/Your masterpiece/i)).toBeDefined();
+    expect(screen.getByText(/is ready!/i)).toBeDefined();
+
+    // QR Code helper & Public ID
+    expect(screen.getByText('Scan to see your copy!')).toBeDefined();
+    expect(screen.getByText('K9X2BQ1')).toBeDefined();
+
+    // Action buttons
+    expect(screen.getByRole('button', { name: /Session Done!/i })).toBeDefined();
+    expect(screen.getByRole('button', { name: /Print/i })).toBeDefined();
+  });
+
+  it('shows unprinted warning modal when clicking Session Done! before printing and allows exit anyway to experience choice', async () => {
+    render(<FlipbookCompletionScreen />);
+
+    const doneButton = screen.getByRole('button', { name: /Session Done!/i });
+    fireEvent.click(doneButton);
+
+    // Warning dialog should appear
+    expect(screen.getByText('Not printed yet?')).toBeDefined();
+    expect(screen.getByRole('button', { name: /Exit Anyway/i })).toBeDefined();
+
+    // Clicking Exit Anyway resets flipbook and returns to experience screen
+    const exitAnywayBtn = screen.getByRole('button', { name: /Exit Anyway/i });
+    fireEvent.click(exitAnywayBtn);
 
     await waitFor(() => {
       const flipbookState = useFlipbookStore.getState();
-      expect(flipbookState.currentStep).toBe('instructions');
-      expect(flipbookState.sessionId).toBe('new-session-456');
-      expect(flipbookState.sessionToken).toBe('new-token-xyz');
+      expect(flipbookState.sessionId).toBeNull();
       expect(flipbookState.publicId).toBeNull();
       expect(flipbookState.outputGifUrl).toBeNull();
       expect(flipbookState.coverUrls).toEqual([]);
       expect(flipbookState.videoUrls).toEqual([]);
     });
 
-    expect(createSessionSpy).toHaveBeenCalledWith(
-      'SIC General Assembly',
-      expect.any(String),
-      'Operator',
-      'flipbook',
-    );
-
     const sessionState = useSessionStore.getState();
-    expect(sessionState.activeSession).toEqual({
-      id: 'new-session-456',
-      type: 'flipbook',
-      token: 'new-token-xyz',
-    });
+    expect(sessionState.activeSession).toBeNull();
+    expect(sessionState.stage).toBe('choose_experience');
   });
 
-  it('falls back to a new local session and still transitions to instructions if backend fails', async () => {
-    vi.spyOn(boothApi, 'createSession').mockRejectedValue(new Error('Network error'));
+  it('opens print modal on clicking Print button', async () => {
+    render(<FlipbookCompletionScreen />);
+
+    const printButton = screen.getByRole('button', { name: /Print/i });
+    fireEvent.click(printButton);
+
+    expect(screen.getByText(/Flipbook Print Layout/i)).toBeDefined();
+  });
+
+  it('finishes session directly after print and returns to experience choice', async () => {
+    vi.spyOn(boothApi, 'recordPrint').mockResolvedValue(undefined);
 
     render(<FlipbookCompletionScreen />);
 
-    const finishButton = screen.getByRole('button', { name: /Finish session/i });
-    fireEvent.click(finishButton);
+    // Open print modal
+    const printButton = screen.getByRole('button', { name: /Print/i });
+    fireEvent.click(printButton);
+
+    expect(screen.getByText(/Flipbook Print Layout/i)).toBeDefined();
+
+    // Trigger Print inside modal
+    const printPdfBtn = screen.getByRole('button', { name: /Print.*PDF/i });
+    fireEvent.click(printPdfBtn);
 
     await waitFor(() => {
-      const flipbookState = useFlipbookStore.getState();
-      expect(flipbookState.currentStep).toBe('instructions');
-      expect(flipbookState.sessionId).toMatch(/^mock-flipbook-/);
-      expect(flipbookState.publicId).toBeNull();
-      expect(flipbookState.coverUrls).toEqual([]);
+      expect(boothApi.recordPrint).toHaveBeenCalled();
     });
 
+    // Close modal
+    const doneModalBtn = screen.getByRole('button', { name: /^Done$/i });
+    fireEvent.click(doneModalBtn);
+
+    // Click Session Done!
+    const doneButton = screen.getByRole('button', { name: /^Session Done!$/i });
+    fireEvent.click(doneButton);
+
     const sessionState = useSessionStore.getState();
-    expect(sessionState.activeSession?.type).toBe('flipbook');
-    expect(sessionState.activeSession?.id).toMatch(/^mock-flipbook-/);
+    expect(sessionState.activeSession).toBeNull();
+    expect(sessionState.stage).toBe('choose_experience');
   });
 });

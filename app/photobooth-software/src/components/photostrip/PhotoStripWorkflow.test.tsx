@@ -44,7 +44,7 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
     });
   });
 
-  it('shows confirmation modal upon clicking layout card and advances to instructions on confirm', async () => {
+  it('selects layout card and advances to instructions on clicking I LIKE THIS', async () => {
     vi.spyOn(boothApi, 'listTemplates').mockResolvedValue([
       {
         id: 'test-template-1',
@@ -73,11 +73,7 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
     const templateCard = await screen.findByText('Retro Strip');
     fireEvent.click(templateCard);
 
-    // Modal should now be open
-    expect(screen.getByText('CONFIRM LAYOUT')).toBeDefined();
-    expect(screen.getByText('Use Retro Strip?')).toBeDefined();
-
-    const confirmButton = screen.getByRole('button', { name: /Use this layout/i });
+    const confirmButton = screen.getByRole('button', { name: /I LIKE THIS/i });
     fireEvent.click(confirmButton);
 
     // Should now be on instructions step
@@ -87,8 +83,10 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
       expect(state.selectedTemplate?.id).toBe('test-template-1');
     });
 
-    expect(screen.getByText('PHOTO STRIP INSTRUCTIONS')).toBeDefined();
-    expect(screen.getByText('Get ready to strike a pose.')).toBeDefined();
+    expect(screen.getByText(/Get ready to strike a pose/i)).toBeDefined();
+    expect(screen.getByText('Hands-Free Capture')).toBeDefined();
+    expect(screen.getByText('Keep Best Shots')).toBeDefined();
+    expect(screen.getByText(/LET'S GO/i)).toBeDefined();
   });
 
   it('advances from instructions to capturing when manually clicking Start camera now', async () => {
@@ -142,14 +140,46 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
 
     render(<PhotoStripWorkflow />);
 
-    expect(screen.getByText(/Starting camera in 6s/i)).toBeDefined();
+    expect(screen.getByText(/Starting camera in 10s/i)).toBeDefined();
 
-    // Fast-forward 6 seconds
+    // Fast-forward 10 seconds
     await act(async () => {
-      vi.advanceTimersByTime(6000);
+      vi.advanceTimersByTime(10000);
     });
 
     const state = usePhotoStripStore.getState();
     expect(state.currentStep).toBe('capturing');
+  });
+
+  it('navigates back to experience choice from template_select screen', async () => {
+    vi.spyOn(boothApi, 'listTemplates').mockResolvedValue([
+      {
+        id: 'test-template-1',
+        name: 'Retro Strip',
+        orientation: 'portrait',
+        outputWidth: 1200,
+        outputHeight: 1800,
+        countdownSeconds: 5,
+        requiredCaptureCount: 3,
+        placements: [],
+      },
+    ]);
+
+    usePhotoStripStore.setState({
+      currentStep: 'template_select',
+      sessionId: 'session-photo-123',
+      sessionToken: 'token-photo-123',
+    });
+
+    render(<PhotoStripWorkflow />);
+
+    const backButton = await screen.findByRole('button', { name: /Back/i });
+    expect(backButton).toBeDefined();
+
+    fireEvent.click(backButton);
+
+    const sessionState = useSessionStore.getState();
+    expect(sessionState.activeSession).toBeNull();
+    expect(sessionState.stage).toBe('choose_experience');
   });
 });

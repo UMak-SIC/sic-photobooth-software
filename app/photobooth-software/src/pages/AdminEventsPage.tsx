@@ -1,21 +1,20 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { CreateEventForm } from '../components/events/CreateEventForm';
 import { EventRow, type Event } from '../components/events/EventRow';
+import { boothApi } from '../services/api';
 
 export function AdminEventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [date, setDate] = useState('');
   const [operatorName, setOperatorName] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/events')
-      .then(async (response) => {
-        if (!response.ok) throw new Error();
-        const body = (await response.json()) as { data: Event[] };
-        setEvents(body.data);
-      })
+    boothApi
+      .listEvents()
+      .then((loaded) => setEvents(loaded))
       .catch(() => setError('Could not load events.'));
   }, []);
 
@@ -23,22 +22,19 @@ export function AdminEventsPage() {
     event.preventDefault();
     setError('');
     try {
-      const response = await fetch('/api/events', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name, date, operatorName }),
-      });
-      const body = (await response.json()) as { data?: Event; error?: { message?: string } };
-      if (!response.ok || !body.data) {
-        setError(body.error?.message ?? 'Could not create event.');
-        return;
-      }
-      setEvents((current) => [body.data!, ...current]);
+      const created = await boothApi.createEvent(
+        name,
+        date,
+        operatorName,
+        description.trim() || undefined,
+      );
+      setEvents((current) => [created, ...current]);
       setName('');
+      setDescription('');
       setDate('');
       setOperatorName('');
-    } catch {
-      setError('Could not create event.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Could not create event.');
     }
   };
 
@@ -58,9 +54,11 @@ export function AdminEventsPage() {
         </div>
         <CreateEventForm
           date={date}
+          description={description}
           error={error}
           name={name}
           onDateChange={setDate}
+          onDescriptionChange={setDescription}
           onNameChange={setName}
           onOperatorNameChange={setOperatorName}
           onSubmit={createEvent}

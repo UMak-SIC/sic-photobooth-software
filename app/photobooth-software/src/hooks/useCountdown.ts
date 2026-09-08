@@ -12,11 +12,11 @@ export function useCountdown({ seconds, autoStart = true, onExpire }: UseCountdo
   const onExpireRef = useRef(onExpire);
   onExpireRef.current = onExpire;
 
-  const isExpiringRef = useRef(false);
+  const hasExpiredRef = useRef(false);
 
   const reset = useCallback(
     (newSeconds?: number) => {
-      isExpiringRef.current = false;
+      hasExpiredRef.current = false;
       setTimeLeft(newSeconds ?? seconds);
       setIsRunning(true);
     },
@@ -33,25 +33,21 @@ export function useCountdown({ seconds, autoStart = true, onExpire }: UseCountdo
   useEffect(() => {
     if (!isRunning) return;
 
+    if (timeLeft <= 0) {
+      setIsRunning(false);
+      if (!hasExpiredRef.current) {
+        hasExpiredRef.current = true;
+        onExpireRef.current?.();
+      }
+      return;
+    }
+
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setIsRunning(false);
-          if (!isExpiringRef.current) {
-            isExpiringRef.current = true;
-            setTimeout(() => {
-              onExpireRef.current?.();
-            }, 0);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft((prev) => Math.max(0, prev - 1));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, timeLeft]);
 
   // Formatted string MM:SS or SS
   const minutes = Math.floor(timeLeft / 60);

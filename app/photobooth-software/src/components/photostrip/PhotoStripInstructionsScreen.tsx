@@ -7,10 +7,9 @@ export interface PhotoStripInstructionsScreenProps {
 }
 
 export const PhotoStripInstructionsScreen: React.FC<PhotoStripInstructionsScreenProps> = ({
-  template,
   onStart,
 }) => {
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(6);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(10);
 
   useEffect(() => {
     if (secondsRemaining <= 0) {
@@ -32,70 +31,86 @@ export const PhotoStripInstructionsScreen: React.FC<PhotoStripInstructionsScreen
     return () => clearInterval(timer);
   }, [secondsRemaining, onStart]);
 
-  const uniquePhotosCount =
-    template?.requiredCaptureCount ??
-    (template?.placements ? new Set(template.placements.map((p) => p.captureIndex)).size : 3);
-
-  const countdownSec = template?.countdownSeconds || 5;
-
   return (
-    <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[#ecfff8] px-8 py-14 text-center text-[#113b33]">
-      <div className="flex items-center gap-3">
-        <p className="text-[13px] font-bold tracking-[0.14em] text-[#28806c] uppercase">
-          PHOTO STRIP INSTRUCTIONS
-        </p>
-        <span className="rounded-full bg-[#146a56]/10 border border-[#146a56]/20 px-3 py-0.5 text-[12px] font-bold text-[#146a56]">
-          Starting camera in {secondsRemaining}s
+    <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[#f8fafc] px-6 py-10 sm:py-14 text-center select-none font-['Nunito',sans-serif]">
+      {/* Top Countdown & Main Title */}
+      <div className="flex flex-col items-center">
+        <span
+          className="text-[64px] sm:text-[55px] md:text-[65px] font-semibold text-[#167a5b] leading-none tracking-tight"
+          aria-live="polite"
+        >
+          {secondsRemaining}
         </span>
+        <span className="sr-only">Starting camera in {secondsRemaining}s</span>
+
+        <h1 className="text-[30px] sm:text-[38px] md:text-[44px] font-bold tracking-tight text-[#1e293b]">
+          Get ready to strike a pose
+        </h1>
       </div>
 
-      <h4 className="mt-3 text-[44px] md:text-[52px] font-black tracking-[-0.06em]">
-        Get ready to strike a pose.
-      </h4>
+      {/* Two Instruction Cards */}
+      <div className="mt-6 sm:mt-7 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 w-full max-w-4xl lg:max-w-5xl">
+        {/* Left Card: Hands-Free Capture */}
+        <div className="relative flex flex-col justify-between overflow-hidden rounded-[32px] bg-white px-10 pt-10 shadow-[0_12px_36px_rgba(0,0,0,0.10)] border border-slate-100 transition-all duration-300 hover:shadow-[0_18px_48px_rgba(0,0,0,0.08)]">
+          <div className="text-left">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">
+              Hands-Free Capture
+            </h2>
+            <p className="mt-4 text-lg sm:text-lg md:text-xl text-slate-600 leading-relaxed">
+              The <span className="font-bold text-[#047857]">camera automatically takes photos</span>, so just enjoy!
+            </p>
+          </div>
 
-      <p className="mt-2 text-sm text-[#53796e] max-w-lg">
-        {template?.name ? `Using layout "${template.name}"` : 'Your layout is ready.'}
-      </p>
-
-      <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-6 text-left w-full max-w-4xl">
-        <div className="rounded-3xl bg-[#d9f7ed] p-7 shadow-xs">
-          <span className="text-[14px] font-black text-[#20745f]">01</span>
-          <h5 className="mt-5 text-[20px] font-black text-[#113b33]">Strike your pose</h5>
-          <p className="mt-2 text-[14px] leading-6 text-[#56796f]">
-            A {countdownSec}-second countdown will run on screen before every shot.
-          </p>
+          <div className="flex justify-center items-end w-full overflow-hidden">
+            <img
+              src="/assets/images/left-box-instruct.svg"
+              alt="Hands-Free Capture demonstration"
+              className="h-48 sm:h-56 md:h-60 mt-[-10px] w-auto object-contain object-bottom pointer-events-none"
+            />
+          </div>
         </div>
 
-        <div className="rounded-3xl bg-[#d9f7ed] p-7 shadow-xs">
-          <span className="text-[14px] font-black text-[#20745f]">02</span>
-          <h5 className="mt-5 text-[20px] font-black text-[#113b33]">Automatic captures</h5>
-          <p className="mt-2 text-[14px] leading-6 text-[#56796f]">
-            We will take all {uniquePhotosCount} photos in sequence for your strip.
-          </p>
-        </div>
+        {/* Right Card: Keep Best Shots */}
+        <div className="relative flex flex-col justify-between overflow-hidden rounded-[32px] bg-white px-10 pt-10 shadow-[0_12px_36px_rgba(0,0,0,0.10)] border border-slate-100 transition-all duration-300 hover:shadow-[0_18px_48px_rgba(0,0,0,0.08)]">
+          <div className="text-left">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-[#1e293b] tracking-tight">
+              Keep Best Shots
+            </h2>
+            <p className="mt-2 text-lg sm:text-lg md:text-xl text-slate-600 leading-relaxed">
+              Review shots when finished and <span className="font-bold text-[#047857]">retake up to 4 photos</span>
+            </p>
+          </div>
 
-        <div className="rounded-3xl bg-[#d9f7ed] p-7 shadow-xs">
-          <span className="text-[14px] font-black text-[#20745f]">03</span>
-          <h5 className="mt-5 text-[20px] font-black text-[#113b33]">Keep the good ones</h5>
-          <p className="mt-2 text-[14px] leading-6 text-[#56796f]">
-            Review all shots at the end with up to 4 individual retakes.
-          </p>
+          <div className="flex justify-center items-end w-full overflow-hidden">
+            <img
+              src="/assets/images/right-box-instruct.svg"
+              alt="Keep Best Shots demonstration"
+              className="h-48 sm:h-56 md:h-60 mt-[-10px] w-auto object-contain object-bottom pointer-events-none"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="mt-12 flex flex-col items-center gap-3">
+      {/* Bottom LET'S GO Button */}
+      <div className="mt-9 sm:mt-11 flex justify-center">
         <button
           type="button"
           onClick={onStart}
-          className="rounded-2xl bg-[#146a56] px-10 py-4 text-[16px] font-bold text-white shadow-[0_8px_20px_rgba(20,106,86,0.25)] transition hover:bg-[#115746] active:scale-[0.98] cursor-pointer flex items-center gap-2"
+          aria-label="Start camera now"
+          className="group rounded-full bg-[#1b6b55] px-10 sm:px-14 py-3 sm:py-3 shadow-[0_10px_25px_rgba(27,107,85,0.32)] transition-all duration-200 hover:bg-[#155644] hover:scale-105 active:scale-95 cursor-pointer flex items-center justify-center gap-3"
         >
-          <span>Start camera now</span>
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-mono">
-            {secondsRemaining}s
+          <span className="text-[35px] sm:text-[25px] font-bold text-white tracking-normal">
+            LET&apos;S GO
           </span>
+          <img
+            src="/assets/images/star-icon.svg"
+            alt="Star icon"
+            className="w-25 h-25 sm:w-10 sm:h-10 object-contain transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110"
+          />
         </button>
       </div>
     </div>
   );
 };
+
 

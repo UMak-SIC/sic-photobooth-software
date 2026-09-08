@@ -558,4 +558,131 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(fetched!.placements[0].width).toBe(520);
     expect(fetched!.overlays).toHaveLength(0);
   });
+
+  it('supports retake photo capture and subsequent booth confirmation without invalid state error', async () => {
+    // 1. Create session
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        eventName: 'Retake Test Expo',
+        eventDate: '2026-09-08',
+        operatorName: 'Joey Dev',
+        type: 'photo_strip',
+      },
+    });
+    const { sessionId, token } = JSON.parse(createRes.body).data;
+
+    // 2. Select template with required count
+    const templatesRes = await app.inject({ method: 'GET', url: '/api/templates' });
+    const templates = JSON.parse(templatesRes.body).data;
+    const template =
+      templates.find(
+        (t: { requiredCaptureCount?: number; placements?: unknown[] }) =>
+          (t.requiredCaptureCount || t.placements?.length) === 3,
+      ) || templates[0];
+    const requiredPhotos =
+      (typeof template.requiredCaptureCount === 'number'
+        ? template.requiredCaptureCount
+        : template.placements?.length) || 3;
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/template`,
+      headers: { 'x-session-token': token },
+      payload: { templateId: template.id },
+    });
+
+    // 3. Upload initial captures
+    const boundary = '----WebKitFormBoundaryRetakeTest';
+    const samplePng = Buffer.from(
+      '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
+      'hex',
+    );
+    for (let slot = 1; slot <= requiredPhotos; slot++) {
+      const payload = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="captureIndex"\r\n\r\n${slot}\r\n`,
+        ),
+        Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="slot-${slot}.png"\r\nContent-Type: image/png\r\n\r\n`,
+        ),
+        samplePng,
+        Buffer.from(`\r\n--${boundary}--\r\n`),
+      ]);
+      const res = await app.inject({
+        method: 'POST',
+        url: `/api/sessions/${sessionId}/captures/photo`,
+        headers: {
+          'x-session-token': token,
+          'content-type': `multipart/form-data; boundary=${boundary}`,
+        },
+        payload,
+      });
+      expect(res.statusCode).toBe(201);
+    }
+
+    // Session is now in review state
+    const session1 = await dbRepository.getSessionById(sessionId);
+    expect(session1?.state).toBe('review');
+
+    // 4. Retake photo #1: Transition to capturing
+    const transRes = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/transition`,
+      headers: { 'x-session-token': token },
+      payload: { targetState: 'capturing' },
+    });
+    expect(transRes.statusCode).toBe(200);
+
+    // 5. Upload retake for slot 1 with isRetake=true in query & body
+    const retakePayload = Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="captureIndex"\r\n\r\n1\r\n`,
+      ),
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="isRetake"\r\n\r\ntrue\r\n`,
+      ),
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="slot-1-retake.png"\r\nContent-Type: image/png\r\n\r\n`,
+      ),
+      samplePng,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+    const retakeUploadRes = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/captures/photo?captureIndex=1&isRetake=true`,
+      headers: {
+        'x-session-token': token,
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+      },
+      payload: retakePayload,
+    });
+    expect(retakeUploadRes.statusCode).toBe(201);
+    const retakeUploadBody = JSON.parse(retakeUploadRes.body);
+    expect(retakeUploadBody.data.retakeCount).toBe(1);
+    expect(retakeUploadBody.data.state).toBe('review');
+
+    // 6. Confirm Photo Strip ("I'm finished")
+    const confirmRes = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/photo-strip/confirm`,
+      headers: { 'x-session-token': token },
+    });
+    expect(confirmRes.statusCode).toBe(200);
+    const confirmBody = JSON.parse(confirmRes.body);
+    expect(confirmBody.success).toBe(true);
+    expect(confirmBody.data.state).toBe('booth_confirmed');
+
+    // 7. Duplicate confirm call returns same output idempotently without throwing INVALID_STATE
+    const dupConfirmRes = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/photo-strip/confirm`,
+      headers: { 'x-session-token': token },
+    });
+    expect(dupConfirmRes.statusCode).toBe(200);
+    const dupBody = JSON.parse(dupConfirmRes.body);
+    expect(dupBody.data.publicId).toBe(confirmBody.data.publicId);
+  });
 });
+

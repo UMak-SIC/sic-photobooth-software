@@ -6,6 +6,7 @@ import type { SessionType } from '@photobooth/public-output';
 export interface EventData {
   id: string;
   name: string;
+  description?: string;
   date: string;
   operatorName: string;
   createdAt: Date;
@@ -34,6 +35,7 @@ export interface TemplateOverlay {
   id?: string;
   label: string;
   assetPath?: string;
+  path?: string;
   x: number;
   y: number;
   width: number;
@@ -131,7 +133,7 @@ export class DatabaseRepository {
   public async listEvents(): Promise<EventData[]> {
     try {
       const result = await pool.query(`
-        SELECT id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+        SELECT id, name, description, date::text, operator_name AS "operatorName", created_at AS "createdAt"
         FROM events
         ORDER BY date DESC, name ASC
       `);
@@ -143,15 +145,20 @@ export class DatabaseRepository {
     }
   }
 
-  public async createEvent(name: string, date: string, operatorName: string): Promise<EventData> {
+  public async createEvent(
+    name: string,
+    date: string,
+    operatorName: string,
+    description?: string,
+  ): Promise<EventData> {
     try {
       const result = await pool.query(
         `
-          INSERT INTO events (name, date, operator_name)
-          VALUES ($1, $2, $3)
-          RETURNING id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+          INSERT INTO events (name, description, date, operator_name)
+          VALUES ($1, $2, $3, $4)
+          RETURNING id, name, description, date::text, operator_name AS "operatorName", created_at AS "createdAt"
         `,
-        [name, date, operatorName],
+        [name, description || null, date, operatorName],
       );
       return result.rows[0];
     } catch (error: unknown) {
@@ -172,12 +179,28 @@ export class DatabaseRepository {
       const event: EventData = {
         id: crypto.randomUUID(),
         name,
+        description: description || undefined,
         date,
         operatorName,
         createdAt: new Date(),
       };
       this.inMemoryEvents.set(key, event);
       return event;
+    }
+  }
+
+  public async deleteEvent(id: string): Promise<boolean> {
+    try {
+      const result = await pool.query('DELETE FROM events WHERE id = $1 RETURNING id', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      for (const [key, val] of this.inMemoryEvents.entries()) {
+        if (val.id === id) {
+          this.inMemoryEvents.delete(key);
+          return true;
+        }
+      }
+      return false;
     }
   }
 
