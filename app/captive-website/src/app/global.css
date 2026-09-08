@@ -1,1 +1,74 @@
 @import 'tailwindcss';
+
+:root {
+  --background: #061715;
+  --surface: #0a231f;
+  --surface-elevated: #0f302b;
+  --accent-primary: #a8f3dd;
+  --accent-secondary: #48c4a1;
+  --foreground: #e8fff5;
+  --foreground-muted: #9ec4b9;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family:
+    var(--font-geist-sans),
+    system-ui,
+    -apple-system,
+    sans-serif;
+  margin: 0;
+  padding: 0;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Background Ambient Glow */
+.bg-ambient-radial {
+  background-image: 
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(72, 196, 161, 0.15) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 50% 100%, rgba(20, 106, 86, 0.2) 0%, transparent 80%);
+}
+
+/* Reticle & Scanline Animations */
+@keyframes scan {
+  0% {
+    top: 4%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 4%;
+    opacity: 0.8;
+  }
+}
+
+@keyframes pulseSlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.03);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulseSlow 4s ease-in-out infinite;
+}
+
+/* Safe area padding utilities for mobile edge-to-edge displays */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 1rem);
+}
+

@@ -18,11 +18,11 @@ describe('GifRenderer Service', () => {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    // Create a mock cover photo (600x400 blue)
+    // Create a mock 16:9 cover photo (1280x720 blue)
     await sharp({
       create: {
-        width: 600,
-        height: 400,
+        width: 1280,
+        height: 720,
         channels: 4,
         background: { r: 0, g: 120, b: 200, alpha: 1 },
       },
@@ -30,11 +30,11 @@ describe('GifRenderer Service', () => {
       .jpeg()
       .toFile(coverPath);
 
-    // Create a mock transparent overlay PNG (600x400 with a green border)
+    // Create a mock transparent overlay PNG (800x300 4"x1.5" with branding border)
     await sharp({
       create: {
-        width: 600,
-        height: 400,
+        width: 800,
+        height: 300,
         channels: 4,
         background: { r: 0, g: 255, b: 128, alpha: 0.5 },
       },
@@ -56,7 +56,7 @@ describe('GifRenderer Service', () => {
     }
   });
 
-  it('renders a valid animated GIF with 3.0s cover hold and overlay compositing', async () => {
+  it('renders a valid animated GIF at 2.41"x1.32" (482x264) with 3s cover hold and looping motion frames', async () => {
     await gifRenderer.renderFlipbookGif(
       coverPath,
       mockVideoPath,
@@ -64,11 +64,11 @@ describe('GifRenderer Service', () => {
       outputPath,
       intermediateDir,
       {
-        frameCount: 21,
+        frameCount: 20,
         coverHoldMs: 3000,
-        frameDelayMs: 500,
-        outputWidth: 300,
-        outputHeight: 200,
+        frameDelayMs: 250,
+        outputWidth: 482,
+        outputHeight: 264,
         timeoutMs: 10000,
       },
     );
@@ -80,6 +80,54 @@ describe('GifRenderer Service', () => {
     const header = fileBuffer.subarray(0, 6).toString('ascii');
     expect(header.startsWith('GIF')).toBe(true);
     expect(fileBuffer.length).toBeGreaterThan(1000);
+  });
+
+  it('renders a valid animated GIF dynamically sized from template placements aspect ratio', async () => {
+    const dynamicOutputPath = path.join(tempDir, 'output-dynamic.gif');
+    await gifRenderer.renderFlipbookGif(
+      coverPath,
+      mockVideoPath,
+      null,
+      dynamicOutputPath,
+      path.join(tempDir, 'intermediate-dynamic'),
+      {
+        frameCount: 5,
+        coverHoldMs: 1000,
+        frameDelayMs: 250,
+        placements: [{ x: 100, y: 100, width: 640, height: 360 }], // 16:9 slot
+        timeoutMs: 10000,
+      },
+    );
+
+    expect(fs.existsSync(dynamicOutputPath)).toBe(true);
+
+    const metadata = await sharp(dynamicOutputPath).metadata();
+    expect(metadata.width).toBe(640);
+    expect(metadata.height).toBe(360);
+  });
+
+  it('proportionally scales down oversized template slots to max dimension 800px', async () => {
+    const scaledOutputPath = path.join(tempDir, 'output-scaled.gif');
+    await gifRenderer.renderFlipbookGif(
+      coverPath,
+      mockVideoPath,
+      null,
+      scaledOutputPath,
+      path.join(tempDir, 'intermediate-scaled'),
+      {
+        frameCount: 5,
+        coverHoldMs: 1000,
+        frameDelayMs: 250,
+        placements: [{ x: 0, y: 0, width: 1200, height: 675 }], // 1200x675 oversized slot
+        timeoutMs: 10000,
+      },
+    );
+
+    expect(fs.existsSync(scaledOutputPath)).toBe(true);
+
+    const metadata = await sharp(scaledOutputPath).metadata();
+    expect(metadata.width).toBe(800);
+    expect(metadata.height).toBe(450);
   });
 
   it('times out and throws contract error when rendering exceeds deadline', async () => {

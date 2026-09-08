@@ -1,0 +1,1 @@
+ALTER TABLE templates ADD COLUMN IF NOT EXISTS sort_order INT;

@@ -2,6 +2,7 @@ import { buildApp } from './app.js';
 import { config } from './config.js';
 import { runMigrations } from './db/migrations.js';
 import { checkDatabaseHealth, closePool } from './db/pool.js';
+import { startPublishingWorker, stopPublishingWorker } from './services/publishing-worker.js';
 
 async function startServer() {
   const app = await buildApp();
@@ -24,6 +25,7 @@ async function startServer() {
   for (const signal of signals) {
     process.on(signal, async () => {
       app.log.info(`Received ${signal}. Shutting down gracefully...`);
+      stopPublishingWorker();
       await app.close();
       await closePool();
       process.exit(0);
@@ -32,6 +34,7 @@ async function startServer() {
 
   try {
     await app.listen({ port: config.port, host: config.host });
+    startPublishingWorker();
     app.log.info(`Photobooth Backend server running at http://${config.host}:${config.port}`);
   } catch (err) {
     app.log.error(err);

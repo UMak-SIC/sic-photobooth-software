@@ -42,7 +42,15 @@ export interface GifRendererOptions {
   frameDelayMs?: number;
   outputWidth?: number;
   outputHeight?: number;
+  slotWidthPx?: number;
+  slotHeightPx?: number;
+  slotXPx?: number;
+  slotYPx?: number;
+  motionCanvasBgColor?: string;
   timeoutMs?: number;
+  coverOverlayPath?: string | null;
+  motionOverlayPath?: string | null;
+  placements?: Array<{ x: number; y: number; width: number; height: number }>;
 }
 
 export class GifRenderer {
@@ -51,7 +59,41 @@ export class GifRenderer {
   public static readonly DEFAULT_FRAME_DELAY_MS = flipbookConfig.gifFrameDelayMs;
   public static readonly DEFAULT_OUTPUT_WIDTH = flipbookConfig.gifOutputWidth;
   public static readonly DEFAULT_OUTPUT_HEIGHT = flipbookConfig.gifOutputHeight;
+  public static readonly DEFAULT_SLOT_WIDTH = flipbookConfig.slotWidthPx;
+  public static readonly DEFAULT_SLOT_HEIGHT = flipbookConfig.slotHeightPx;
+  public static readonly DEFAULT_SLOT_X = flipbookConfig.slotXPx;
+  public static readonly DEFAULT_SLOT_Y = flipbookConfig.slotYPx;
+  public static readonly DEFAULT_CANVAS_BG = flipbookConfig.motionCanvasBgColor;
   public static readonly DEFAULT_TIMEOUT_MS = flipbookConfig.gifTimeoutMs;
+
+  /**
+   * Helper to extract the 4"x1.5" top strip (Slot 1) if the overlay is a 4R sheet (1200x1800)
+   */
+  private async prepareOverlayBuffer(
+    overlayPath: string | null | undefined,
+    targetWidth: number,
+    targetHeight: number,
+  ): Promise<Buffer | null> {
+    if (!overlayPath || !fs.existsSync(overlayPath)) return null;
+    try {
+      const metadata = await sharp(overlayPath).metadata();
+      const imgWidth = metadata.width || targetWidth;
+      const imgHeight = metadata.height || targetHeight;
+
+      // If portrait 4R sheet where height > width (e.g. 1200x1800), extract top 25% strip (Slot 1)
+      if (imgHeight > imgWidth) {
+        const stripHeight = Math.round(imgHeight / 4);
+        return await sharp(overlayPath)
+          .extract({ left: 0, top: 0, width: imgWidth, height: stripHeight })
+          .resize(targetWidth, targetHeight, { fit: 'fill' })
+          .toBuffer();
+      }
+
+      return await sharp(overlayPath).resize(targetWidth, targetHeight, { fit: 'fill' }).toBuffer();
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Extracts evenly spaced frames from a video file using ffmpeg.
@@ -95,8 +137,8 @@ export class GifRenderer {
   }
 
   /**
-   * Generates the animated looping GIF combining cover photo (3s hold) and 21 video frames (0.5s each),
-   * compositing the overlay frame onto each image.
+   * Generates the animated looping GIF from video motion frames at 2.41" x 1.32" (482x264 px).
+   * Cover hold is omitted from the GIF so it loops purely as smooth video motion.
    */
   public async renderFlipbookGif(
     coverPath: string,
@@ -109,9 +151,36 @@ export class GifRenderer {
     const frameCount = options.frameCount ?? GifRenderer.DEFAULT_FRAME_COUNT;
     const coverHoldMs = options.coverHoldMs ?? GifRenderer.DEFAULT_COVER_HOLD_MS;
     const frameDelayMs = options.frameDelayMs ?? GifRenderer.DEFAULT_FRAME_DELAY_MS;
-    const width = options.outputWidth ?? 600;
-    const height = options.outputHeight ?? 400;
+
+    let width = options.outputWidth;
+    let height = options.outputHeight;
+    if (!width || !height) {
+      if (options.placements && options.placements.length > 0) {
+        const p = options.placements[0];
+        let w = Math.round(p.width || 620);
+        let h = Math.round(p.height || 349);
+        const maxDim = 800;
+        if (w > maxDim || h > maxDim) {
+          const ratio = w / h;
+          if (w >= h) {
+            w = maxDim;
+            h = Math.round(maxDim / ratio);
+          } else {
+            h = maxDim;
+            w = Math.round(maxDim * ratio);
+          }
+        }
+        width = w;
+        height = h;
+      } else {
+        width = GifRenderer.DEFAULT_OUTPUT_WIDTH;
+        height = GifRenderer.DEFAULT_OUTPUT_HEIGHT;
+      }
+    }
+
     const timeoutMs = options.timeoutMs ?? GifRenderer.DEFAULT_TIMEOUT_MS;
+    const coverOverlay = options.coverOverlayPath ?? overlayPath;
+    const motionOverlay = options.motionOverlayPath ?? overlayPath;
 
     const renderPromise = (async () => {
       const framesDir = path.join(intermediateDir, 'extracted_frames');
@@ -133,48 +202,55 @@ export class GifRenderer {
       if (frameFiles.length === 0) {
         for (let i = 1; i <= frameCount; i++) {
           const fallbackPath = path.join(framesDir, `frame_${String(i).padStart(3, '0')}.png`);
-          await sharp(coverPath).resize(width, height, { fit: 'cover' }).toFile(fallbackPath);
+          await sharp(coverPath).resize(width, height, { fit: 'cover', position: 'center' }).toFile(fallbackPath);
           frameFiles.push(fallbackPath);
         }
       }
 
-      // 2. Prepare overlay buffer if provided
-      let overlayBuffer: Buffer | null = null;
-      if (overlayPath && fs.existsSync(overlayPath)) {
-        overlayBuffer = await sharp(overlayPath).resize(width, height, { fit: 'fill' }).toBuffer();
-      }
+      // 2. Prepare overlay buffers if provided
+      const coverOverlayBuffer = await this.prepareOverlayBuffer(coverOverlay, width, height);
+      const motionOverlayBuffer = await this.prepareOverlayBuffer(motionOverlay, width, height);
 
-      // Helper to compose image + overlay to raw RGBA buffer
-      const processImage = async (imgSrc: string): Promise<Uint8ClampedArray> => {
-        let pipeline = sharp(imgSrc).resize(width, height, { fit: 'cover' });
-        if (overlayBuffer) {
-          pipeline = pipeline.composite([{ input: overlayBuffer, blend: 'over' }]);
+      // Helper to process individual frame to exact slot dimensions
+      const processFrame = async (imgSrc: string, overlayBuf: Buffer | null = null): Promise<Uint8ClampedArray> => {
+        let pipeline = sharp(imgSrc).resize(width, height, { fit: 'cover', position: 'center' });
+        if (overlayBuf) {
+          const resizedOverlay = await sharp(overlayBuf)
+            .resize(width, height, { fit: 'cover', position: 'center' })
+            .toBuffer();
+          pipeline = pipeline.composite([{ input: resizedOverlay, blend: 'over' }]);
         }
         const { data } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
         return new Uint8ClampedArray(data);
       };
 
-      // 3. Initialize GIFEncoder
+      // 3. Initialize GIFEncoder and write cover frame (3-second hold) followed by motion frames
       const gif = GIFEncoder();
+      let hasWrittenFirstFrame = false;
 
-      // Process Cover (Frame 1: 3000ms delay)
-      const coverRgba = await processImage(coverPath);
-      const coverPalette = quantize(coverRgba, 256);
-      const coverIndex = applyPalette(coverRgba, coverPalette);
-      gif.writeFrame(coverIndex, width, height, {
-        palette: coverPalette,
-        delay: coverHoldMs,
-        repeat: 0,
-      });
+      // Write cover photo as initial frame held for coverHoldMs (e.g. 3000ms / 3 seconds)
+      if (coverHoldMs > 0 && fs.existsSync(coverPath)) {
+        const coverRgba = await processFrame(coverPath, coverOverlayBuffer);
+        const coverPalette = quantize(coverRgba, 256);
+        const coverIndexed = applyPalette(coverRgba, coverPalette);
+        gif.writeFrame(coverIndexed, width, height, {
+          palette: coverPalette,
+          delay: coverHoldMs,
+          repeat: 0, // Loop entire GIF indefinitely
+        });
+        hasWrittenFirstFrame = true;
+      }
 
-      // Process Video Frames (Frames 2..N: 500ms delay each)
-      for (const frameFile of frameFiles) {
-        const frameRgba = await processImage(frameFile);
+      // Write video motion frames (e.g. 20 frames at 250ms each)
+      for (let i = 0; i < frameFiles.length; i++) {
+        const frameFile = frameFiles[i];
+        const frameRgba = await processFrame(frameFile, motionOverlayBuffer);
         const framePalette = quantize(frameRgba, 256);
         const frameIndexed = applyPalette(frameRgba, framePalette);
         gif.writeFrame(frameIndexed, width, height, {
           palette: framePalette,
           delay: frameDelayMs,
+          repeat: !hasWrittenFirstFrame && i === 0 ? 0 : undefined,
         });
       }
 

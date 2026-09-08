@@ -1,0 +1,135 @@
+{
+  "version": "5",
+  "remote": {
+    "https://deno.land/std@0.224.0/async/delay.ts": "f90dd685b97c2f142b8069082993e437b1602b8e2561134827eeb7c12b95c499",
+    "https://deno.land/std@0.224.0/http/server.ts": "f9313804bf6467a1704f45f76cb6cd0a3396a3b31c316035e6a4c2035d1ea514"
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@eslint/js@^9.20.0",
+        "npm:@types/node@^22.13.4",
+        "npm:eslint-config-prettier@^10.0.1",
+        "npm:eslint@^9.20.1",
+        "npm:prettier@^3.5.1",
+        "npm:typescript-eslint@^8.24.0",
+        "npm:typescript@^5.7.3",
+        "npm:vitest@^3.0.5"
+      ]
+    },
+    "members": {
+      "app/backend": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@fastify/cors@^10.0.2",
+            "npm:@fastify/multipart@^9.0.3",
+            "npm:@fastify/rate-limit@^10.2.2",
+            "npm:@supabase/supabase-js@^2.115.0",
+            "npm:@types/fluent-ffmpeg@^2.1.27",
+            "npm:@types/node@^22.13.4",
+            "npm:@types/pg@^8.11.11",
+            "npm:cloudinary@^2.11.0",
+            "npm:dotenv@^16.4.7",
+            "npm:fastify@5.2.1",
+            "npm:ffmpeg-static@^5.2.0",
+            "npm:fluent-ffmpeg@^2.1.3",
+            "npm:gifenc@^1.0.3",
+            "npm:pg@^8.13.3",
+            "npm:sharp@~0.33.5",
+            "npm:tsx@^4.19.2",
+            "npm:typescript@^5.7.3",
+            "npm:zod@^3.24.2"
+          ]
+        }
+      },
+      "app/captive-website": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@tailwindcss/postcss@^4.3.3",
+            "npm:@types/node@20",
+            "npm:@types/react-dom@19",
+            "npm:@types/react@19",
+            "npm:@zxing/library@0.23",
+            "npm:eslint-config-next@16.3.4",
+            "npm:eslint@9",
+            "npm:jsqr@^1.4.0",
+            "npm:lucide-react@^1.40.0",
+            "npm:next@16.3.4",
+            "npm:postcss@^8.5.27",
+            "npm:react-dom@19.2.8",
+            "npm:react@19.2.8",
+            "npm:tailwindcss@^4.3.3",
+            "npm:typescript@5"
+          ]
+        }
+      },
+      "app/photobooth-software": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@tailwindcss/vite@^4.3.3",
+            "npm:@testing-library/react@^16.3.3",
+            "npm:@types/node@^24.13.3",
+            "npm:@types/qrcode@^1.5.6",
+            "npm:@types/react-dom@^19.2.4",
+            "npm:@types/react@^19.2.18",
+            "npm:@vitejs/plugin-react@^6.1.0",
+            "npm:jsdom@^26.1.0",
+            "npm:oxlint@^1.79.0",
+            "npm:qrcode@^1.5.4",
+            "npm:react-dom@^19.2.8",
+            "npm:react@^19.2.8",
+            "npm:tailwindcss@^4.3.3",
+            "npm:typescript@~6.0.2",
+            "npm:vite@^8.2.2",
+            "npm:zustand@^5.0.15"
+          ]
+        }
+      },
+      "app/public-website": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@tailwindcss/postcss@^4.3.3",
+            "npm:@types/node@20",
+            "npm:@types/react-dom@19",
+            "npm:@types/react@19",
+            "npm:eslint-config-next@16.3.4",
+            "npm:eslint@9",
+            "npm:next@16.3.4",
+            "npm:postcss@^8.5.27",
+            "npm:react-dom@19.2.8",
+            "npm:react@19.2.8",
+            "npm:tailwindcss@^4.3.3",
+            "npm:typescript@5"
+          ]
+        }
+      },
+      "app/supabase": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@supabase/supabase-js@^2.115.0"
+          ]
+        }
+      },
+      "packages/public-output": {
+        "packageJson": {
+          "dependencies": [
+            "npm:typescript@^5.7.3"
+          ]
+        }
+      },
+      "packages/ui": {
+        "packageJson": {
+          "dependencies": [
+            "npm:@testing-library/react@^16.2.0",
+            "npm:@types/react-dom@^19.0.4",
+            "npm:@types/react@^19.0.10",
+            "npm:jsdom@26",
+            "npm:react-dom@19",
+            "npm:react@19",
+            "npm:typescript@^5.7.3"
+          ]
+        }
+      }
+    }
+  }
+}

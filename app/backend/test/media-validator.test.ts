@@ -18,6 +18,9 @@ describe('MediaValidator', () => {
     expect(validator.detectImageFormat(validPngHeader)).toBe('png');
     expect(validator.detectImageFormat(validJpegHeader)).toBe('jpeg');
     expect(validator.detectImageFormat(Buffer.from('fake-text-file'))).toBeNull();
+    expect(
+      validator.detectImageFormat(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"></svg>')),
+    ).toBe('svg');
   });
 
   it('detects valid video formats from magic bytes', () => {
@@ -79,6 +82,20 @@ describe('MediaValidator', () => {
     expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
   });
 
+  it('ignores false-positive 0x44 0x89 byte patterns in cluster payload without corrupting duration', () => {
+    // Create streamed WebM with random payload containing 0x44 0x89 and a huge float/double value
+    const baseWebm = createSyntheticStreamedWebm(5.0);
+    const fakeDurationNoise = Buffer.from([
+      0x44, 0x89, 0x88, // 8-byte double prefix
+      0x7f, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // huge double (1.79e308)
+    ]);
+    const noisyWebm = Buffer.concat([baseWebm, fakeDurationNoise]);
+    const result = validator.validateVideo(noisyWebm);
+    expect(result.isValid).toBe(true);
+    expect(result.format).toBe('webm');
+    expect(Math.round(result.durationSeconds ?? 0)).toBe(5);
+  });
+
   it('rejects video files with missing duration headers when duration is required', () => {
     const headerWithoutDuration = Buffer.from([
       0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x00,
@@ -93,6 +110,21 @@ describe('MediaValidator', () => {
     expect(validator.validateImage(Buffer.alloc(0)).isValid).toBe(false);
     expect(validator.validateVideo(Buffer.alloc(0)).isValid).toBe(false);
     expect(validator.validateImage(Buffer.from('not an image')).isValid).toBe(false);
+  });
+
+  it('rejects images exceeding maximum dimensions of 8192x8192 pixels', () => {
+    // Construct PNG header with dimensions 10000 x 10000 (0x2710)
+    const oversizedDimPng = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), // PNG signature
+      Buffer.from([0x00, 0x00, 0x00, 0x0d]), // IHDR length
+      Buffer.from('IHDR'), // IHDR type
+      Buffer.from([0x00, 0x00, 0x27, 0x10]), // Width: 10000
+      Buffer.from([0x00, 0x00, 0x27, 0x10]), // Height: 10000
+      Buffer.from([0x08, 0x02, 0x00, 0x00, 0x00]), // 8-bit truecolor
+    ]);
+    const result = validator.validateImage(oversizedDimPng);
+    expect(result.isValid).toBe(false);
+    expect(result.error).toContain('Image dimensions (10000x10000) exceed maximum allowed');
   });
 });
 

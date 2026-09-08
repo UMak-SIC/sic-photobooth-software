@@ -3,19 +3,28 @@ import type { FrameItem } from '../services/api';
 
 export type FlipbookStep =
   | 'welcome'
-  | 'frame_select'
+  | 'setup'
   | 'instructions'
   | 'cover_capture'
   | 'video_capture'
   | 'review_cover'
   | 'review_video'
   | 'processing'
+  | 'frame_select'
   | 'complete';
+
+export interface FlipbookEventData {
+  id: string;
+  name: string;
+  date: string;
+  operatorName: string;
+}
 
 interface FlipbookState {
   currentStep: FlipbookStep;
   sessionId: string | null;
   sessionToken: string | null;
+  selectedEvent: FlipbookEventData | null;
   selectedFrame: FrameItem | null;
 
   // Captured assets (local object URLs for instant review)
@@ -23,6 +32,7 @@ interface FlipbookState {
   coverBlobs: Blob[];
   videoUrls: string[];
   videoBlobs: Blob[];
+  videoFrames: string[][]; // Extracted motion frame snapshots per video
 
   // Guest selections
   selectedCoverIndex: number; // 1..3 (default 1)
@@ -39,10 +49,12 @@ interface FlipbookState {
 
   // Actions
   setSession: (sessionId: string, token: string) => void;
+  setSelectedEvent: (event: FlipbookEventData | null) => void;
   setStep: (step: FlipbookStep) => void;
   setSelectedFrame: (frame: FrameItem) => void;
+  confirmFrameSelection: () => void;
   addCoverCapture: (blob: Blob) => void;
-  addVideoCapture: (blob: Blob) => void;
+  addVideoCapture: (blob: Blob, frames?: string[]) => void;
   setSelectedCoverIndex: (index: number) => void;
   setSelectedVideoIndex: (index: number) => void;
   setConfirmedOutput: (publicId: string, qrUrl: string, gifUrl?: string) => void;
@@ -56,11 +68,13 @@ const initialState = {
   currentStep: 'welcome' as FlipbookStep,
   sessionId: null,
   sessionToken: null,
+  selectedEvent: null,
   selectedFrame: null,
   coverUrls: [],
   coverBlobs: [],
   videoUrls: [],
   videoBlobs: [],
+  videoFrames: [],
   selectedCoverIndex: 1,
   selectedVideoIndex: 1,
   publicId: null,
@@ -75,9 +89,13 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
 
   setSession: (sessionId, token) => set({ sessionId, sessionToken: token }),
 
+  setSelectedEvent: (selectedEvent) => set({ selectedEvent }),
+
   setStep: (currentStep) => set({ currentStep, errorMessage: null }),
 
   setSelectedFrame: (selectedFrame) => set({ selectedFrame }),
+
+  confirmFrameSelection: () => set({ currentStep: 'instructions' }),
 
   addCoverCapture: (blob) =>
     set((state) => {
@@ -88,12 +106,13 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
       };
     }),
 
-  addVideoCapture: (blob) =>
+  addVideoCapture: (blob, frames) =>
     set((state) => {
       const url = URL.createObjectURL(blob);
       return {
         videoBlobs: [...state.videoBlobs, blob],
         videoUrls: [...state.videoUrls, url],
+        videoFrames: [...state.videoFrames, frames || []],
       };
     }),
 
@@ -116,16 +135,20 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
 
   resetFlipbook: () =>
     set((state) => {
-      // Revoke all created object URLs
-      state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
-      state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      // Revoke all created object URLs if revokeObjectURL is available
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
+        state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      }
       return initialState;
     }),
 
   resetToCoverCapture: () =>
     set((state) => {
-      state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
-      state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+        state.coverUrls.forEach((u) => URL.revokeObjectURL(u));
+        state.videoUrls.forEach((u) => URL.revokeObjectURL(u));
+      }
       return {
         coverUrls: [],
         coverBlobs: [],

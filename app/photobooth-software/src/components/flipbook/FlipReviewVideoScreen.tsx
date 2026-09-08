@@ -3,7 +3,7 @@ import { useFlipbookStore } from '../../store/flipbook-store';
 import { useCountdown } from '../../hooks/useCountdown';
 import { boothApi } from '../../services/api';
 
-function VideoItemPreview({
+function VideoCardItem({
   url,
   index,
   isSelected,
@@ -17,50 +17,58 @@ function VideoItemPreview({
   const [hasError, setHasError] = useState(false);
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={`group relative overflow-hidden rounded-2xl border-4 aspect-[4/3] bg-black/40 transition-all ${
-        isSelected
-          ? 'border-[#a8f3dd] ring-4 ring-[#a8f3dd]/40 scale-[1.02] shadow-2xl'
-          : 'border-white/20 opacity-80 hover:opacity-100 hover:border-white/40'
-      }`}
-    >
-      {url && !hasError ? (
-        <video
-          src={url}
-          autoPlay
-          loop
-          muted
-          playsInline
-          preload="auto"
-          onLoadedData={(e) => {
-            const el = e.currentTarget;
-            el.muted = true;
-            el.currentTime = 0.001;
-            el.play().catch(() => {});
-          }}
-          onError={() => setHasError(true)}
-          className="size-full object-cover"
-        />
-      ) : (
-        <div className="flex size-full items-center justify-center text-sm font-bold text-white/50">
-          VIDEO 0{index}
-        </div>
-      )}
-
-      {/* Badges */}
-      <div
-        className={`absolute bottom-3 left-3 flex items-center gap-2 rounded-lg px-3 py-1 text-xs font-black backdrop-blur-md ${
-          isSelected ? 'bg-[#a8f3dd] text-[#0e473d]' : 'bg-black/50 text-white'
+    <div className="flex flex-col items-center w-full">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isSelected}
+        onClick={onSelect}
+        className={`group relative w-full aspect-[4/3] overflow-hidden rounded-2xl bg-black transition-all duration-200 cursor-pointer text-left outline-none ${
+          isSelected
+            ? 'border-2 border-[#058d51] ring-4 ring-[#058d51]/40 shadow-xl scale-[1.03]'
+            : 'border border-gray-200 hover:border-gray-400 shadow-md opacity-90 hover:opacity-100 hover:scale-[1.01]'
         }`}
       >
-        <span>▶ 6 SEC</span>
-        <span>
-          VIDEO 0{index} {isSelected && '✓'}
-        </span>
-      </div>
-    </button>
+        {url && !hasError ? (
+          <video
+            src={url}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            onLoadedData={(e) => {
+              const el = e.currentTarget;
+              el.muted = true;
+              el.currentTime = 0.001;
+              el.play().catch(() => {});
+            }}
+            onError={() => setHasError(true)}
+            className="size-full object-cover pointer-events-none"
+          />
+        ) : (
+          <div className="flex size-full items-center justify-center text-sm font-bold text-white/50 bg-[#176754]">
+            VIDEO {index}
+          </div>
+        )}
+
+        {/* Selected Checkmark Overlay */}
+        {isSelected && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
+            <img
+              src="/assets/images/check-mark.svg"
+              alt="Selected"
+              className="size-10 sm:size-12 drop-shadow-md"
+            />
+          </div>
+        )}
+      </button>
+
+      {/* Large Digit Number Below */}
+      <span className="text-[38px] sm:text-[48px] md:text-[56px] font-bold text-[#1e293b] leading-none mt-3.5 select-none">
+        {index}
+      </span>
+    </div>
   );
 }
 
@@ -105,34 +113,51 @@ export function FlipReviewVideoScreen() {
     setError,
   ]);
 
-  // 5-minute countdown auto-defaulting to Video 1 if no choice is made
-  const { formattedMMSS } = useCountdown({
-    seconds: 300,
+  // 60-second countdown auto-defaulting to selection if unattended
+  const { timeLeft } = useCountdown({
+    seconds: 60,
     autoStart: true,
     onExpire: () => {
-      setSelectedVideoIndex(1);
       handleCreateFlipbook();
     },
   });
 
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-between overflow-hidden bg-[#0e473d] text-white px-8 py-10">
-      {/* 5-Minute Auto-select Banner */}
-      <div className="flex justify-center z-10">
-        <span className="rounded-full bg-white/20 border border-white/10 px-6 py-2.5 text-[13px] font-bold text-[#a8f3dd] backdrop-blur-md shadow-sm">
-          Auto-selects in {formattedMMSS}
-        </span>
+    <div className="relative flex h-full min-h-[100dvh] w-full flex-col items-center justify-between overflow-hidden bg-[#f4f6f5] px-6 py-4 sm:px-10 sm:py-6 text-[#1e293b] select-none font-['Nunito',sans-serif]">
+      {/* Top Header Row: Progress Bar & Arcade Countdown Timer */}
+      <div className="flex items-center justify-between w-full max-w-5xl shrink-0 gap-6 pt-1">
+        {/* Progress Bar (Step 2 of 2 Review Stages: 50% / Green fill) */}
+        <div className="flex-1 h-3.5 sm:h-4.5 bg-[#e2e8f0] rounded-full overflow-hidden shadow-inner">
+          <div className="w-1/2 h-full bg-[#1b6b55] rounded-full" />
+        </div>
+
+        {/* Arcade Gamer Green Countdown Timer */}
+        <div className="flex items-center shrink-0">
+          <span
+            className="font-['PressStart2P','Arcade_Gamer',monospace] text-[28px] sm:text-[34px] md:text-[38px] font-bold text-[#008037] leading-none tracking-normal drop-shadow-xs"
+            aria-live="polite"
+            aria-label={`Auto continue in ${timeLeft} seconds`}
+          >
+            {timeLeft}
+          </span>
+        </div>
       </div>
 
-      {/* Main Selection Area */}
-      <div className="relative z-10 flex w-full flex-col items-center justify-center my-auto max-w-6xl">
-        <p className="mb-6 text-[15px] font-bold tracking-[0.14em] text-[#a8f3dd]">
-          SELECT A VIDEO CLIP
-        </p>
+      {/* Main Content Area */}
+      <div className="flex flex-col items-center justify-center w-full max-w-4xl my-auto py-2">
+        {/* Title */}
+        <h1 className="text-[28px] sm:text-[36px] md:text-[42px] font-bold tracking-tight text-[#1e293b] text-center">
+          Pick the one you like as your GIF
+        </h1>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 w-full">
+        {/* 3 Video Cards in 3 Columns */}
+        <div
+          role="radiogroup"
+          aria-label="Video Clip Selection"
+          className="grid grid-cols-3 gap-6 sm:gap-8 w-full mt-8 sm:mt-12 items-start"
+        >
           {[1, 2, 3].map((index) => (
-            <VideoItemPreview
+            <VideoCardItem
               key={index}
               index={index}
               url={videoUrls[index - 1]}
@@ -143,17 +168,23 @@ export function FlipReviewVideoScreen() {
         </div>
       </div>
 
-      {/* Bottom Action */}
-      <div className="flex justify-center z-10 pt-6">
+      {/* Bottom Action Button: I LIKE THIS */}
+      <div className="flex justify-end w-full max-w-5xl shrink-0 pb-1">
         <button
           type="button"
           disabled={loading}
           onClick={handleCreateFlipbook}
-          className="rounded-2xl bg-[#a8f3dd] px-12 py-4 text-[16px] font-black text-[#0e473d] shadow-[0_8px_25px_rgba(0,0,0,0.3)] transition hover:bg-[#91ebd2] active:scale-[0.98] disabled:opacity-50"
+          className="inline-flex items-center gap-2.5 px-6 sm:px-8 py-3 sm:py-3.5 rounded-full bg-[#1b6b55] hover:bg-[#155644] text-white text-lg sm:text-xl font-bold tracking-wide shadow-[0_6px_20px_rgba(27,107,85,0.32)] transition-all hover:-translate-y-0.5 active:scale-95 cursor-pointer disabled:opacity-50"
         >
-          {loading ? 'Submitting...' : `Create flipbook with Video 0${selectedVideoIndex}`}
+          <span>{loading ? 'Creating...' : 'I LIKE THIS'}</span>
+          <img
+            src="/assets/images/like-icon.svg"
+            alt=""
+            className="size-6 sm:size-7 object-contain pointer-events-none drop-shadow-xs"
+          />
         </button>
       </div>
     </div>
   );
 }
+

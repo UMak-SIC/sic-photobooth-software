@@ -6,6 +6,7 @@ import type { SessionType } from '@photobooth/public-output';
 export interface EventData {
   id: string;
   name: string;
+  description?: string;
   date: string;
   operatorName: string;
   createdAt: Date;
@@ -16,6 +17,47 @@ export interface FrameItem {
   name: string;
   overlayPath: string;
   isActive: boolean;
+  placements?: TemplatePlacement[];
+}
+
+export interface TemplatePlacement {
+  captureIndex: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+  borderRadius?: number;
+  zIndex?: number;
+}
+
+export interface TemplateOverlay {
+  id?: string;
+  label: string;
+  assetPath?: string;
+  path?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation?: number;
+  zIndex?: number;
+}
+
+export interface TemplateItem {
+  id: string;
+  name: string;
+  orientation: 'landscape' | 'portrait';
+  outputWidth: number;
+  outputHeight: number;
+  backgroundPath: string;
+  isActive: boolean;
+  requiredCaptureCount: number;
+  countdownSeconds: 3 | 5 | 10;
+  placements: TemplatePlacement[];
+  overlays?: TemplateOverlay[];
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface CaptureItem {
@@ -51,11 +93,47 @@ export interface OutputItem {
   eventDate: string;
 }
 
+export type PublicationStatus = 'queued' | 'in_progress' | 'uploaded' | 'failed';
+
+export interface QueuedPublication {
+  id: string;
+  publicId: string;
+  filePath: string;
+  mediaType: string;
+  eventName: string;
+  eventDate: string;
+  retryCount: number;
+}
+
+export interface PublicationRecord {
+  id: string;
+  publicId: string;
+  status: PublicationStatus;
+  retryCount: number;
+  lastAttemptAt: Date | null;
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  cloudFinalizedAt: Date | null;
+  cloudinaryUrl: string | null;
+  cloudinaryPublicId: string | null;
+  expiresAt: Date | null;
+  createdAt: Date;
+  mediaType: string;
+  eventName: string;
+  eventDate: string;
+}
+
+export interface LocalPublicationOutput {
+  publicId: string;
+  filePath: string;
+  mediaType: string;
+}
+
 export class DatabaseRepository {
   public async listEvents(): Promise<EventData[]> {
     try {
       const result = await pool.query(`
-        SELECT id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+        SELECT id, name, description, date::text, operator_name AS "operatorName", created_at AS "createdAt"
         FROM events
         ORDER BY date DESC, name ASC
       `);
@@ -67,19 +145,29 @@ export class DatabaseRepository {
     }
   }
 
-  public async createEvent(name: string, date: string, operatorName: string): Promise<EventData> {
+  public async createEvent(
+    name: string,
+    date: string,
+    operatorName: string,
+    description?: string,
+  ): Promise<EventData> {
     try {
       const result = await pool.query(
         `
-          INSERT INTO events (name, date, operator_name)
-          VALUES ($1, $2, $3)
-          RETURNING id, name, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+          INSERT INTO events (name, description, date, operator_name)
+          VALUES ($1, $2, $3, $4)
+          RETURNING id, name, description, date::text, operator_name AS "operatorName", created_at AS "createdAt"
         `,
-        [name, date, operatorName],
+        [name, description || null, date, operatorName],
       );
       return result.rows[0];
     } catch (error: unknown) {
-      if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505'
+      ) {
         throw error;
       }
       const key = `${name}_${date}`;
@@ -91,6 +179,7 @@ export class DatabaseRepository {
       const event: EventData = {
         id: crypto.randomUUID(),
         name,
+        description: description || undefined,
         date,
         operatorName,
         createdAt: new Date(),
@@ -100,23 +189,142 @@ export class DatabaseRepository {
     }
   }
 
+  public async deleteEvent(id: string): Promise<boolean> {
+    try {
+      const result = await pool.query('DELETE FROM events WHERE id = $1 RETURNING id', [id]);
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      for (const [key, val] of this.inMemoryEvents.entries()) {
+        if (val.id === id) {
+          this.inMemoryEvents.delete(key);
+          return true;
+        }
+      }
+      return false;
+    }
+  }
+
+  // Default 4-strip placements for canonical flipbook templates/frames
+  private defaultFlipbookPlacements: TemplatePlacement[] = [
+    { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+    { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+    { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+    { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+  ];
+
   // In-memory fallback stores when PostgreSQL is offline
   private inMemoryEvents: Map<string, EventData> = new Map();
   private inMemorySessions: Map<string, SessionData> = new Map();
   private inMemoryFrames: Map<string, FrameItem> = new Map([
-    ['1', { id: '1', name: 'SIC Seal', overlayPath: 'frames/sic-seal.png', isActive: true }],
+    [
+      '1',
+      {
+        id: '1',
+        name: 'SIC Seal',
+        overlayPath: 'frames/sic-seal.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
+    ],
     [
       '2',
-      { id: '2', name: 'Emerald Motion', overlayPath: 'frames/emerald-motion.png', isActive: true },
+      {
+        id: '2',
+        name: 'Emerald Motion',
+        overlayPath: 'frames/emerald-motion.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
     ],
     [
       '3',
-      { id: '3', name: 'Pioneer Grid', overlayPath: 'frames/pioneer-grid.png', isActive: true },
+      {
+        id: '3',
+        name: 'Pioneer Grid',
+        overlayPath: 'frames/pioneer-grid.png',
+        isActive: true,
+        placements: [
+          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+        ],
+      },
+    ],
+  ]);
+  private inMemoryTemplates: Map<string, TemplateItem> = new Map([
+    [
+      'grid-landscape',
+      {
+        id: 'grid-landscape',
+        name: 'Grid 2x2 Landscape',
+        orientation: 'landscape',
+        outputWidth: 1800,
+        outputHeight: 1200,
+        backgroundPath: 'templates/grid-landscape.png',
+        isActive: true,
+        requiredCaptureCount: 4,
+        countdownSeconds: 5,
+        placements: [
+          {
+            captureIndex: 1,
+            x: 120,
+            y: 120,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 960,
+            y: 120,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 3,
+            x: 120,
+            y: 630,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 4,
+            x: 960,
+            y: 630,
+            width: 720,
+            height: 450,
+            rotation: 0,
+            borderRadius: 8,
+            zIndex: 1,
+          },
+        ],
+        overlays: [],
+      },
     ],
   ]);
   private inMemoryCaptures: Map<string, CaptureItem[]> = new Map();
   private inMemoryVideos: Map<string, VideoItem[]> = new Map();
   private inMemoryOutputs: Map<string, OutputItem> = new Map();
+  private inMemoryPublications: Map<string, PublicationRecord> = new Map();
 
   /**
    * Creates or returns an existing event by name and date.
@@ -337,7 +545,10 @@ export class DatabaseRepository {
       `;
       const res = await pool.query(query);
       if (res.rows && res.rows.length > 0) {
-        return res.rows;
+        return res.rows.map((row: FrameItem) => ({
+          ...row,
+          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+        }));
       }
       return Array.from(this.inMemoryFrames.values()).filter((f) => f.isActive);
     } catch {
@@ -358,7 +569,13 @@ export class DatabaseRepository {
           WHERE id = $1
         `;
         const res = await pool.query(query, [frameId]);
-        if (res.rows[0]) return res.rows[0];
+        if (res.rows[0]) {
+          const row = res.rows[0];
+          return {
+            ...row,
+            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+          };
+        }
       } catch {
         // ignore database errors in in-memory fallback
       }
@@ -371,7 +588,13 @@ export class DatabaseRepository {
           LIMIT 1
         `;
         const res = await pool.query(query, [`%${frameId}%`]);
-        if (res.rows[0]) return res.rows[0];
+        if (res.rows[0]) {
+          const row = res.rows[0];
+          return {
+            ...row,
+            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+          };
+        }
       } catch {
         // ignore database errors
       }
@@ -387,7 +610,13 @@ export class DatabaseRepository {
         LIMIT 1
       `;
       const fbRes = await pool.query(fallbackQuery);
-      if (fbRes.rows[0]) return fbRes.rows[0];
+      if (fbRes.rows[0]) {
+        const row = fbRes.rows[0];
+        return {
+          ...row,
+          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+        };
+      }
     } catch {
       // ignore
     }
@@ -507,39 +736,106 @@ export class DatabaseRepository {
     isRetake: boolean = false,
   ): Promise<{ captureCount: number; retakeCount: number }> {
     try {
-      if (isRetake) {
-        await pool.query(
-          `UPDATE sessions SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-          [sessionId],
-        );
-        await pool.query(
-          `UPDATE session_captures SET file_path = $3, created_at = CURRENT_TIMESTAMP WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
-          [sessionId, captureIndex, filePath],
-        );
-      } else {
-        await pool.query(
-          `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
-           VALUES ($1, $2, $3, false, true)
-           ON CONFLICT DO NOTHING`,
-          [sessionId, captureIndex, filePath],
-        );
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        if (isRetake) {
+          const updateRes = await client.query(
+            `UPDATE sessions
+             SET retake_count = retake_count + 1, last_activity_at = CURRENT_TIMESTAMP
+             WHERE id = $1 AND retake_count < 4
+             RETURNING retake_count AS "retakeCount"`,
+            [sessionId],
+          );
+
+          if (updateRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            throw new Error('Maximum retake limit of 4 reached for this session');
+          }
+
+          const updCapRes = await client.query(
+            `UPDATE session_captures
+             SET file_path = $3, created_at = CURRENT_TIMESTAMP
+             WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+            [sessionId, captureIndex, filePath],
+          );
+
+          if (updCapRes.rowCount === 0) {
+            await client.query(
+              `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
+               VALUES ($1, $2, $3, false, true)`,
+              [sessionId, captureIndex, filePath],
+            );
+          }
+
+          const capRes = await client.query(
+            `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
+            [sessionId],
+          );
+
+          await client.query('COMMIT');
+          return {
+            retakeCount: updateRes.rows[0].retakeCount,
+            captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+          };
+        } else {
+          await client.query(
+            `DELETE FROM session_captures WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
+            [sessionId, captureIndex],
+          );
+          await client.query(
+            `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
+             VALUES ($1, $2, $3, false, true)`,
+            [sessionId, captureIndex, filePath],
+          );
+
+          const sessRes = await client.query(
+            `SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`,
+            [sessionId],
+          );
+          const capRes = await client.query(
+            `SELECT COUNT(DISTINCT capture_index) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
+            [sessionId],
+          );
+
+          await client.query('COMMIT');
+          return {
+            retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
+            captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
+          };
+        }
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes('Maximum retake limit')) {
+        throw err;
       }
 
-      const [sessRes, capRes] = await Promise.all([
-        pool.query(`SELECT retake_count AS "retakeCount" FROM sessions WHERE id = $1`, [sessionId]),
-        pool.query(
-          `SELECT COUNT(*) AS count FROM session_captures WHERE session_id = $1 AND is_cover = false`,
-          [sessionId],
-        ),
-      ]);
+      let session = this.inMemorySessions.get(sessionId);
+      if (!session) {
+        session = {
+          id: sessionId,
+          token: 'in-memory-token',
+          eventId: 'in-memory-event',
+          type: 'photo_strip',
+          state: 'capturing',
+          retakeCount: 0,
+          isPrinted: false,
+          copiesPrinted: 0,
+          createdAt: new Date(),
+          lastActivityAt: new Date(),
+        };
+        this.inMemorySessions.set(sessionId, session);
+      }
 
-      return {
-        retakeCount: sessRes.rows[0]?.retakeCount ?? 0,
-        captureCount: parseInt(capRes.rows[0]?.count ?? '0', 10),
-      };
-    } catch {
-      const session = this.inMemorySessions.get(sessionId);
-      if (isRetake && session) {
+      if (isRetake) {
+        if (session.retakeCount >= 4) {
+          throw new Error('Maximum retake limit of 4 reached for this session');
+        }
         session.retakeCount = (session.retakeCount || 0) + 1;
       }
       const list = this.inMemoryCaptures.get(sessionId) || [];
@@ -559,8 +855,8 @@ export class DatabaseRepository {
       }
       this.inMemoryCaptures.set(sessionId, list);
       return {
-        retakeCount: session?.retakeCount ?? 0,
-        captureCount: list.filter((c) => !c.isCover).length,
+        retakeCount: session.retakeCount ?? 0,
+        captureCount: new Set(list.filter((c) => !c.isCover).map((c) => c.captureIndex)).size,
       };
     }
   }
@@ -666,20 +962,28 @@ export class DatabaseRepository {
     videoIndex: number,
   ): Promise<void> {
     try {
-      await pool.query('BEGIN');
-      await pool.query(
-        `UPDATE session_captures SET is_selected = (capture_index = $2) WHERE session_id = $1 AND is_cover = true`,
-        [sessionId, coverIndex],
-      );
-      await pool.query(
-        `UPDATE session_videos SET is_selected = (video_index = $2) WHERE session_id = $1`,
-        [sessionId, videoIndex],
-      );
-      await pool.query(
-        `UPDATE sessions SET state = 'processing', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
-      await pool.query('COMMIT');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE session_captures SET is_selected = (capture_index = $2) WHERE session_id = $1 AND is_cover = true`,
+          [sessionId, coverIndex],
+        );
+        await client.query(
+          `UPDATE session_videos SET is_selected = (video_index = $2) WHERE session_id = $1`,
+          [sessionId, videoIndex],
+        );
+        await client.query(
+          `UPDATE sessions SET state = 'processing', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       const covers = this.inMemoryCaptures.get(sessionId) || [];
       covers.forEach((c) => {
@@ -704,16 +1008,25 @@ export class DatabaseRepository {
    */
   public async resetFlipbookToCoverCapture(sessionId: string): Promise<void> {
     try {
-      await pool.query('BEGIN');
-      await pool.query(`DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`, [
-        sessionId,
-      ]);
-      await pool.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
-      await pool.query(
-        `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
-      await pool.query('COMMIT');
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `DELETE FROM session_captures WHERE session_id = $1 AND is_cover = true`,
+          [sessionId],
+        );
+        await client.query(`DELETE FROM session_videos WHERE session_id = $1`, [sessionId]);
+        await client.query(
+          `UPDATE sessions SET state = 'cover_capture', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       this.inMemoryCaptures.delete(sessionId);
       this.inMemoryVideos.delete(sessionId);
@@ -737,36 +1050,44 @@ export class DatabaseRepository {
     height: number,
   ): Promise<string> {
     try {
-      await pool.query('BEGIN');
-      const outputQuery = `
-        INSERT INTO generated_outputs (session_id, public_id, media_type, file_path, width, height)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
-      `;
-      const outputRes = await pool.query(outputQuery, [
-        sessionId,
-        publicId,
-        mediaType,
-        filePath,
-        width,
-        height,
-      ]);
-      const outputId = outputRes.rows[0].id;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const outputQuery = `
+          INSERT INTO generated_outputs (session_id, public_id, media_type, file_path, width, height)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `;
+        const outputRes = await client.query(outputQuery, [
+          sessionId,
+          publicId,
+          mediaType,
+          filePath,
+          width,
+          height,
+        ]);
+        const outputId = outputRes.rows[0].id;
 
-      const pubQuery = `
-        INSERT INTO publication_records (output_id, public_id, status)
-        VALUES ($1, $2, 'queued')
-        ON CONFLICT (public_id) DO NOTHING
-      `;
-      await pool.query(pubQuery, [outputId, publicId]);
+        const pubQuery = `
+          INSERT INTO publication_records (output_id, public_id, status)
+          VALUES ($1, $2, 'queued')
+          ON CONFLICT (public_id) DO NOTHING
+        `;
+        await client.query(pubQuery, [outputId, publicId]);
 
-      await pool.query(
-        `UPDATE sessions SET state = 'booth_confirmed', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
-        [sessionId],
-      );
+        await client.query(
+          `UPDATE sessions SET state = 'booth_confirmed', last_activity_at = CURRENT_TIMESTAMP WHERE id = $1`,
+          [sessionId],
+        );
 
-      await pool.query('COMMIT');
-      return outputId;
+        await client.query('COMMIT');
+        return outputId;
+      } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
+        throw err;
+      } finally {
+        client.release();
+      }
     } catch {
       const outputId = crypto.randomUUID();
       const output: OutputItem = {
@@ -782,6 +1103,24 @@ export class DatabaseRepository {
         eventDate: new Date().toISOString().split('T')[0],
       };
       this.inMemoryOutputs.set(publicId, output);
+      const publicationId = crypto.randomUUID();
+      this.inMemoryPublications.set(publicationId, {
+        id: publicationId,
+        publicId,
+        status: 'queued',
+        retryCount: 0,
+        lastAttemptAt: null,
+        nextAttemptAt: new Date(),
+        lastError: null,
+        cloudFinalizedAt: null,
+        cloudinaryUrl: null,
+        cloudinaryPublicId: null,
+        expiresAt: null,
+        createdAt: new Date(),
+        mediaType,
+        eventName: output.eventName,
+        eventDate: output.eventDate,
+      });
 
       const session = this.inMemorySessions.get(sessionId);
       if (session) {
@@ -819,6 +1158,828 @@ export class DatabaseRepository {
     } catch {
       return this.inMemoryOutputs.get(publicId) || null;
     }
+  }
+
+  public async listPublications(): Promise<PublicationRecord[]> {
+    try {
+      const result = await pool.query(`
+        SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
+          o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+        FROM publication_records p
+        JOIN generated_outputs o ON o.id = p.output_id
+        JOIN sessions s ON s.id = o.session_id
+        JOIN events e ON e.id = s.event_id
+        ORDER BY p.created_at DESC
+      `);
+      return [...result.rows, ...this.inMemoryPublications.values()].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+    } catch {
+      return Array.from(this.inMemoryPublications.values()).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+    }
+  }
+
+  public async getPublicationOutput(id: string): Promise<LocalPublicationOutput | null> {
+    try {
+      const result = await pool.query(
+        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType"
+         FROM publication_records p
+         JOIN generated_outputs o ON o.id = p.output_id
+         WHERE p.id = $1`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    return publication ? this.inMemoryOutputs.get(publication.publicId) ?? null : null;
+  }
+
+  public async retryPublication(id: string): Promise<PublicationRecord | null> {
+    let retried: PublicationRecord | undefined;
+    try {
+      const result = await pool.query(
+        `WITH requeued AS (
+          UPDATE publication_records
+          SET status = 'queued', retry_count = 0, last_attempt_at = NULL,
+            next_attempt_at = CURRENT_TIMESTAMP, last_error = NULL
+          WHERE id = $1 AND status = 'failed'
+          RETURNING *
+        )
+        SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+          p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+          p.cloud_finalized_at AS "cloudFinalizedAt",
+          p.cloudinary_url AS "cloudinaryUrl", p.cloudinary_public_id AS "cloudinaryPublicId",
+          p.expires_at AS "expiresAt", p.created_at AS "createdAt",
+          o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+        FROM requeued p
+        JOIN generated_outputs o ON o.id = p.output_id
+        JOIN sessions s ON s.id = o.session_id
+        JOIN events e ON e.id = s.event_id`,
+        [id],
+      );
+      retried = result.rows[0];
+    } catch {
+      retried = undefined;
+    }
+    if (retried) return retried;
+    const publication = this.inMemoryPublications.get(id);
+    if (!publication || publication.status !== 'failed') return null;
+    publication.status = 'queued';
+    publication.retryCount = 0;
+    publication.lastAttemptAt = null;
+    publication.nextAttemptAt = new Date();
+    publication.lastError = null;
+    return publication;
+  }
+
+  public async deleteLocalPublication(id: string): Promise<LocalPublicationOutput | null> {
+    try {
+      const result = await pool.query(
+        `DELETE FROM generated_outputs o
+         WHERE o.id = (
+           SELECT output_id FROM publication_records WHERE id = $1 AND status <> 'in_progress'
+         )
+         RETURNING public_id AS "publicId", file_path AS "filePath", media_type AS "mediaType"`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    const output = publication && this.inMemoryOutputs.get(publication.publicId);
+    if (!publication || !output || publication.status === 'in_progress') return null;
+    this.inMemoryPublications.delete(id);
+    this.inMemoryOutputs.delete(publication.publicId);
+    return output;
+  }
+
+  public async removeCloudPublication(id: string): Promise<PublicationRecord | null> {
+    try {
+      const result = await pool.query(
+        `WITH removed AS (
+           UPDATE publication_records
+           SET status = 'failed', cloud_finalized_at = NULL, cloudinary_url = NULL,
+             cloudinary_public_id = NULL, expires_at = NULL, next_attempt_at = NULL, last_error = NULL
+           WHERE id = $1 AND status = 'uploaded'
+           RETURNING *
+         )
+         SELECT p.id, p.public_id AS "publicId", p.status, p.retry_count AS "retryCount",
+           p.last_attempt_at AS "lastAttemptAt", p.next_attempt_at AS "nextAttemptAt", p.last_error AS "lastError",
+           p.cloud_finalized_at AS "cloudFinalizedAt", p.cloudinary_url AS "cloudinaryUrl",
+           p.cloudinary_public_id AS "cloudinaryPublicId", p.expires_at AS "expiresAt", p.created_at AS "createdAt",
+           o.media_type AS "mediaType", e.name AS "eventName", e.date::text AS "eventDate"
+         FROM removed p
+         JOIN generated_outputs o ON o.id = p.output_id
+         JOIN sessions s ON s.id = o.session_id
+         JOIN events e ON e.id = s.event_id`,
+        [id],
+      );
+      if (result.rows[0]) return result.rows[0];
+    } catch {}
+    const publication = this.inMemoryPublications.get(id);
+    if (!publication || publication.status !== 'uploaded') return null;
+    publication.status = 'failed';
+    publication.cloudFinalizedAt = null;
+    publication.cloudinaryUrl = null;
+    publication.cloudinaryPublicId = null;
+    publication.expiresAt = null;
+    publication.nextAttemptAt = null;
+    publication.lastError = null;
+    return publication;
+  }
+
+  /**
+   * Atomically claims up to `limit` queued publications for upload, marking them in_progress.
+   */
+  public async claimQueuedPublications(
+    limit: number,
+    now: Date = new Date(),
+  ): Promise<QueuedPublication[]> {
+    let pgClaimed: QueuedPublication[] = [];
+    try {
+      const claim = await pool.query(
+        `UPDATE publication_records p
+         SET status = 'in_progress', last_attempt_at = CURRENT_TIMESTAMP
+         WHERE p.id IN (
+           SELECT q.id
+           FROM publication_records q
+           JOIN generated_outputs o ON o.id = q.output_id
+           WHERE q.status = 'queued' AND q.next_attempt_at <= $2
+           ORDER BY q.created_at
+           LIMIT $1
+           FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id`,
+        [limit, now],
+      );
+      if (claim.rows.length > 0) {
+        const details = await pool.query(
+          `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
+             e.name AS "eventName", e.date::text AS "eventDate", p.retry_count AS "retryCount"
+           FROM publication_records p
+           JOIN generated_outputs o ON o.id = p.output_id
+           JOIN sessions s ON s.id = o.session_id
+           JOIN events e ON e.id = s.event_id
+           WHERE p.id = ANY($1::uuid[])
+           ORDER BY p.created_at`,
+          [claim.rows.map((r) => r.id)],
+        );
+        pgClaimed = details.rows;
+      }
+    } catch {
+      pgClaimed = [];
+    }
+    const remaining = limit - pgClaimed.length;
+    if (remaining <= 0) return pgClaimed;
+    return [...pgClaimed, ...this.claimQueuedInMemory(remaining, now)];
+  }
+
+  /**
+   * Claims queued publications from the in-memory mirror (degraded / hybrid operation).
+   */
+  private claimQueuedInMemory(limit: number, now: Date): QueuedPublication[] {
+    return Array.from(this.inMemoryPublications.entries())
+      .filter(
+        ([, p]) => p.status === 'queued' && p.nextAttemptAt !== null && p.nextAttemptAt <= now,
+      )
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime())
+      .slice(0, limit)
+      .map(([id, p]) => {
+        const output = this.inMemoryOutputs.get(p.publicId);
+        if (!output) return null;
+        p.status = 'in_progress';
+        p.lastAttemptAt = now;
+        this.inMemoryPublications.set(id, p);
+        return {
+          id,
+          publicId: p.publicId,
+          filePath: output.filePath,
+          mediaType: output.mediaType,
+          eventName: output.eventName,
+          eventDate: output.eventDate,
+          retryCount: p.retryCount,
+        };
+      })
+      .filter((q): q is QueuedPublication => q !== null);
+  }
+
+  /**
+   * Marks a publication successfully uploaded to Cloudinary.
+   */
+  public async markPublicationUploaded(
+    id: string,
+    cloudinaryUrl: string,
+    cloudinaryPublicId: string,
+    cloudFinalizedAt: Date,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = 'uploaded', cloudinary_url = $2, cloudinary_public_id = $3,
+           cloud_finalized_at = $4, expires_at = $5, next_attempt_at = NULL, last_error = NULL
+         WHERE id = $1`,
+        [id, cloudinaryUrl, cloudinaryPublicId, cloudFinalizedAt, expiresAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return true;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return false;
+    pub.status = 'uploaded';
+    pub.cloudinaryUrl = cloudinaryUrl;
+    pub.cloudinaryPublicId = cloudinaryPublicId;
+    pub.cloudFinalizedAt = cloudFinalizedAt;
+    pub.expiresAt = expiresAt;
+    pub.nextAttemptAt = null;
+    pub.lastError = null;
+    return true;
+  }
+
+  /**
+   * Records a failed upload attempt. A null nextAttemptAt is a dead-letter job.
+   */
+  public async markPublicationFailed(
+    id: string,
+    error: string,
+    nextAttemptAt: Date | null,
+  ): Promise<void> {
+    let updated = false;
+    try {
+      const result = await pool.query(
+        `UPDATE publication_records
+         SET status = CASE WHEN $3 IS NULL THEN 'failed' ELSE 'queued' END,
+           retry_count = retry_count + 1,
+           last_attempt_at = CURRENT_TIMESTAMP,
+           next_attempt_at = $3,
+           last_error = $2
+         WHERE id = $1`,
+        [id, error, nextAttemptAt],
+      );
+      updated = (result.rowCount ?? 0) > 0;
+    } catch {
+      // fall back to in-memory
+    }
+    if (updated) return;
+    const pub = this.inMemoryPublications.get(id);
+    if (!pub) return;
+    pub.retryCount += 1;
+    pub.lastAttemptAt = new Date();
+    pub.nextAttemptAt = nextAttemptAt;
+    pub.lastError = error;
+    pub.status = nextAttemptAt === null ? 'failed' : 'queued';
+  }
+
+  /** Requeues interrupted work and counts the interrupted attempt toward the dead-letter limit. */
+  public async recoverStalledPublications(staleBefore: Date, maxAttempts: number): Promise<void> {
+    try {
+      await pool.query(
+        `UPDATE publication_records
+         SET retry_count = retry_count + 1,
+           status = CASE WHEN retry_count + 1 >= $2 THEN 'failed' ELSE 'queued' END,
+           next_attempt_at = CASE WHEN retry_count + 1 >= $2 THEN NULL ELSE CURRENT_TIMESTAMP END,
+           last_error = 'Upload worker interrupted; job requeued.'
+         WHERE status = 'in_progress' AND last_attempt_at < $1`,
+        [staleBefore, maxAttempts],
+      );
+    } catch {
+      // The in-memory mirror below keeps degraded mode recoverable too.
+    }
+    for (const publication of this.inMemoryPublications.values()) {
+      if (
+        publication.status === 'in_progress' &&
+        publication.lastAttemptAt !== null &&
+        publication.lastAttemptAt < staleBefore
+      ) {
+        publication.retryCount += 1;
+        publication.status = publication.retryCount >= maxAttempts ? 'failed' : 'queued';
+        publication.nextAttemptAt = publication.status === 'failed' ? null : new Date();
+        publication.lastError = 'Upload worker interrupted; job requeued.';
+      }
+    }
+  }
+
+  /**
+   * Retrieves the latest generated output for a session.
+   */
+  public async getLatestOutputForSession(sessionId: string): Promise<OutputItem | null> {
+    try {
+      const query = `
+        SELECT
+          o.id,
+          o.session_id AS "sessionId",
+          o.public_id AS "publicId",
+          o.media_type AS "mediaType",
+          o.file_path AS "filePath",
+          o.width,
+          o.height,
+          o.created_at AS "createdAt",
+          e.name AS "eventName",
+          e.date::text AS "eventDate"
+        FROM generated_outputs o
+        JOIN sessions s ON o.session_id = s.id
+        JOIN events e ON s.event_id = e.id
+        WHERE o.session_id = $1
+        ORDER BY o.created_at DESC
+        LIMIT 1
+      `;
+      const res = await pool.query(query, [sessionId]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    for (const output of this.inMemoryOutputs.values()) {
+      if (output.sessionId === sessionId) {
+        return output;
+      }
+    }
+    return null;
+  }
+
+  private readonly templateSelectFields = `
+    SELECT
+      t.id,
+      t.name,
+      t.orientation,
+      t.output_width AS "outputWidth",
+      t.output_height AS "outputHeight",
+      t.background_path AS "backgroundPath",
+      t.is_active AS "isActive",
+      t.required_capture_count AS "requiredCaptureCount",
+      t.countdown_seconds AS "countdownSeconds",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', p.id,
+              'captureIndex', p.capture_index,
+              'x', p.x,
+              'y', p.y,
+              'width', p.width,
+              'height', p.height,
+              'rotation', p.rotation,
+              'borderRadius', p.border_radius,
+              'zIndex', p.z_index
+            ) ORDER BY p.z_index ASC, p.capture_index ASC
+          )
+          FROM template_placements p
+          WHERE p.template_id = t.id
+        ),
+        '[]'::json
+      ) AS placements,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', o.id,
+              'label', o.label,
+              'assetPath', o.asset_path,
+              'x', o.x,
+              'y', o.y,
+              'width', o.width,
+              'height', o.height,
+              'rotation', o.rotation,
+              'zIndex', o.z_index
+            ) ORDER BY o.z_index ASC
+          )
+          FROM template_overlays o
+          WHERE o.template_id = t.id
+        ),
+        '[]'::json
+      ) AS overlays,
+      t.created_at AS "createdAt",
+      t.updated_at AS "updatedAt"
+    FROM templates t
+  `;
+
+  /**
+   * Lists all active templates for Photo Strip sessions.
+   */
+  public async listActiveTemplates(): Promise<TemplateItem[]> {
+    try {
+      const query = `
+        ${this.templateSelectFields}
+        WHERE t.is_active = true
+        ORDER BY t.created_at ASC
+      `;
+      const res = await pool.query(query);
+      if (res.rows && res.rows.length > 0) {
+        return res.rows;
+      }
+      return Array.from(this.inMemoryTemplates.values()).filter((t) => t.isActive);
+    } catch {
+      return Array.from(this.inMemoryTemplates.values()).filter((t) => t.isActive);
+    }
+  }
+
+  /**
+   * Retrieves a template by ID.
+   */
+  public async getTemplateById(templateId: string): Promise<TemplateItem | null> {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      templateId,
+    );
+    if (isUuid) {
+      try {
+        const query = `
+          ${this.templateSelectFields}
+          WHERE t.id = $1
+        `;
+        const res = await pool.query(query, [templateId]);
+        if (res.rows[0]) return res.rows[0];
+      } catch {
+        // fallback to memory
+      }
+    } else {
+      try {
+        const query = `
+          ${this.templateSelectFields}
+          WHERE t.name ILIKE $1
+          LIMIT 1
+        `;
+        const res = await pool.query(query, [`%${templateId}%`]);
+        if (res.rows[0]) return res.rows[0];
+      } catch {
+        // fallback to memory
+      }
+    }
+
+    if (this.inMemoryTemplates.has(templateId)) {
+      return this.inMemoryTemplates.get(templateId) || null;
+    }
+
+    const all = Array.from(this.inMemoryTemplates.values());
+    const match = all.find(
+      (t) => t.id === templateId || t.name.toLowerCase().includes(templateId.toLowerCase()),
+    );
+    return match || null;
+  }
+
+  /**
+   * Creates a new template in the database with normalized placements and overlays.
+   */
+  public async createTemplate(
+    name: string,
+    orientation: 'landscape' | 'portrait',
+    outputWidth: number,
+    outputHeight: number,
+    backgroundPath: string,
+    requiredCaptureCount: number,
+    countdownSeconds: 3 | 5 | 10,
+    placements: TemplatePlacement[] = [],
+    overlays: TemplateOverlay[] = [],
+  ): Promise<TemplateItem> {
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+
+      const templateRes = await client.query(
+        `
+        INSERT INTO templates (
+          name, orientation, output_width, output_height,
+          background_path, required_capture_count, countdown_seconds
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING
+          id, name, orientation,
+          output_width AS "outputWidth",
+          output_height AS "outputHeight",
+          background_path AS "backgroundPath",
+          is_active AS "isActive",
+          required_capture_count AS "requiredCaptureCount",
+          countdown_seconds AS "countdownSeconds",
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        `,
+        [
+          name,
+          orientation,
+          outputWidth,
+          outputHeight,
+          backgroundPath,
+          requiredCaptureCount,
+          countdownSeconds,
+        ],
+      );
+      const row = templateRes.rows[0];
+      const templateId = row.id;
+
+      if (placements.length > 0) {
+        for (const p of placements) {
+          await client.query(
+            `
+            INSERT INTO template_placements (
+              template_id, capture_index, x, y, width, height, rotation, border_radius, z_index
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `,
+            [
+              templateId,
+              p.captureIndex,
+              p.x,
+              p.y,
+              p.width,
+              p.height,
+              p.rotation || 0,
+              p.borderRadius || 0,
+              p.zIndex || 1,
+            ],
+          );
+        }
+      }
+
+      if (overlays.length > 0) {
+        for (const o of overlays) {
+          await client.query(
+            `
+            INSERT INTO template_overlays (
+              template_id, label, asset_path, x, y, width, height, rotation, z_index
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `,
+            [
+              templateId,
+              o.label,
+              o.assetPath || '',
+              o.x || 0,
+              o.y || 0,
+              o.width,
+              o.height,
+              o.rotation || 0,
+              o.zIndex || 2,
+            ],
+          );
+        }
+      }
+
+      await client.query('COMMIT');
+      return {
+        ...row,
+        placements,
+        overlays,
+      };
+    } catch {
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      const id = crypto.randomUUID();
+      const template: TemplateItem = {
+        id,
+        name,
+        orientation,
+        outputWidth,
+        outputHeight,
+        backgroundPath,
+        isActive: true,
+        requiredCaptureCount,
+        countdownSeconds,
+        placements,
+        overlays,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.inMemoryTemplates.set(id, template);
+      return template;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+
+  /**
+   * Updates template placements and overlays using transactional replace-all.
+   */
+  public async updateTemplateLayout(
+    templateId: string,
+    placements: TemplatePlacement[],
+    overlays: TemplateOverlay[] = [],
+  ): Promise<boolean> {
+    let client;
+    try {
+      client = await pool.connect();
+      await client.query('BEGIN');
+      await client.query('DELETE FROM template_placements WHERE template_id = $1', [templateId]);
+      for (const p of placements) {
+        await client.query(
+          `
+          INSERT INTO template_placements (
+            template_id, capture_index, x, y, width, height, rotation, border_radius, z_index
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `,
+          [
+            templateId,
+            p.captureIndex,
+            p.x,
+            p.y,
+            p.width,
+            p.height,
+            p.rotation || 0,
+            p.borderRadius || 0,
+            p.zIndex || 1,
+          ],
+        );
+      }
+
+      await client.query('DELETE FROM template_overlays WHERE template_id = $1', [templateId]);
+      for (const o of overlays) {
+        await client.query(
+          `
+          INSERT INTO template_overlays (
+            template_id, label, asset_path, x, y, width, height, rotation, z_index
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+          `,
+          [
+            templateId,
+            o.label,
+            o.assetPath || '',
+            o.x || 0,
+            o.y || 0,
+            o.width,
+            o.height,
+            o.rotation || 0,
+            o.zIndex || 2,
+          ],
+        );
+      }
+      await client.query('UPDATE templates SET updated_at = CURRENT_TIMESTAMP WHERE id = $1', [
+        templateId,
+      ]);
+      await client.query('COMMIT');
+      return true;
+    } catch {
+      if (client) {
+        await client.query('ROLLBACK').catch(() => {});
+      }
+      const mem = this.inMemoryTemplates.get(templateId);
+      if (mem) {
+        mem.placements = placements;
+        mem.overlays = overlays;
+        mem.updatedAt = new Date();
+        return true;
+      }
+      return false;
+    } finally {
+      if (client) {
+        client.release();
+      }
+    }
+  }
+
+  /**
+   * Associates a template with a Photo Strip session, saves an immutable snapshot,
+   * and advances state to 'template_selected'.
+   */
+  public async selectTemplate(
+    sessionId: string,
+    template: TemplateItem,
+  ): Promise<SessionData | null> {
+    const snapshot = {
+      id: template.id,
+      name: template.name,
+      orientation: template.orientation,
+      outputWidth: template.outputWidth,
+      outputHeight: template.outputHeight,
+      backgroundPath: template.backgroundPath,
+      requiredCaptureCount: template.requiredCaptureCount,
+      countdownSeconds: template.countdownSeconds,
+      placements: template.placements,
+      overlays: template.overlays || [],
+      snapshottedAt: new Date().toISOString(),
+    };
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      template.id,
+    );
+    const dbTemplateId = isUuid ? template.id : null;
+
+    try {
+      const query = `
+        UPDATE sessions
+        SET template_id = $2,
+            template_snapshot = $3::jsonb,
+            state = 'template_selected',
+            last_activity_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+        RETURNING
+          id,
+          token,
+          event_id AS "eventId",
+          type,
+          state,
+          template_id AS "templateId",
+          frame_id AS "frameId",
+          template_snapshot AS "templateSnapshot",
+          retake_count AS "retakeCount",
+          is_printed AS "isPrinted",
+          copies_printed AS "copiesPrinted",
+          created_at AS "createdAt",
+          last_activity_at AS "lastActivityAt",
+          cancelled_at AS "cancelledAt"
+      `;
+      const res = await pool.query(query, [sessionId, dbTemplateId, JSON.stringify(snapshot)]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    const session = this.inMemorySessions.get(sessionId);
+    if (session) {
+      session.templateId = template.id;
+      session.templateSnapshot = snapshot;
+      session.state = 'template_selected';
+      session.lastActivityAt = new Date();
+      return session;
+    }
+    return null;
+  }
+
+  /**
+   * Retrieves all selected photo captures for a session.
+   */
+  public async getPhotoCaptures(sessionId: string): Promise<CaptureItem[]> {
+    try {
+      const query = `
+        SELECT
+          id,
+          session_id AS "sessionId",
+          capture_index AS "captureIndex",
+          file_path AS "filePath",
+          is_cover AS "isCover",
+          is_selected AS "isSelected",
+          created_at AS "createdAt"
+        FROM session_captures
+        WHERE session_id = $1 AND is_cover = false AND is_selected = true
+        ORDER BY capture_index ASC
+      `;
+      const res = await pool.query(query, [sessionId]);
+      return res.rows;
+    } catch {
+      const captures = this.inMemoryCaptures.get(sessionId) || [];
+      return captures
+        .filter((c) => !c.isCover && c.isSelected)
+        .sort((a, b) => a.captureIndex - b.captureIndex);
+    }
+  }
+
+  /**
+   * Records print status for a confirmed session and transitions state to 'printed'.
+   */
+  public async recordPrintStatus(
+    sessionId: string,
+    copiesPrinted: number,
+  ): Promise<SessionData | null> {
+    try {
+      const query = `
+        UPDATE sessions
+        SET is_printed = true,
+            copies_printed = copies_printed + $2,
+            state = 'printed',
+            last_activity_at = CURRENT_TIMESTAMP
+        WHERE id = $1 AND (state = 'booth_confirmed' OR state = 'printed')
+        RETURNING
+          id,
+          token,
+          event_id AS "eventId",
+          type,
+          state,
+          template_id AS "templateId",
+          frame_id AS "frameId",
+          template_snapshot AS "templateSnapshot",
+          retake_count AS "retakeCount",
+          is_printed AS "isPrinted",
+          copies_printed AS "copiesPrinted",
+          created_at AS "createdAt",
+          last_activity_at AS "lastActivityAt",
+          cancelled_at AS "cancelledAt"
+      `;
+      const res = await pool.query(query, [sessionId, copiesPrinted]);
+      if (res.rows[0]) return res.rows[0];
+    } catch {
+      // fallback to in-memory
+    }
+
+    const session = this.inMemorySessions.get(sessionId);
+    if (session && (session.state === 'booth_confirmed' || session.state === 'printed')) {
+      session.isPrinted = true;
+      session.copiesPrinted += copiesPrinted;
+      session.state = 'printed';
+      session.lastActivityAt = new Date();
+      return session;
+    }
+    return null;
   }
 }
 

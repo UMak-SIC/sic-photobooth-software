@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -b && node -e \"const fs=require('node:fs'), path=require('node:path'); const dest=path.resolve('dist/db/migrations'); fs.mkdirSync(dest, {recursive:true}); fs.cpSync(path.resolve('src/db/migrations'), dest, {recursive:true}); if (fs.existsSync('src/db/schema.sql')) fs.copyFileSync(path.resolve('src/db/schema.sql'), path.resolve('dist/db/schema.sql'));\"",
     "typecheck": "tsc --noEmit",
+    "test:integration": "vitest run test/supabase-publication.integration.test.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "start": "node dist/server.js",
     "clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\""
@@ -17,6 +18,8 @@
     "@fastify/multipart": "^9.0.3",
     "@fastify/rate-limit": "^10.2.2",
     "@photobooth/public-output": "workspace:*",
+    "@supabase/supabase-js": "^2.115.0",
+    "cloudinary": "^2.11.0",
     "dotenv": "^16.4.7",
     "fastify": "5.2.1",
     "ffmpeg-static": "^5.2.0",

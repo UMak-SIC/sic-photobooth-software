@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useFlipbookStore } from '../../store/flipbook-store';
-import { boothApi } from '../../services/api';
+import { boothApi, API_BASE_URL } from '../../services/api';
 
 export function ProcessingScreen() {
   const { sessionId, setConfirmedOutput, resetToCoverCapture } = useFlipbookStore();
@@ -38,7 +38,9 @@ export function ProcessingScreen() {
             clearInterval(interval);
             clearTimeout(timeoutTimer);
             setProgress(100);
-            setConfirmedOutput('aB3x9Z1', 'https://myphotobooth.com/aB3x9Z1');
+            const mockId = 'aB3x9Z1';
+            const mockGifUrl = `${API_BASE_URL}/photos/${mockId}`;
+            setConfirmedOutput(mockId, `https://myphotobooth.com/${mockId}`, mockGifUrl);
           }, 2000);
           return;
         }
@@ -47,7 +49,8 @@ export function ProcessingScreen() {
         clearInterval(interval);
         clearTimeout(timeoutTimer);
         setProgress(100);
-        setConfirmedOutput(data.publicId, data.qrUrl);
+        const gifUrl = `${API_BASE_URL}/photos/${data.publicId}`;
+        setConfirmedOutput(data.publicId, data.qrUrl, gifUrl);
       } catch (err: unknown) {
         clearInterval(interval);
         clearTimeout(timeoutTimer);
@@ -75,7 +78,7 @@ export function ProcessingScreen() {
   }, [sessionId, setConfirmedOutput, resetToCoverCapture]);
 
   return (
-    <div className="relative grid w-full min-h-[calc(100vh-77px)] place-items-center overflow-hidden bg-[#ecfff8] px-8 text-[#113b33]">
+    <div className="relative grid w-full min-h-[100vh] place-items-center overflow-hidden bg-[#ecfff8] px-8 text-[#113b33]">
       <div className="max-w-[620px] text-center px-8">
         {/* Visual Orb Spinner */}
         <div className="relative mx-auto grid size-52 place-items-center">

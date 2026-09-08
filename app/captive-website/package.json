@@ -3,13 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 5174",
+    "dev": "next dev -H 0.0.0.0 --port 5174",
+    "dev:https": "next dev -H 0.0.0.0 --port 5174 --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@photobooth/public-output": "workspace:*",
+    "@photobooth/ui": "workspace:*",
+    "@zxing/library": "^0.23.0",
+    "jsqr": "^1.4.0",
+    "lucide-react": "^1.40.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"

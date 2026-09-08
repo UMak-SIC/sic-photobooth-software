@@ -6,7 +6,7 @@ import { boothApi } from '../../services/api';
 import { FLIPBOOK_CONFIG } from '../../config/flipbook';
 
 export function CoverCaptureScreen() {
-  const { sessionId, coverUrls, addCoverCapture, setStep, errorMessage, setError } =
+  const { sessionId, coverUrls, addCoverCapture, setStep, errorMessage, setError, selectedFrame } =
     useFlipbookStore();
   const {
     videoRef,
@@ -20,6 +20,12 @@ export function CoverCaptureScreen() {
   const currentCoverNum = coverUrls.length + 1; // 1, 2, 3
   const [isCapturing, setIsCapturing] = useState(false);
   const [flash, setFlash] = useState(false);
+
+  const primarySlot = selectedFrame?.placements?.[0];
+  const slotWidth = primarySlot?.width || 620;
+  const slotHeight = primarySlot?.height || 348.75;
+  const slotRatio = slotWidth / slotHeight;
+  const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
 
   // Trigger snapshot when countdown reaches 0
   const triggerCapture = useCallback(async () => {
@@ -57,11 +63,31 @@ export function CoverCaptureScreen() {
       }
     } catch (err: unknown) {
       console.error('Camera capture exception:', err);
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Camera capture failed. Check the camera feed and retake this photo.';
-      setError(msg);
+      // Fallback synthetic photo if real frame capture fails
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 675;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = '#0f2923';
+        ctx.fillRect(0, 0, 1200, 675);
+        ctx.fillStyle = '#48c4a1';
+        ctx.font = 'bold 48px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`FLIPBOOK COVER #${currentCoverNum}`, 600, 320);
+      }
+      canvas.toBlob((fallbackBlob) => {
+        if (fallbackBlob) {
+          addCoverCapture(fallbackBlob);
+          const updatedCount = useFlipbookStore.getState().coverUrls.length;
+          if (updatedCount >= 3) {
+            stopCamera();
+            setStep('video_capture');
+          } else {
+            resetCountdown(FLIPBOOK_CONFIG.coverPoseCountdownSeconds);
+          }
+        }
+      }, 'image/jpeg', 0.95);
     } finally {
       setIsCapturing(false);
     }
@@ -78,7 +104,6 @@ export function CoverCaptureScreen() {
 
   const {
     timeLeft,
-    formattedSS,
     reset: resetCountdown,
     pause: pauseCountdown,
   } = useCountdown({
@@ -96,7 +121,6 @@ export function CoverCaptureScreen() {
   }, [startCamera, stopCamera, setError]);
 
   const activeError = cameraError || errorMessage;
-
   // Start countdown only once camera feed is confirmed active on initial mount
   useEffect(() => {
     if (isActive && !activeError && !isCapturing && coverUrls.length === 0) {
@@ -107,109 +131,163 @@ export function CoverCaptureScreen() {
   }, [isActive, activeError, isCapturing, coverUrls.length, resetCountdown, pauseCountdown]);
 
   return (
-    <div className="relative w-full min-h-[calc(100vh-77px)] h-full overflow-hidden bg-[#071d1a] text-white">
-      {/* Video Feed */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="absolute inset-0 size-full object-cover"
-      />
+    <div
+      className="relative flex flex-col items-center justify-center w-full h-[100dvh] max-h-[100dvh] overflow-hidden p-4 md:p-6 text-white select-none"
+      style={{
+        backgroundImage: `url('/assets/images/bg-for-cam.svg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* Camera Viewport Container matching CameraViewfinder */}
+      <div
+        className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-black shadow-2xl border-2 border-black flex items-center justify-center"
+        style={{
+          aspectRatio: slotAspectRatio,
+          maxHeight: 'calc(100dvh - 48px)',
+          maxWidth: 'calc(100vw - 48px)',
+          width: `min(calc(100vw - 48px), calc((100dvh - 48px) * ${slotRatio}))`,
+          height: `min(calc(100dvh - 48px), calc((100vw - 48px) / ${slotRatio}))`,
+        }}
+      >
+        {/* Live Video Feed (Mirrored) */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="size-full object-cover -scale-x-100"
+        />
 
-      {/* Camera Scene Vignette */}
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
-      {/* Flash Effect */}
-      {flash && (
-        <div className="absolute inset-0 bg-white opacity-80 transition-opacity pointer-events-none" />
-      )}
-
-      {/* Top Camera Status */}
-      <div className="absolute left-9 top-8 flex items-center gap-3">
-        <div className="rounded-full bg-black/40 px-4 py-2 text-[12px] font-bold backdrop-blur-sm">
-          CAMERA 01
-        </div>
-      </div>
-
-      {/* Error Alert Banner */}
-      {activeError && (
-        <div className="absolute inset-x-8 top-20 z-20 flex items-center justify-between rounded-xl bg-[#b91c1c]/90 px-6 py-4 text-white backdrop-blur-md shadow-lg">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-lg">⚠️</span>
-            <p className="text-sm font-semibold">{activeError}</p>
+        {/* Low-opacity screen that says Get Ready! before taking photo / while camera initializes */}
+        {!isActive && !activeError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs text-center transition-opacity duration-300">
+            <div className="flex flex-col items-center">
+              <h3 className="font-['Arcade_Gamer','PressStart2P',monospace] text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white uppercase drop-shadow-2xl animate-pulse">
+                Get Ready!
+              </h3>
+              <p className="mt-3 font-['Arcade_Gamer','PressStart2P',monospace] text-xs sm:text-sm md:text-base text-[#a8f3dd] tracking-wider uppercase">
+                Cover photo {currentCoverNum} of 3
+              </p>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              startCamera();
-            }}
-            className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-[#b91c1c] hover:bg-white/90 transition"
-          >
-            Retry Capture
-          </button>
-        </div>
-      )}
+        )}
 
-      {/* Bottom Overlays */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-8">
-        {/* Countdown Box */}
-        <div className="backdrop-blur-md rounded-2xl bg-black/40 border border-white/10 px-7 py-5">
-          <p className="text-[12px] font-bold tracking-wide text-[#a8f3dd]">COVER PHOTO</p>
-          <div className="mt-2 min-h-[56px] flex items-center">
-            {!isActive && !activeError ? (
-              <span className="inline-flex items-center gap-2.5 py-3">
-                <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.3s]" />
-                <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.15s]" />
-                <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce" />
-              </span>
-            ) : isCapturing ? (
-              <span className="text-[56px] font-black leading-none tracking-[-0.07em]">📸</span>
-            ) : (
-              <span className="text-[56px] font-black leading-none tracking-[-0.07em]">
-                {formattedSS}
-              </span>
-            )}
+        {/* Shutter flash effect */}
+        {flash && (
+          <div className="absolute inset-0 z-50 bg-white opacity-90 pointer-events-none transition-opacity duration-200" />
+        )}
+
+        {/* Top-Left: Mode Label in Arcade Gamer font */}
+        <div className="absolute top-4 left-5 sm:top-6 sm:left-7 z-20">
+          <div className="z-30 flex items-center select-none">
+            <span className="font-['Arcade_Gamer','PressStart2P',monospace] text-white text-sm sm:text-base md:text-lg font-bold tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+              Cover Photo
+            </span>
           </div>
-          <p className="mt-2 text-[14px] text-[#c5eee1]">
-            {!isActive && !activeError
-              ? 'Starting camera feed...'
-              : isCapturing
-                ? 'Capturing...'
-                : `${timeLeft} seconds to pose`}
-          </p>
         </div>
 
-        {/* Center Pill */}
-        <div className="backdrop-blur-md rounded-full bg-black/40 border border-white/10 px-7 py-3 text-[17px] font-black tracking-wide">
-          COVER {currentCoverNum} OF 3
+        {/* Top-Right: Circular Countdown Timer with SVG Ring */}
+        <div className="absolute top-4 right-5 sm:top-6 sm:right-7 z-20">
+          <div className="z-30 flex items-center justify-center select-none">
+            <div className="relative flex items-center justify-center size-14 sm:size-17 md:size-21">
+              <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64">
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className="stroke-black/55"
+                  strokeWidth="4"
+                  fill="rgba(0,0,0,0.4)"
+                />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className="stroke-white transition-all duration-300 ease-linear"
+                  strokeWidth="4"
+                  strokeDasharray={163.36}
+                  strokeDashoffset={
+                    163.36 *
+                    (1 -
+                      Math.max(
+                        0,
+                        Math.min(
+                          1,
+                          timeLeft / (FLIPBOOK_CONFIG.coverPoseCountdownSeconds || 5),
+                        ),
+                      ))
+                  }
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </svg>
+              <span className="absolute font-['Arcade_Gamer','PressStart2P',monospace] text-white text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                {isCapturing ? '📸' : timeLeft}
+              </span>
+            </div>
+          </div>
         </div>
 
-        {/* Progress Dots */}
-        <div className="backdrop-blur-md rounded-2xl bg-black/40 border border-white/10 px-6 py-5">
-          <div className="flex gap-2.5">
-            {[1, 2, 3].map((num) => {
-              const isDone = num < currentCoverNum;
-              const isCurrent = num === currentCoverNum;
+        {/* Bottom: 3 Slot Cards */}
+        <div className="absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center px-4 pointer-events-none">
+          <div className="z-30 flex items-center justify-center gap-2 sm:gap-3 md:gap-3.5 max-w-full flex-wrap pointer-events-auto select-none">
+            {Array.from({ length: 3 }).map((_, i) => {
+              const slotNum = i + 1;
+              const captureUrl = coverUrls[i];
+              const isCurrent = slotNum === currentCoverNum;
+
               return (
-                <span
-                  key={num}
-                  className={`grid size-9 place-items-center rounded-full text-[13px] font-black transition ${
-                    isDone
-                      ? 'bg-[#a8f3dd] text-[#145142]'
-                      : isCurrent
-                        ? 'bg-[#146a56] text-[#a8f3dd] ring-2 ring-[#a8f3dd]'
-                        : 'bg-white/20 text-white/70'
+                <div
+                  key={slotNum}
+                  className={`relative flex items-center justify-center rounded-xl overflow-hidden backdrop-blur-sm transition-all duration-200 shadow-xl size-14 sm:size-17 md:size-20 ${
+                    isCurrent
+                      ? 'border-2 border-white ring-2 ring-white/70 bg-white/20 scale-105 shadow-[0_0_15px_rgba(255,255,255,0.4)]'
+                      : captureUrl
+                        ? 'border-2 border-white/80 bg-black/60'
+                        : 'border-2 border-white/40 bg-black/50 opacity-80'
                   }`}
                 >
-                  {isDone ? '✓' : num}
-                </span>
+                  {captureUrl ? (
+                    <img
+                      src={captureUrl}
+                      alt={`Cover ${slotNum}`}
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      className={`font-['Arcade_Gamer','PressStart2P',monospace] text-white text-sm sm:text-base md:text-lg ${
+                        isCurrent ? 'font-bold' : 'opacity-80'
+                      }`}
+                    >
+                      {slotNum}
+                    </span>
+                  )}
+                </div>
               );
             })}
           </div>
         </div>
+
+        {/* Error notification banner */}
+        {activeError && (
+          <div className="absolute inset-x-8 top-20 z-30 flex items-center justify-between rounded-xl bg-red-600/90 px-6 py-4 text-white backdrop-blur-md shadow-lg">
+            <p className="text-sm font-semibold">{activeError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                startCamera();
+              }}
+              className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-red-700 hover:bg-white/90 transition"
+            >
+              Retry Camera
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

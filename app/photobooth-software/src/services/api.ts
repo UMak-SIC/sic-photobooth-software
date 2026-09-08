@@ -1,4 +1,15 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
+
+export const API_BASE_URL =
+  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+export const resolveAssetUrl = (relativeUrl: string | null): string | null => {
+  if (!relativeUrl) return null;
+  if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://') || relativeUrl.startsWith('data:')) {
+    return relativeUrl;
+  }
+  return new URL(relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`, API_BASE_URL).toString();
+};
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -9,11 +20,44 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+export interface EventItem {
+  id: string;
+  name: string;
+  description?: string;
+  date: string;
+  operatorName: string;
+}
+
 export interface FrameItem {
   id: string;
   name: string;
-  overlayPath: string;
-  isActive: boolean;
+  type?: 'photo_strip' | 'flipbook';
+  coverPath?: string | null;
+  backgroundPath?: string | null;
+  overlayPath?: string | null;
+  isActive?: boolean;
+  placements?: Array<{
+    id?: string;
+    captureIndex: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+    borderRadius?: number;
+    zIndex?: number;
+  }>;
+  overlays?: Array<{
+    id?: string;
+    label?: string;
+    path?: string | null;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation?: number;
+    zIndex?: number;
+  }>;
 }
 
 export interface SessionInfo {
@@ -75,20 +119,120 @@ export class BoothApiClient {
     return body.data;
   }
 
+  public async transition(sessionId: string, targetState: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/transition`, {
+      method: 'POST',
+      headers: this.getHeaders('application/json'),
+      body: JSON.stringify({ targetState }),
+    });
+    const body: ApiResponse = await res.json();
+    if (!res.ok || !body.success) {
+      throw new Error(body.error?.message || `Failed to transition to ${targetState}`);
+    }
+  }
+
+  public async listEvents(): Promise<EventItem[]> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/events`);
+      if (!res.ok) throw new Error('Failed to fetch events');
+      const body = await res.json();
+      if (body.data && Array.isArray(body.data)) {
+        return body.data;
+      }
+      return body;
+    } catch {
+      return [
+        {
+          id: '1',
+          name: 'SIC General Assembly',
+          description: 'Official photobooth for the SIC General Assembly',
+          date: 'May 24, 2026',
+          operatorName: 'Mika Santos',
+        },
+        {
+          id: '2',
+          name: 'College Week 2026',
+          description: 'Annual college week celebration and exhibits',
+          date: 'June 18, 2026',
+          operatorName: 'Mika Santos',
+        },
+      ];
+    }
+  }
+
+  public async createEvent(
+    name: string,
+    date: string,
+    operatorName: string,
+    description?: string,
+  ): Promise<EventItem> {
+    const res = await fetch(`${API_BASE_URL}/api/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        date,
+        operatorName,
+        description: description?.trim() || undefined,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.data) {
+      throw new Error(body.error?.message || 'Could not create event');
+    }
+    return body.data;
+  }
+
+  public async deleteEvent(id: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/events/${id}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    });
+    const body: ApiResponse = await res.json().catch(() => ({ success: res.ok }));
+    if (!res.ok || body.success === false) {
+      throw new Error(body.error?.message || 'Could not delete event');
+    }
+  }
+
   public async listFrames(): Promise<FrameItem[]> {
+    const defaultPlacements = [
+      { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75 },
+    ];
     const res = await fetch(`${API_BASE_URL}/api/frames`);
     const body: ApiResponse<FrameItem[]> = await res.json();
     if (!res.ok || !body.success || !body.data) {
       return [
-        { id: '1', name: 'SIC Seal', overlayPath: 'frames/sic-seal.png', isActive: true },
+        {
+          id: '1',
+          name: 'SIC Seal',
+          overlayPath: 'frames/sic-seal.png',
+          isActive: true,
+          placements: defaultPlacements,
+        },
         {
           id: '2',
           name: 'Emerald Motion',
           overlayPath: 'frames/emerald-motion.png',
           isActive: true,
+          placements: defaultPlacements,
         },
-        { id: '3', name: 'Pioneer Grid', overlayPath: 'frames/pioneer-grid.png', isActive: true },
+        {
+          id: '3',
+          name: 'Pioneer Grid',
+          overlayPath: 'frames/pioneer-grid.png',
+          isActive: true,
+          placements: defaultPlacements,
+        },
       ];
+    }
+    return body.data;
+  }
+
+  public async listTemplates(): Promise<ReviewTemplate[]> {
+    const res = await fetch(`${API_BASE_URL}/templates?active=true`);
+    const body: ApiResponse<ReviewTemplate[]> = await res.json();
+    if (!res.ok || !body.success || !body.data) {
+      throw new Error(body.error?.message || 'Failed to list templates');
     }
     return body.data;
   }
@@ -198,6 +342,88 @@ export class BoothApiClient {
       headers: this.getHeaders('application/json'),
       body: JSON.stringify({}),
     });
+  }
+
+  public async selectTemplate(sessionId: string, templateId: string): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/template`, {
+      method: 'POST',
+      headers: this.getHeaders('application/json'),
+      body: JSON.stringify({ templateId }),
+    });
+    const body: ApiResponse = await res.json();
+    if (!res.ok || !body.success) {
+      throw new Error(body.error?.message || 'Failed to select template');
+    }
+  }
+
+  public async uploadPhotoCapture(
+    sessionId: string,
+    photoBlob: Blob,
+    captureIndex: number,
+    isRetake: boolean = false,
+  ): Promise<{ captureIndex: number; retakeCount: number; state: string }> {
+    const formData = new FormData();
+    formData.append('captureIndex', String(captureIndex));
+    if (isRetake) {
+      formData.append('isRetake', 'true');
+    }
+    formData.append('file', photoBlob, `photo_${captureIndex}.jpg`);
+
+    const queryParams = new URLSearchParams({
+      captureIndex: String(captureIndex),
+      ...(isRetake ? { isRetake: 'true' } : {}),
+    });
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/sessions/${sessionId}/captures/photo?${queryParams.toString()}`,
+      {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: formData,
+      },
+    );
+    const body: ApiResponse<{ captureIndex: number; retakeCount: number; state: string }> =
+      await res.json();
+    if (!res.ok || !body.success || !body.data) {
+      throw new Error(body.error?.message || 'Failed to upload photo capture');
+    }
+    return body.data;
+  }
+
+  public async confirmPhotoStrip(
+    sessionId: string,
+  ): Promise<{ outputId: string; publicId: string; qrUrl: string; filePath: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/photo-strip/confirm`, {
+      method: 'POST',
+      headers: this.getHeaders('application/json'),
+      body: JSON.stringify({}),
+    });
+    const body: ApiResponse<{
+      outputId: string;
+      publicId: string;
+      qrUrl: string;
+      filePath: string;
+    }> = await res.json();
+    if (!res.ok || !body.success || !body.data) {
+      throw new Error(body.error?.message || 'Failed to confirm photo strip');
+    }
+    return body.data;
+  }
+
+  public async recordPrint(
+    sessionId: string,
+    copies: number = 1,
+    recordOnly?: boolean,
+  ): Promise<void> {
+    const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/print`, {
+      method: 'POST',
+      headers: this.getHeaders('application/json'),
+      body: JSON.stringify({ copies, recordOnly }),
+    });
+    const body: ApiResponse = await res.json();
+    if (!res.ok || !body.success) {
+      throw new Error(body.error?.message || 'Failed to record print');
+    }
   }
 }
 

@@ -22,12 +22,28 @@ Owner: `app/photobooth-software/`
   /flipbook/videos
   /flipbook/review
   /admin/events
-  /admin/templates
   /admin/frames
   /admin/publications
 ```
 
-The exact URLs are `TBD`; this is the PRD workflow map, not an implemented router contract.
+The remaining entries are `TBD`; this is the PRD workflow map, not an implemented router contract.
+
+### Implemented Local Routes
+
+These routes are implemented by `app/photobooth-software/`:
+
+```text
+/admin/templates
+  Local template library and creation
+/admin/templates/new
+  New Photo Strip template editor
+/admin/templates/:id
+  Existing Photo Strip template editor
+/admin/frames
+  Flipbook frame library and editor for cover and GIF template uploads
+/admin/publications
+  Local publication status dashboard and failed-job retry
+```
 
 ## Captive Website
 
@@ -47,6 +63,8 @@ Guest routes must never expose booth controls.
 Owner: `app/public-website/`
 
 ```text
+/
+  Public QR/code recovery page
 /:id
   Public finalized-output preview and download, or unavailable state
 ```
@@ -57,4 +75,11 @@ This app reads public delivery data only. It never contacts the local backend.
 
 Owner: `app/backend/`
 
-The API is session-oriented. Implemented event setup routes are `GET /api/events` and `POST /api/events`. The API must also cover health, sessions, workflow transitions, templates/frames, media registration, retakes, finalization, local approved-output retrieval, printing records, and publication administration.
+The API is session-oriented. Implemented routes cover event setup (`GET /api/events`, `POST /api/events`), health (`GET /health`), sessions (`POST /api/sessions`, capture uploads, flipbook processing), public output retrieval (`GET /photos/:id`, `GET /photos/:id/info`), and publication administration (`GET /api/publications`, `POST /api/publications/:id/retry`). The API must also cover templates/frames management, retakes, and printing records.
+
+### Implemented Template Export
+
+```text
+GET /templates/export
+  Downloads every template definition plus its background and uploaded overlays as a ZIP archive.
+```

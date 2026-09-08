@@ -1,73 +1,135 @@
 import { useState } from 'react';
 import { useFlipbookStore } from '../store/flipbook-store';
+import { usePhotoStripStore } from '../store/photostrip-store';
 import { useSessionStore } from '../store/session-store';
+import { EventSelectScreen } from './events/EventSelectScreen';
+import { type Event } from './events/EventRow';
+import { WelcomeSplashScreen } from './WelcomeSplashScreen';
+import { ExperienceChoiceScreen } from './ExperienceChoiceScreen';
+import { CameraSetupModal } from './CameraSetupModal';
 import { boothApi } from '../services/api';
 
-export function WelcomeExperienceScreen() {
-  const { setSession, setStep } = useFlipbookStore();
-  const { setActiveSession } = useSessionStore();
-  const [loading, setLoading] = useState(false);
+export interface WelcomeScreenProps {
+  preview?: boolean;
+}
 
-  const handleStartFlipbook = async () => {
-    setLoading(true);
+export function WelcomeScreen({ preview = false }: WelcomeScreenProps = {}) {
+  const { setStep: setFlipbookStep, setSession: setFlipbookSession, setSelectedEvent: setFlipbookEvent } = useFlipbookStore();
+  const { setStep: setPhotoStripStep, setSession: setPhotoStripSession, setSelectedEvent: setPhotoStripEvent } = usePhotoStripStore();
+  const {
+    setActiveSession,
+    stage,
+    setStage,
+    selectedEvent: chosenEvent,
+    setSelectedEvent: setChosenEvent,
+  } = useSessionStore();
+  const [isCameraSetupOpen, setIsCameraSetupOpen] = useState(false);
+
+  const handleTouchScreen = () => {
+    if (preview) return;
+    setStage('choose_event');
+  };
+
+  const handleEventContinue = (selectedEvent: Event, operatorName: string) => {
+    if (preview) return;
+    const date = selectedEvent.date || new Date().toISOString().split('T')[0];
+    setChosenEvent({
+      id: selectedEvent.id,
+      name: selectedEvent.name,
+      date,
+      operatorName,
+    });
+    setStage('choose_experience');
+  };
+
+  const startSession = async (type: 'photo_strip' | 'flipbook') => {
+    if (preview) return;
+    const eventName = chosenEvent?.name || 'SIC Event';
+    const eventDate = chosenEvent?.date || new Date().toISOString().split('T')[0];
+    const operatorName = chosenEvent?.operatorName || 'Mika Santos';
+    const eventObj = chosenEvent
+      ? { id: chosenEvent.id || 'default', name: chosenEvent.name, date: chosenEvent.date, operatorName: chosenEvent.operatorName }
+      : { id: 'default', name: eventName, date: eventDate, operatorName };
+
     try {
-      const today = new Date().toISOString().split('T')[0];
       const session = await boothApi.createSession(
-        'SIC General Assembly',
-        today,
-        'Operator',
-        'flipbook',
+        eventName,
+        eventDate,
+        operatorName,
+        type,
       );
-      setSession(session.sessionId, session.token);
-      setActiveSession({ id: session.sessionId, type: 'flipbook' });
-      setStep('frame_select');
-    } catch {
-      // Offline fallback
-      setSession('mock-flipbook-session-id', 'mock-token');
-      setActiveSession({ id: 'mock-flipbook-session-id', type: 'flipbook' });
-      setStep('frame_select');
-    } finally {
-      setLoading(false);
+      if (type === 'photo_strip') {
+        setPhotoStripSession(session.sessionId, session.token);
+        setPhotoStripEvent(eventObj);
+        setActiveSession({ id: session.sessionId, type: 'photo_strip', token: session.token });
+        setPhotoStripStep('template_select');
+      } else {
+        setFlipbookSession(session.sessionId, session.token);
+        setFlipbookEvent(eventObj);
+        setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
+        setFlipbookStep('frame_select');
+      }
+    } catch (err: unknown) {
+      console.warn('Backend session creation failed, continuing in mock session mode:', err);
+      const mockId = `mock-${type}-${Date.now()}`;
+      if (type === 'photo_strip') {
+        setPhotoStripSession(mockId, 'mock-token');
+        setPhotoStripEvent(eventObj);
+        setActiveSession({ id: mockId, type: 'photo_strip' });
+        setPhotoStripStep('template_select');
+      } else {
+        setFlipbookSession(mockId, 'mock-token');
+        setFlipbookEvent(eventObj);
+        setActiveSession({ id: mockId, type: 'flipbook' });
+        setFlipbookStep('frame_select');
+      }
     }
   };
 
+  const handleStartPhotoStrip = () => {
+    void startSession('photo_strip');
+  };
+
+  const handleStartFlipbook = () => {
+    void startSession('flipbook');
+  };
+
+  if (stage === 'welcome' || stage === 'choose_event') {
+    return (
+      <div className="relative flex flex-1 w-full h-[100dvh] min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f4f6f5]">
+        <EventSelectScreen
+          preview={preview}
+          initialEventId={chosenEvent?.id}
+          initialOperatorName={chosenEvent?.operatorName}
+          onContinue={handleEventContinue}
+          onBack={() => setStage('welcome')}
+          backButtonText="Back"
+        />
+
+        {stage === 'welcome' && (
+          <WelcomeSplashScreen onStart={handleTouchScreen} />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="relative flex w-full min-h-[calc(100vh-77px)] flex-col items-center justify-center gap-14 overflow-hidden bg-[#ecfff8] px-8 py-16 text-[#113b33]">
-      <div className="text-center">
-        <p className="text-xs font-bold tracking-[0.22em] text-[#28806c] mb-3">SIC PHOTOBOOTH</p>
-        <h4 className="text-[52px] md:text-[64px] font-black leading-[0.92] tracking-[-0.06em]">
-          What are we creating today?
-        </h4>
-      </div>
+    <>
+      <ExperienceChoiceScreen
+        onSelectPhotoStrip={handleStartPhotoStrip}
+        onSelectFlipbook={handleStartFlipbook}
+        onBack={() => setStage('choose_event')}
+        onChangeCamera={() => setIsCameraSetupOpen(true)}
+      />
 
-      <div className="flex flex-wrap justify-center gap-8 max-w-4xl w-full">
-        {/* Photo Strips */}
-        <button
-          type="button"
-          disabled
-          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754]/40 px-12 py-12 transition opacity-60 cursor-not-allowed"
-        >
-          <div className="visual-strip size-40 rounded-2xl bg-[#0e473d]/40 flex items-center justify-center font-bold text-white/50 text-base">
-            PHOTO STRIP
-          </div>
-          <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">PHOTO STRIPS</h5>
-        </button>
-
-        {/* Flipbook */}
-        <button
-          type="button"
-          disabled={loading}
-          onClick={handleStartFlipbook}
-          className="group flex flex-1 min-w-[280px] max-w-[340px] flex-col items-center gap-6 overflow-hidden rounded-3xl bg-[#176754] px-12 py-12 shadow-2xl transition hover:-translate-y-1.5 hover:bg-[#135848] active:scale-[0.99]"
-        >
-          <div className="visual-flip size-40 rounded-2xl bg-[#0e473d] flex items-center justify-center font-black text-[#9ef0dc] text-xl shadow-inner">
-            FLIPBOOK
-          </div>
-          <h5 className="text-[24px] font-black tracking-[-0.04em] text-white">
-            {loading ? 'Starting...' : 'FLIPBOOK'}
-          </h5>
-        </button>
-      </div>
-    </div>
+      {isCameraSetupOpen && (
+        <CameraSetupModal
+          onCancel={() => setIsCameraSetupOpen(false)}
+          onContinue={() => setIsCameraSetupOpen(false)}
+        />
+      )}
+    </>
   );
 }
+
+export { WelcomeScreen as WelcomeExperienceScreen };

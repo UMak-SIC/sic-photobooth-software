@@ -155,6 +155,14 @@ export class StorageService {
     return null;
   }
 
+  public async removeOutput(publicId: string, filePath: string, mediaType: string): Promise<void> {
+    await fs.promises.rm(filePath, { force: true });
+    const extension = mediaType === 'image/gif' ? 'gif' : 'png';
+    await fs.promises.rm(path.join(this.baseDir, 'outputs', `${this.sanitizeId(publicId)}.${extension}`), {
+      force: true,
+    });
+  }
+
   /**
    * Deletes session storage assets.
    */
