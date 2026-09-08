@@ -63,6 +63,8 @@ Guest routes must never expose booth controls.
 Owner: `app/public-website/`
 
 ```text
+/
+  Public QR/code recovery page
 /:id
   Public finalized-output preview and download, or unavailable state
 ```

@@ -1,79 +1,67 @@
 import { isValidPublicId } from '@photobooth/public-output';
-import { headers } from 'next/headers';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { BrandMark } from '../../components/BrandMark';
+import { lookupPublicOutput } from './actions';
 
-type PublicOutput = {
-  cloudinary_url: string;
-  media_type: 'image/png' | 'image/gif';
-  event_name: string;
-  event_date: string;
-};
+/* Cloudinary output URLs are dynamic public assets and do not have a fixed image host. */
+/* eslint-disable @next/next/no-img-element */
 
-async function consumeLookupToken(): Promise<boolean> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) return false;
+function formatEventDate(value: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
 
-  const requestHeaders = await headers();
-  const clientAddress =
-    requestHeaders.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    requestHeaders.get('x-real-ip') ||
-    'unknown';
-  const response = await fetch(`${supabaseUrl}/rest/v1/rpc/consume_public_output_lookup`, {
-    method: 'POST',
-    headers: {
-      apikey: serviceRoleKey,
-      Authorization: `Bearer ${serviceRoleKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ client_address: clientAddress }),
-    cache: 'no-store',
-  });
-  return response.ok && (await response.json()) === true;
-}
-
-async function getPublicOutput(publicId: string): Promise<PublicOutput | null> {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!supabaseUrl || !publishableKey) return null;
-
-  const response = await fetch(
-    `${supabaseUrl}/rest/v1/public_outputs?select=cloudinary_url,media_type,event_name,event_date&public_id=eq.${encodeURIComponent(publicId)}&limit=1`,
-    {
-      headers: { apikey: publishableKey, Authorization: `Bearer ${publishableKey}` },
-      cache: 'no-store',
-    },
-  );
-  if (!response.ok) return null;
-  const outputs = (await response.json()) as PublicOutput[];
-  return outputs[0] || null;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${value}T00:00:00Z`));
 }
 
 export default async function PublicOutputPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!isValidPublicId(id)) notFound();
-  if (!(await consumeLookupToken())) notFound();
-  const output = await getPublicOutput(id);
+  const output = await lookupPublicOutput(id);
   if (!output) notFound();
 
-  const label = output.media_type === 'image/gif' ? 'Flipbook' : 'Photo strip';
+  const label = output.sessionType === 'flipbook' ? 'Flipbook' : 'Photo strip';
   return (
     <main className="public-output-page">
+      <header className="site-header">
+        <Link className="brand" href="/" aria-label="UMak Society of Innovative Computing">
+          <BrandMark />
+          <span>
+            <strong>UMak Society of Innovative Computing</strong>
+            <small>PUBLIC DELIVERY</small>
+          </span>
+        </Link>
+        <Link className="quiet-link" href="/">
+          Find another photo
+        </Link>
+      </header>
       <section className="public-output-card" aria-labelledby="output-title">
-        <p className="public-output-kicker">SIC PHOTOBOOTH</p>
-        <h1 id="output-title">Your {label.toLowerCase()}</h1>
-        <p className="public-output-meta">
-          {output.event_name} · {output.event_date}
-        </p>
-        <img
-          className="public-output-media"
-          src={output.cloudinary_url}
-          alt={`${label} from ${output.event_name}`}
-        />
-        <a className="public-output-download" href={output.cloudinary_url} download>
-          Download original
-        </a>
+        <div className="output-intro">
+          <p className="eyebrow">{output.sessionType === 'flipbook' ? 'LOOPING FLIPBOOK' : 'PHOTO STRIP'}</p>
+          <h1 id="output-title">Your {label}</h1>
+          <p className="public-output-meta">{output.eventName}</p>
+          <p className="public-output-date">{formatEventDate(output.eventDate)}</p>
+        </div>
+        <figure className="public-output-frame">
+          <img className="public-output-media" src={output.mediaUrl} alt={`${label} from ${output.eventName}`} />
+        </figure>
+        <div className="output-actions">
+          <a
+            className="public-output-download"
+            href={`/${output.publicId}/download`}
+          >
+            Save {label.toLowerCase()}
+          </a>
+          <p className="public-output-note">Available for two months after the event.</p>
+        </div>
       </section>
+      <footer className="site-footer">
+        <p>UMak Society of Innovative Computing</p>
+      </footer>
     </main>
   );
 }

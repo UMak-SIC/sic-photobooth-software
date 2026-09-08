@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3001",
+    "dev": "next dev --port 3002",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@photobooth/public-output": "workspace:*",
+    "jsqr": "^1.4.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -14,6 +14,7 @@ Thumbs.db
 
 # Design-sheet exports
 *.png
+!app/public-website/public/sic-logo.png
 
 # Playwright MCP browser state
 .playwright-mcp/
@@ -26,4 +27,3 @@ app/storage/
 # Local dev certificates
 certificates/
 *.pem
-

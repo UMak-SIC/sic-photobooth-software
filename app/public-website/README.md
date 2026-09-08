@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UMak SIC Photobooth Public Website
+
+The Vercel-hosted retrieval website resolves a public seven-character output ID to finalized Cloudinary media. It never contacts the local photobooth backend.
 
 ## Getting Started
 
-First, run the development server:
+From the repository root, configure the server-only Supabase values:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp app/public-website/.env.example app/public-website/.env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `app/public-website/.env.local` for development, and in Vercel for deployment. Do not set either value with a `NEXT_PUBLIC_` prefix.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm --filter public-website dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3002](http://localhost:3002). The public output route is `/:id`.
 
-## Learn More
+## Security Boundary
 
-To learn more about Next.js, take a look at the following resources:
+- Supabase REST and rate-limit RPC requests run only through `'use server'` modules.
+- The Supabase service role key is never available to browser code.
+- Browser code receives only approved delivery metadata and a public Cloudinary asset URL.
+- Cloudinary delivery URLs are public by design; they are not Cloudinary management credentials.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Checks
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm --filter public-website lint
+pnpm --filter public-website typecheck
+pnpm --filter public-website build
+pnpm vitest run app/public-website
+```
