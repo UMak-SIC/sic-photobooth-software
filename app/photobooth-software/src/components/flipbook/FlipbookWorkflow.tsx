@@ -14,6 +14,7 @@ import { FlipbookCompletionScreen } from './FlipbookCompletionScreen';
 
 export function FlipbookWorkflow() {
   const {
+    sessionId,
     currentStep,
     setSession,
     setSelectedEvent,
@@ -21,7 +22,7 @@ export function FlipbookWorkflow() {
     setError,
     resetFlipbook,
   } = useFlipbookStore();
-  const { setActiveSession, clearActiveSession } = useSessionStore();
+  const { setActiveSession, backToExperienceChoice } = useSessionStore();
 
   const handleEventContinue = async (selectedEvent: Event, operatorName: string) => {
     setError(null);
@@ -36,20 +37,31 @@ export function FlipbookWorkflow() {
       setSession(session.sessionId, session.token);
       setActiveSession({ id: session.sessionId, type: 'flipbook', token: session.token });
       setSelectedEvent({ id: selectedEvent.id, name: selectedEvent.name, date, operatorName });
-      setStep('instructions');
+      setStep('frame_select');
     } catch (err: unknown) {
       console.warn('Backend session creation failed, continuing in mock session mode:', err);
       const mockId = `mock-flipbook-${Date.now()}`;
       setSession(mockId, 'mock-token');
       setActiveSession({ id: mockId, type: 'flipbook' });
       setSelectedEvent({ id: selectedEvent.id, name: selectedEvent.name, date, operatorName });
-      setStep('instructions');
+      setStep('frame_select');
     }
   };
 
-  const handleBackToWelcome = () => {
+  const handleStartCapturing = async () => {
+    if (sessionId && !sessionId.startsWith('mock-')) {
+      try {
+        await boothApi.acknowledgeInstructions(sessionId);
+      } catch (err) {
+        console.warn('Backend instructions acknowledgement failed:', err);
+      }
+    }
+    setStep('cover_capture');
+  };
+
+  const handleBackToExperience = () => {
     resetFlipbook();
-    clearActiveSession();
+    backToExperienceChoice();
   };
 
   switch (currentStep) {
@@ -57,15 +69,18 @@ export function FlipbookWorkflow() {
       return null;
     case 'setup':
       return (
-        <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
+        <div className="flex flex-1 w-full min-h-[100vh] bg-[#f4f6f5]">
           <EventSelectScreen
             onContinue={handleEventContinue}
-            onBack={handleBackToWelcome}
+            onBack={handleBackToExperience}
+            backButtonText="Back to experience choice"
           />
         </div>
       );
+    case 'frame_select':
+      return <FrameSelectScreen onBack={handleBackToExperience} />;
     case 'instructions':
-      return <InstructionsScreen />;
+      return <InstructionsScreen onStart={handleStartCapturing} />;
     case 'cover_capture':
       return <CoverCaptureScreen />;
     case 'video_capture':
@@ -76,11 +91,9 @@ export function FlipbookWorkflow() {
       return <FlipReviewVideoScreen />;
     case 'processing':
       return <ProcessingScreen />;
-    case 'frame_select':
-      return <FrameSelectScreen onBack={() => setStep('instructions')} />;
     case 'complete':
       return <FlipbookCompletionScreen />;
     default:
-      return <InstructionsScreen />;
+      return <FrameSelectScreen onBack={handleBackToExperience} />;
   }
 }

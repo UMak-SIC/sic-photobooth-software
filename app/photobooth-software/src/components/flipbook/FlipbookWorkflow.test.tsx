@@ -49,8 +49,8 @@ describe('FlipbookWorkflow event selection and navigation', () => {
 
     render(<FlipbookWorkflow />);
 
-    expect(screen.getByText('EVENT DETAILS')).toBeDefined();
-    expect(screen.getByText('Select the event.')).toBeDefined();
+    expect(screen.getByText('SIC PHOTOBOOTH')).toBeDefined();
+    expect(screen.getByText('Which event are you operating?')).toBeDefined();
 
     const backButton = screen.getByRole('button', { name: /Back to experience choice/i });
     expect(backButton).toBeDefined();
@@ -63,7 +63,7 @@ describe('FlipbookWorkflow event selection and navigation', () => {
     expect(sessionState.activeSession).toBeNull();
   });
 
-  it('creates backend session and advances to instructions on Continue from EventSelectScreen', async () => {
+  it('creates backend session and advances to frame_select on Continue from EventSelectScreen', async () => {
     const mockEvents: EventItem[] = [
       { id: 'evt-2', name: 'College Week 2026', date: '2026-06-18', operatorName: 'J. Domingo' },
     ];
@@ -91,7 +91,7 @@ describe('FlipbookWorkflow event selection and navigation', () => {
 
     await waitFor(() => {
       const flipbookState = useFlipbookStore.getState();
-      expect(flipbookState.currentStep).toBe('instructions');
+      expect(flipbookState.currentStep).toBe('frame_select');
       expect(flipbookState.sessionId).toBe('session-flip-999');
       expect(flipbookState.sessionToken).toBe('token-flip-999');
       expect(flipbookState.selectedEvent?.name).toBe('College Week 2026');
@@ -112,7 +112,7 @@ describe('FlipbookWorkflow event selection and navigation', () => {
     });
   });
 
-  it('navigates from instructions to frame_select on start button click', async () => {
+  it('navigates from instructions to cover_capture on start button click', async () => {
     vi.spyOn(boothApi, 'acknowledgeInstructions').mockResolvedValue(undefined);
 
     useFlipbookStore.setState({
@@ -123,18 +123,18 @@ describe('FlipbookWorkflow event selection and navigation', () => {
 
     render(<FlipbookWorkflow />);
 
-    const startButton = screen.getByRole('button', { name: /Choose Frame|Start/i });
+    const startButton = screen.getByRole('button', { name: /LET'S GO|Start/i });
     expect(startButton).toBeDefined();
 
     fireEvent.click(startButton);
 
     await waitFor(() => {
       const flipbookState = useFlipbookStore.getState();
-      expect(flipbookState.currentStep).toBe('frame_select');
+      expect(flipbookState.currentStep).toBe('cover_capture');
     });
   });
 
-  it('navigates back to instructions from frame_select screen', async () => {
+  it('navigates back to experience choice from frame_select screen', async () => {
     vi.spyOn(boothApi, 'listFrames').mockResolvedValue([
       {
         id: 'frame-1',
@@ -158,7 +158,8 @@ describe('FlipbookWorkflow event selection and navigation', () => {
 
     fireEvent.click(backButton);
 
-    const flipbookState = useFlipbookStore.getState();
-    expect(flipbookState.currentStep).toBe('instructions');
+    const sessionState = useSessionStore.getState();
+    expect(sessionState.activeSession).toBeNull();
+    expect(sessionState.stage).toBe('choose_experience');
   });
 });

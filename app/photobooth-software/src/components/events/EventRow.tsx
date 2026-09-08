@@ -1,6 +1,7 @@
 export type Event = {
   id: string;
   name: string;
+  description?: string;
   date: string;
   operatorName: string;
 };
@@ -8,6 +9,7 @@ export type Event = {
 export interface EventRowProps {
   event?: Event;
   title?: string;
+  description?: string;
   date?: string;
   active?: boolean;
   selected?: boolean;
@@ -18,6 +20,7 @@ export interface EventRowProps {
 export function EventRow({
   event,
   title,
+  description,
   date,
   active = false,
   selected = false,
@@ -25,6 +28,7 @@ export function EventRow({
   onClick,
 }: EventRowProps) {
   const displayTitle = title ?? event?.name ?? '';
+  const displayDescription = description ?? event?.description;
   const displayDate = date ?? event?.date ?? '';
   const displayOperator = event?.operatorName;
 
@@ -41,6 +45,9 @@ export function EventRow({
       >
         <span>
           <strong className="block text-[17px] text-[#113b33]">{displayTitle}</strong>
+          {displayDescription && (
+            <p className="mt-0.5 text-xs text-[#5b8176]">{displayDescription}</p>
+          )}
           <small className="mt-1 block text-[13px] text-[#5b8176]">
             {displayDate}
             {displayOperator ? ` · ${displayOperator}` : ''}
@@ -61,6 +68,9 @@ export function EventRow({
     <div className="flex items-center justify-between border-b border-[#dcefe8] px-6 py-5 last:border-0">
       <span>
         <strong className="block text-[15px]">{displayTitle}</strong>
+        {displayDescription && (
+          <p className="mt-0.5 text-xs text-[#64877d]">{displayDescription}</p>
+        )}
         <small className="mt-1 block text-[12px] text-[#64877d]">
           {displayDate}
           {displayOperator ? ` · ${displayOperator}` : ''}

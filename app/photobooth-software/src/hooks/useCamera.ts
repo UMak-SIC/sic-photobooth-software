@@ -58,6 +58,13 @@ export function useCamera() {
       }
 
       streamRef.current = stream;
+
+      // Persist active camera deviceId if not already stored
+      const activeDeviceId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+      if (activeDeviceId && !window.localStorage.getItem(SELECTED_CAMERA_STORAGE_KEY)) {
+        window.localStorage.setItem(SELECTED_CAMERA_STORAGE_KEY, activeDeviceId);
+      }
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.muted = true;
@@ -212,7 +219,8 @@ export function useCamera() {
         recorder.start(100);
         setIsRecording(true);
 
-        // Auto stop after exact duration
+        // Auto stop after duration + small buffer for browser MediaRecorder startup latency
+        const bufferMs = 400;
         setTimeout(() => {
           if (recorder.state === 'recording') {
             try {
@@ -222,7 +230,7 @@ export function useCamera() {
             }
             recorder.stop();
           }
-        }, durationSeconds * 1000);
+        }, durationSeconds * 1000 + bufferMs);
       });
     },
     [],

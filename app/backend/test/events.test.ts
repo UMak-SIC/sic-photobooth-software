@@ -26,4 +26,29 @@ describe('Event routes', () => {
       error: { code: 'INVALID_REQUEST' },
     });
   });
+
+  it('creates and deletes an event', async () => {
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/events',
+      payload: {
+        name: 'Backend Test Event',
+        date: '2026-10-15',
+        operatorName: 'Operator Test',
+      },
+    });
+    expect(createRes.statusCode).toBe(201);
+    const created = JSON.parse(createRes.body);
+    expect(created.data.id).toBeDefined();
+
+    const deleteRes = await app.inject({
+      method: 'DELETE',
+      url: `/api/events/${created.data.id}`,
+    });
+    expect(deleteRes.statusCode).toBe(200);
+    expect(JSON.parse(deleteRes.body)).toMatchObject({
+      success: true,
+      data: { id: created.data.id },
+    });
+  });
 });

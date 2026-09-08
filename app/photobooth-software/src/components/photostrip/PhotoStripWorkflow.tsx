@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { usePhotoStripStore } from '../../store/photostrip-store';
 import { useSessionStore } from '../../store/session-store';
 import { EventSelectScreen } from '../events/EventSelectScreen';
 import { TemplatePicker } from './TemplatePicker';
+import { PhotoStripInstructionsScreen } from './PhotoStripInstructionsScreen';
 import { CameraViewfinder } from '../CameraViewfinder';
 import { PhotoStripReview, type ReviewTemplate } from './PhotoStripReview';
 import { PrintModal } from './PrintModal';
@@ -14,6 +15,8 @@ export const PhotoStripWorkflow: React.FC = () => {
     sessionId,
     selectedTemplate,
     captures,
+    photoPool,
+    slotAssignments,
     retakeCount,
     activeSlotIndex,
     isRetaking,
@@ -34,6 +37,8 @@ export const PhotoStripWorkflow: React.FC = () => {
     stopCountdown,
     addCapture,
     startRetake,
+    assignPhotoToSlot,
+    toggleCaptureVersion,
     setConfirmedOutput,
     setIsConfirming,
     setError,
@@ -41,8 +46,12 @@ export const PhotoStripWorkflow: React.FC = () => {
     resetPhotoStrip,
   } = usePhotoStripStore();
 
-  const { setActiveSession, clearActiveSession } = useSessionStore();
-  const [, setUploading] = useState(false);
+  const { setActiveSession, backToExperienceChoice } = useSessionStore();
+
+  const handleBackToExperience = () => {
+    resetPhotoStrip();
+    backToExperienceChoice();
+  };
 
   // 1. Event Selection (Setup)
   const handleEventContinue = async (selectedEvent: EventItem, operatorName: string) => {
@@ -69,17 +78,28 @@ export const PhotoStripWorkflow: React.FC = () => {
     }
   };
 
-  // 2. Template Selection
+  // 2. Template Selection (Advances to Instructions)
   const handleSelectTemplate = async (template: ReviewTemplate) => {
     if (sessionId && !sessionId.startsWith('mock-')) {
       try {
         await boothApi.selectTemplate(sessionId, template.id);
-        await boothApi.transition(sessionId, 'capturing');
       } catch (err) {
         console.warn('Backend template selection failed, continuing in local mode:', err);
       }
     }
     setTemplate(template);
+  };
+
+  // 2b. Start Capturing from Instructions (Manual click or 6-sec auto-advance)
+  const handleStartCapturing = async () => {
+    if (sessionId && !sessionId.startsWith('mock-')) {
+      try {
+        await boothApi.transition(sessionId, 'capturing');
+      } catch (err) {
+        console.warn('Backend transition to capturing failed:', err);
+      }
+    }
+    setStep('capturing');
   };
 
   // 3. Retake Trigger
@@ -111,23 +131,24 @@ export const PhotoStripWorkflow: React.FC = () => {
       const targetSlot = activeSlotIndex;
       const retakingFlag = isRetaking;
 
-      setUploading(true);
       try {
         if (sessionId && !sessionId.startsWith('mock-')) {
           await boothApi.uploadPhotoCapture(sessionId, blob, targetSlot, retakingFlag);
         }
       } catch (err) {
         console.warn('Photo upload to backend failed, continuing with local blob:', err);
+        const message = err instanceof Error ? err.message : 'Photo upload failed on backend.';
+        setError(message);
       } finally {
-        setUploading(false);
         addCapture(blob, targetSlot);
       }
     },
-    [sessionId, activeSlotIndex, isRetaking, stopCountdown, addCapture],
+    [sessionId, activeSlotIndex, isRetaking, stopCountdown, addCapture, setError],
   );
 
   // 5. Confirm Photo Strip
   const handleConfirm = async () => {
+    if (isConfirming) return;
     setIsConfirming(true);
     setError(null);
     try {
@@ -164,22 +185,36 @@ export const PhotoStripWorkflow: React.FC = () => {
   // 7. Finish & Return
   const handleFinish = () => {
     resetPhotoStrip();
-    clearActiveSession();
+    backToExperienceChoice();
   };
 
   // RENDER BASED ON CURRENT STEP
   if (currentStep === 'setup') {
     return (
-      <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
-        <EventSelectScreen onContinue={handleEventContinue} onBack={handleFinish} />
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#f4f6f5]">
+        <EventSelectScreen onContinue={handleEventContinue} onBack={handleBackToExperience} backButtonText="Back" />
       </div>
     );
   }
 
   if (currentStep === 'template_select') {
     return (
+      <div className="flex flex-1 w-full min-h-[100vh] bg-[#f4f6f5]">
+        <TemplatePicker
+          onSelectTemplate={handleSelectTemplate}
+          onBack={handleBackToExperience}
+        />
+      </div>
+    );
+  }
+
+  if (currentStep === 'instructions') {
+    return (
       <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
-        <TemplatePicker onSelectTemplate={handleSelectTemplate} />
+        <PhotoStripInstructionsScreen
+          template={selectedTemplate}
+          onStart={handleStartCapturing}
+        />
       </div>
     );
   }
@@ -189,6 +224,10 @@ export const PhotoStripWorkflow: React.FC = () => {
       ? (selectedTemplate.requiredCaptureCount ??
          new Set(selectedTemplate.placements.map((p) => p.captureIndex)).size)
       : 3;
+    const currentPlacement =
+      selectedTemplate?.placements.find((p) => p.captureIndex === activeSlotIndex) ||
+      selectedTemplate?.placements[0];
+
     return (
       <div className="flex flex-1 w-full min-h-[100vh] bg-[#071d1a]">
         <CameraViewfinder
@@ -197,6 +236,9 @@ export const PhotoStripWorkflow: React.FC = () => {
           activeSlotIndex={activeSlotIndex}
           totalSlots={totalSlots}
           isRetaking={isRetaking}
+          slotWidth={currentPlacement?.width}
+          slotHeight={currentPlacement?.height}
+          captures={captures}
           onCountdownComplete={handleCountdownComplete}
           onCancelCountdown={stopCountdown}
         />
@@ -210,10 +252,14 @@ export const PhotoStripWorkflow: React.FC = () => {
         <PhotoStripReview
           template={selectedTemplate ?? undefined}
           captures={captures}
+          photoPool={photoPool}
+          slotAssignments={slotAssignments}
           retakeCount={retakeCount}
           isConfirming={isConfirming}
           errorMessage={errorMessage}
           onRetake={handleRetake}
+          onAssignPhoto={assignPhotoToSlot}
+          onToggleVersion={toggleCaptureVersion}
           onConfirm={handleConfirm}
         />
       </div>

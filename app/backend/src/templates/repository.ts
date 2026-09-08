@@ -99,7 +99,7 @@ export function mapTemplate(
       x: Number(overlay.x),
       y: Number(overlay.y),
       width: Number(overlay.width),
-      height: Number(overlay.width),
+      height: Number(overlay.height),
       rotation: Number(overlay.rotation),
       zIndex: Number(overlay.zIndex),
     })),

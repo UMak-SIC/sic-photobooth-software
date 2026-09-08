@@ -118,7 +118,7 @@ describe('template persistence boundaries', () => {
       borderRadius: 0,
       zIndex: 1,
     });
-    expect(template.overlays[0]).toMatchObject({ width: 240, height: 240 });
+    expect(template.overlays[0]).toMatchObject({ width: 240, height: 160 });
     expect(template.sortOrder).toBe(2);
   });
 

@@ -2,10 +2,12 @@ import type { FormEvent } from 'react';
 
 type CreateEventFormProps = {
   name: string;
+  description?: string;
   date: string;
   operatorName: string;
   error: string;
   onNameChange: (value: string) => void;
+  onDescriptionChange?: (value: string) => void;
   onDateChange: (value: string) => void;
   onOperatorNameChange: (value: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -13,10 +15,12 @@ type CreateEventFormProps = {
 
 export function CreateEventForm({
   name,
+  description = '',
   date,
   operatorName,
   error,
   onNameChange,
+  onDescriptionChange,
   onDateChange,
   onOperatorNameChange,
   onSubmit,
@@ -33,6 +37,17 @@ export function CreateEventForm({
           value={name}
         />
       </label>
+      {onDescriptionChange !== undefined && (
+        <label className="mt-4 block text-[12px] font-bold">
+          Description
+          <textarea
+            rows={2}
+            className="mt-2 w-full resize-none rounded-lg border border-[#98cdbd] bg-white px-3 py-2"
+            onChange={(event) => onDescriptionChange(event.target.value)}
+            value={description}
+          />
+        </label>
+      )}
       <label className="mt-4 block text-[12px] font-bold">
         Event date
         <input
@@ -58,7 +73,7 @@ export function CreateEventForm({
         </p>
       )}
       <button
-        className="mt-5 rounded-lg bg-[#146a56] px-4 py-2 text-[12px] font-bold text-white"
+        className="mt-5 rounded-lg bg-[#146a56] px-4 py-2 text-[12px] font-bold text-white cursor-pointer"
         type="submit"
       >
         Save event

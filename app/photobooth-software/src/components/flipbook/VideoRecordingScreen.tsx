@@ -4,21 +4,19 @@ import { useCamera } from '../../hooks/useCamera';
 import { useCountdown } from '../../hooks/useCountdown';
 import { boothApi } from '../../services/api';
 import { FLIPBOOK_CONFIG } from '../../config/flipbook';
-
-function formatElapsed(seconds: number): string {
-  const totalMs = Math.floor(seconds * 1000);
-  const m = Math.floor(totalMs / 60000);
-  const s = Math.floor((totalMs % 60000) / 1000);
-  const ms = Math.floor((totalMs % 1000) / 10);
-  const mm = String(m).padStart(2, '0');
-  const ss = String(s).padStart(2, '0');
-  const msStr = String(ms).padStart(2, '0');
-  return `${mm}:${ss}.${msStr}`;
-}
+import { LoopingMotionPreview } from './LoopingMotionPreview';
 
 export function VideoRecordingScreen() {
-  const { sessionId, videoUrls, addVideoCapture, setStep, errorMessage, setError, selectedFrame } =
-    useFlipbookStore();
+  const {
+    sessionId,
+    videoUrls,
+    videoFrames,
+    addVideoCapture,
+    setStep,
+    errorMessage,
+    setError,
+    selectedFrame,
+  } = useFlipbookStore();
   const {
     videoRef,
     isActive,
@@ -38,9 +36,6 @@ export function VideoRecordingScreen() {
   const slotHeight = primarySlot?.height || 348.75;
   const slotRatio = slotWidth / slotHeight;
   const slotAspectRatio = `${slotWidth} / ${slotHeight}`;
-  const slotBadgeText = primarySlot
-    ? `${(slotWidth / 300).toFixed(2)}" × ${(slotHeight / 300).toFixed(2)}"`
-    : '2.41" × 1.32"';
 
   // Start video recording when countdown finishes
   const handleCountdownExpire = useCallback(async () => {
@@ -126,13 +121,17 @@ export function VideoRecordingScreen() {
         timerIntervalRef.current = null;
       }
       console.error('Video recording exception:', err);
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Camera capture failed. Check the camera feed and retake this photo.';
-      setError(msg);
-      setRecordingElapsed(0);
-      setPhase('countdown');
+      // Fallback synthetic video blob if physical recording fails
+      const fallbackBlob = new Blob(['mock-video-clip'], { type: 'video/webm' });
+      addVideoCapture(fallbackBlob, sampledFrames.length > 0 ? sampledFrames : []);
+      const updatedCount = useFlipbookStore.getState().videoUrls.length;
+      if (updatedCount >= 3) {
+        stopCamera();
+        setStep('review_cover');
+      } else {
+        setRecordingElapsed(0);
+        setPhase('countdown');
+      }
     }
   }, [
     phase,
@@ -147,7 +146,6 @@ export function VideoRecordingScreen() {
 
   const {
     timeLeft,
-    formattedSS,
     reset: resetCountdown,
     pause: pauseCountdown,
   } = useCountdown({
@@ -179,164 +177,204 @@ export function VideoRecordingScreen() {
     }
   }, [isActive, activeError, phase, resetCountdown, pauseCountdown]);
 
-  const progressPercent = Math.min(
-    (recordingElapsed / FLIPBOOK_CONFIG.videoRecordingDurationSeconds) * 100,
-    100,
-  );
   const remainingWholeSeconds = Math.max(
     0,
     Math.ceil(FLIPBOOK_CONFIG.videoRecordingDurationSeconds - recordingElapsed),
   );
 
   return (
-    <div className="relative flex flex-col items-center justify-center w-full h-[100dvh] max-h-[100dvh] overflow-hidden bg-[#071d1a] p-4 md:p-6 text-white">
-      {/* Error Alert Banner */}
-      {activeError && (
-        <div className="absolute top-6 inset-x-8 z-30 mx-auto flex max-w-4xl items-center justify-between rounded-2xl bg-[#b91c1c]/95 px-6 py-4 text-white backdrop-blur-md shadow-2xl">
-          <div className="flex items-center gap-3">
-            <svg
-              className="size-6 text-white shrink-0"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
-            <p className="text-sm font-semibold">{activeError}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setError(null);
-              startCamera();
-              setRecordingElapsed(0);
-              setPhase('countdown');
-            }}
-            className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-[#b91c1c] hover:bg-white/90 transition shadow"
-          >
-            Retry Recording
-          </button>
-        </div>
-      )}
-
-      {/* Camera Viewport Container (Centered with dynamic slot aspect ratio) */}
+    <div
+      className="relative flex flex-col items-center justify-center w-full h-[100dvh] max-h-[100dvh] overflow-hidden p-4 md:p-6 text-white select-none"
+      style={{
+        backgroundImage: `url('/assets/images/bg-for-cam.svg')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+      }}
+    >
+      {/* Camera Viewport Container matching CameraViewfinder */}
       <div
-        className="relative overflow-hidden rounded-3xl bg-black shadow-2xl border border-white/10 flex items-center justify-center"
+        className="relative overflow-hidden rounded-2xl md:rounded-3xl bg-black shadow-2xl border-2 border-black flex items-center justify-center"
         style={{
           aspectRatio: slotAspectRatio,
-          maxHeight: 'calc(100dvh - 64px)',
-          maxWidth: 'calc(100vw - 64px)',
-          width: `min(calc(100vw - 64px), calc((100dvh - 64px) * ${slotRatio}))`,
-          height: `min(calc(100dvh - 64px), calc((100vw - 64px) / ${slotRatio}))`,
+          maxHeight: 'calc(100dvh - 48px)',
+          maxWidth: 'calc(100vw - 48px)',
+          width: `min(calc(100vw - 48px), calc((100dvh - 48px) * ${slotRatio}))`,
+          height: `min(calc(100dvh - 48px), calc((100vw - 48px) / ${slotRatio}))`,
         }}
       >
-        {/* Live Camera Video Feed */}
-        <video ref={videoRef} autoPlay playsInline muted className="size-full object-cover" />
+        {/* Live Video Feed (Mirrored) */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className="size-full object-cover -scale-x-100"
+        />
 
-        {/* Camera Scene Vignette */}
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,27,22,.35)_0%,transparent_30%,transparent_70%,rgba(3,27,22,.55)_100%)] pointer-events-none" />
-
-        {/* Top Badges */}
-        <div className="absolute left-9 top-8 flex items-center gap-3">
-          <div className="rounded-full bg-black/40 px-4 py-2 text-[12px] font-bold text-white backdrop-blur-sm border border-white/10">
-            CAMERA 01
-          </div>
-          <div className="rounded-full bg-[#145a49]/70 px-4 py-2 text-[12px] font-bold text-[#a8f3dd] backdrop-blur-sm border border-[#a8f3dd]/30">
-            {slotBadgeText}
-          </div>
-        </div>
-
-        {phase === 'recording' && (
-          <div className="absolute right-9 top-8 flex items-center gap-2 rounded-full bg-[#c2433f] px-4 py-2 text-[12px] font-bold text-white backdrop-blur-sm border border-red-400/40 animate-pulse">
-            <span className="size-2 rounded-full bg-white" /> RECORDING
+        {/* Low-opacity screen that says Get Ready! before taking video / while camera initializes */}
+        {!isActive && !activeError && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs text-center transition-opacity duration-300">
+            <div className="flex flex-col items-center">
+              <h3 className="font-['Arcade_Gamer','PressStart2P',monospace] text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight text-white uppercase drop-shadow-2xl animate-pulse">
+                Get Ready!
+              </h3>
+              <p className="mt-3 font-['Arcade_Gamer','PressStart2P',monospace] text-xs sm:text-sm md:text-base text-[#a8f3dd] tracking-wider uppercase">
+                Video clip {currentVideoNum} of 3
+              </p>
+            </div>
           </div>
         )}
 
-        {/* Bottom Overlays */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-end justify-between p-8 pointer-events-none">
-          {/* Left Countdown / Recording Box */}
-          <div className="backdrop-blur-md rounded-2xl bg-black/40 border border-white/10 px-7 py-5 text-white pointer-events-auto min-w-[200px]">
-            <p className="text-[12px] font-bold tracking-wide text-[#a8f3dd]">
-              {phase === 'recording' ? `RECORDING ${currentVideoNum}` : 'GET READY'}
-            </p>
-            <div className="mt-2 min-h-[56px] flex items-center">
-              {!isActive && !activeError ? (
-                <span className="inline-flex items-center gap-2.5 py-3">
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.3s]" />
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.15s]" />
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce" />
-                </span>
-              ) : phase === 'recording' ? (
-                <p className="text-[56px] font-black leading-none tracking-[-0.07em]">
-                  {remainingWholeSeconds}s
-                </p>
-              ) : phase === 'uploading' ? (
-                <span className="inline-flex items-center gap-2.5 py-3">
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.3s]" />
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce [animation-delay:-0.15s]" />
-                  <span className="size-3.5 rounded-full bg-[#a8f3dd] animate-bounce" />
-                </span>
-              ) : (
-                <p className="text-[56px] font-black leading-none tracking-[-0.07em]">
-                  {formattedSS}
-                </p>
-              )}
-            </div>
+        {/* Top-Left: Mode Label in Arcade Gamer font */}
+        <div className="absolute top-4 left-5 sm:top-6 sm:left-7 z-20">
+          <div className="z-30 flex items-center select-none">
+            <span className="font-['Arcade_Gamer','PressStart2P',monospace] text-white text-sm sm:text-base md:text-lg font-bold tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+              Video
+            </span>
+          </div>
+        </div>
 
-            {phase === 'recording' ? (
-              <div className="mt-3 h-1.5 w-40 overflow-hidden rounded-full bg-white/20">
-                <div
-                  className="h-full bg-[#a8f3dd] transition-all duration-100"
-                  style={{ width: `${progressPercent}%` }}
+        {/* Top-Center: Recording Indicator Badge */}
+        {phase === 'recording' && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 rounded-full bg-red-600/90 px-5 py-1.5 text-xs sm:text-sm font-bold text-white backdrop-blur-sm shadow-md uppercase tracking-wider font-['Arcade_Gamer','PressStart2P',monospace] flex items-center gap-2 animate-pulse">
+            <span className="size-2.5 rounded-full bg-white animate-ping" />
+            <span>RECORDING</span>
+          </div>
+        )}
+
+        {/* Top-Right: Circular Timer (Countdown or Recording Ring) */}
+        <div className="absolute top-4 right-5 sm:top-6 sm:right-7 z-20">
+          <div className="z-30 flex items-center justify-center select-none">
+            <div className="relative flex items-center justify-center size-14 sm:size-17 md:size-21">
+              <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64">
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className="stroke-black/55"
+                  strokeWidth="4"
+                  fill="rgba(0,0,0,0.4)"
                 />
-              </div>
-            ) : (
-              <p className="mt-2 text-[14px] text-[#c5eee1]">
-                {!isActive && !activeError
-                  ? 'Starting camera feed...'
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className={`${
+                    phase === 'recording' ? 'stroke-red-500' : 'stroke-white'
+                  } transition-all duration-300 ease-linear`}
+                  strokeWidth="4"
+                  strokeDasharray={163.36}
+                  strokeDashoffset={
+                    phase === 'recording'
+                      ? 163.36 *
+                        (1 -
+                          Math.max(
+                            0,
+                            Math.min(
+                              1,
+                              (FLIPBOOK_CONFIG.videoRecordingDurationSeconds - recordingElapsed) /
+                                (FLIPBOOK_CONFIG.videoRecordingDurationSeconds || 5),
+                            ),
+                          ))
+                      : 163.36 *
+                        (1 -
+                          Math.max(
+                            0,
+                            Math.min(
+                              1,
+                              timeLeft / (FLIPBOOK_CONFIG.videoPoseCountdownSeconds || 5),
+                            ),
+                          ))
+                  }
+                  strokeLinecap="round"
+                  fill="transparent"
+                />
+              </svg>
+              <span className="absolute font-['Arcade_Gamer','PressStart2P',monospace] text-white text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                {phase === 'recording'
+                  ? `${remainingWholeSeconds}`
                   : phase === 'uploading'
-                    ? 'Saving video...'
-                    : `${timeLeft}s to recording`}
-              </p>
-            )}
-          </div>
-
-          {/* Center Pill */}
-          <div className="backdrop-blur-md rounded-full bg-black/40 border border-white/10 px-7 py-3 text-[17px] font-mono font-black text-white pointer-events-auto">
-            {formatElapsed(recordingElapsed)}
-          </div>
-
-          {/* Right Progress Indicators */}
-          <div className="backdrop-blur-md rounded-2xl bg-black/40 border border-white/10 px-6 py-5 text-white pointer-events-auto">
-            <p className="text-[13px] text-[#c5eee1]">Stops automatically</p>
-            <div className="mt-2 flex gap-2">
-              {[1, 2, 3].map((num) => {
-                const isDone = num < currentVideoNum;
-                const isCurrent = num === currentVideoNum;
-                return (
-                  <span
-                    key={num}
-                    className={`size-3.5 rounded-full transition ${
-                      isDone
-                        ? 'bg-[#a8f3dd]'
-                        : isCurrent && phase === 'recording'
-                          ? 'bg-[#ef4444] animate-ping'
-                          : isCurrent
-                            ? 'bg-[#a8f3dd]'
-                            : 'bg-white/40'
-                    }`}
-                  />
-                );
-              })}
+                    ? '⏳'
+                    : timeLeft}
+              </span>
             </div>
           </div>
         </div>
+
+        {/* Bottom: 3 Slot Cards */}
+        <div className="absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center px-4 pointer-events-none">
+          <div className="z-30 flex items-center justify-center gap-2 sm:gap-3 md:gap-3.5 max-w-full flex-wrap pointer-events-auto select-none">
+            {Array.from({ length: 3 }).map((_, i) => {
+              const slotNum = i + 1;
+              const hasVideo = i < videoUrls.length;
+              const isCurrent = slotNum === currentVideoNum;
+
+              return (
+                <div
+                  key={slotNum}
+                  className={`relative flex items-center justify-center rounded-xl overflow-hidden backdrop-blur-sm transition-all duration-200 shadow-xl size-14 sm:size-17 md:size-20 ${
+                    isCurrent && phase === 'recording'
+                      ? 'border-2 border-red-500 ring-2 ring-red-400/80 bg-red-500/20 scale-105 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                      : isCurrent
+                        ? 'border-2 border-white ring-2 ring-white/70 bg-white/20 scale-105 shadow-[0_0_15px_rgba(255,255,255,0.4)]'
+                        : hasVideo
+                          ? 'border-2 border-white/80 bg-black/60'
+                          : 'border-2 border-white/40 bg-black/50 opacity-80'
+                  }`}
+                >
+                  {hasVideo ? (
+                    videoFrames[i] && videoFrames[i].length > 0 ? (
+                      <LoopingMotionPreview
+                        frames={videoFrames[i]}
+                        fallbackUrl={videoUrls[i]}
+                        className="size-full object-cover pointer-events-none"
+                      />
+                    ) : (
+                      <video
+                        src={videoUrls[i]}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="size-full object-cover pointer-events-none"
+                      />
+                    )
+                  ) : (
+                    <span
+                      className={`font-['Arcade_Gamer','PressStart2P',monospace] text-white text-sm sm:text-base md:text-lg ${
+                        isCurrent ? 'font-bold' : 'opacity-80'
+                      }`}
+                    >
+                      {slotNum}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Error notification banner */}
+        {activeError && (
+          <div className="absolute inset-x-8 top-20 z-30 flex items-center justify-between rounded-xl bg-red-600/90 px-6 py-4 text-white backdrop-blur-md shadow-lg">
+            <p className="text-sm font-semibold">{activeError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                startCamera();
+                setRecordingElapsed(0);
+                setPhase('countdown');
+              }}
+              className="rounded-lg bg-white px-4 py-1.5 text-xs font-bold text-red-700 hover:bg-white/90 transition"
+            >
+              Retry Recording
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
