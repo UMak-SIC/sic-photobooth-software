@@ -70,7 +70,9 @@ export function CameraSetupModal({
       const activeId =
         deviceId || stream.getVideoTracks()[0]?.getSettings().deviceId || nextDevices[0]?.deviceId || '';
       setSelectedDeviceId(activeId);
-      if (activeId) window.localStorage.setItem(SELECTED_CAMERA_STORAGE_KEY, activeId);
+      if (activeId && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem(SELECTED_CAMERA_STORAGE_KEY, activeId);
+      }
     } catch (cameraError) {
       const hasLivePreview = streamRef.current?.active && previewRef.current?.srcObject === streamRef.current;
       if (!hasLivePreview) {
@@ -89,7 +91,8 @@ export function CameraSetupModal({
   };
 
   useEffect(() => {
-    void requestCamera(window.localStorage.getItem(SELECTED_CAMERA_STORAGE_KEY) || undefined);
+    const savedId = typeof window !== 'undefined' && window.localStorage ? window.localStorage.getItem(SELECTED_CAMERA_STORAGE_KEY) : null;
+    void requestCamera(savedId || undefined);
     return stopPreview;
   }, []);
 
