@@ -65,7 +65,6 @@ function VideoCardItem({
           </div>
         )}
       </button>
-
       {/* Large Digit Number Below */}
       <span className="text-[38px] sm:text-[48px] md:text-[56px] font-bold text-[#1e293b] leading-none mt-3.5 select-none">
         {index}
@@ -191,5 +190,3 @@ export function FlipReviewVideoScreen() {
     </div>
   );
 }
-
-

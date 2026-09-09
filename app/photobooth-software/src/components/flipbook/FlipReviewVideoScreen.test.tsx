@@ -77,7 +77,6 @@ describe('FlipReviewVideoScreen layout and selection', () => {
 
     expect(submitSpy).toHaveBeenCalledWith('session-flip-456', 2, 1);
   });
-
   it('does not render check mark icon to avoid distraction', () => {
     render(<FlipReviewVideoScreen />);
 

@@ -135,8 +135,11 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         ) : null}
       </div>
 
+      {/* 2. Main Screen Interface */}
       <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-white px-6 sm:px-12 py-8 select-none font-['Nunito',sans-serif] text-[#1f2937]">
+        {/* Main Content: 2-Column Split Layout */}
         <div className="flex flex-col lg:flex-row items-center justify-center gap-14 lg:gap-24 xl:gap-32 w-full max-w-7xl my-auto">
+          {/* Left Column: Final Photo Strip Preview */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative flex items-center justify-center overflow-hidden rounded-2xl bg-white shadow-2xl transition-all">
               {outputImageUrl ? (
@@ -146,6 +149,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                     alt={`Photo Strip Output ${formattedPublicId}`}
                     className="max-h-[calc(100dvh-120px)] w-auto object-contain rounded-2xl"
                   />
+                  {/* Date at the bottom left of the photostrip */}
                   <div className="absolute bottom-3.5 left-4 pointer-events-none">
                     <span className="text-xs sm:text-sm font-bold tracking-wide text-white bg-black/5 rounded-full p-2 px-3 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
                       {stripDate}
@@ -160,7 +164,9 @@ export const PrintModal: React.FC<PrintModalProps> = ({
             </div>
           </div>
 
+          {/* Right Column: Logo, Headline, QR Card, Text & Action Buttons */}
           <div className="flex flex-col items-center justify-center text-center w-full max-w-[440px]">
+            {/* Logo */}
             <div className="flex items-center justify-center">
               <img
                 src="/assets/images/logo.svg"
@@ -169,14 +175,17 @@ export const PrintModal: React.FC<PrintModalProps> = ({
               />
             </div>
 
+            {/* Subtitle */}
             <p className="mt-2 text-xs sm:text-sm font-bold text-[#4b5563] tracking-widest uppercase">
               SIC PHOTOBOOTH
             </p>
 
+            {/* Headline */}
             <h1 className="mt-1 text-3xl sm:text-4xl md:text-5xl font-bold text-[#1f2937] leading-tight tracking-tight ">
               Your masterpiece is ready!
             </h1>
 
+            {/* QR Code Container with Gradient Background, White Border & Shadow */}
             <div className="mt-6 flex items-center justify-center rounded-3xl sm:rounded-[32px] bg-gradient-to-b from-[#7bc6a5] to-[#3ea079] p-3 sm:p-4 border-4 sm:border-[6px] border-white shadow-[0_16px_36px_rgba(62,160,121,0.32)] transition-transform hover:scale-[1.02]">
               <div className="size-48 sm:size-56 md:size-60 rounded-2xl sm:rounded-[22px] bg-white p-2.5 sm:p-3 flex items-center justify-center overflow-hidden shadow-inner">
                 {qrDataUrl ? (
@@ -191,14 +200,17 @@ export const PrintModal: React.FC<PrintModalProps> = ({
               </div>
             </div>
 
+            {/* Text Below QR */}
             <p className="mt-5 text-xl sm:text-2xl font-bold text-[#1f2937] tracking-tight">
               Scan to see your copy!
             </p>
 
+            {/* Public ID in Nunito Font */}
             <p className="mt-1 font-['Nunito',sans-serif] text-xl sm:text-2xl font-extrabold text-[#008037] tracking-wider">
               {formattedPublicId}
             </p>
 
+            {/* Warnings and Recovery */}
             {(printError || showPrintRecord) && (
               <div
                 className={`mt-4 flex w-full flex-col gap-2.5 rounded-xl border p-3.5 text-left text-xs font-bold shadow-md ${
@@ -247,7 +259,9 @@ export const PrintModal: React.FC<PrintModalProps> = ({
               </div>
             )}
 
+            {/* Action Buttons Row */}
             <div className="flex items-center justify-center gap-4 sm:gap-6 w-full mt-6 sm:mt-8">
+              {/* Session Done! Button */}
               <button
                 type="button"
                 onClick={handleFinishAttempt}
@@ -256,6 +270,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                 Session Done!
               </button>
 
+              {/* Print Button */}
               <button
                 type="button"
                 onClick={handleDirectPrint}
@@ -276,6 +291,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         </div>
       </div>
 
+      {/* 3. Unprinted Warning Modal Overlay */}
       {showUnprintedWarning && (
         <div
           role="dialog"
@@ -284,6 +300,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
         >
           <div className="relative w-full max-w-sm sm:max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl text-center flex flex-col items-center">
+            {/* Warning Icon */}
             <div className="flex size-14 sm:size-16 items-center justify-center rounded-full bg-amber-100 text-amber-600 mb-4">
               <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
