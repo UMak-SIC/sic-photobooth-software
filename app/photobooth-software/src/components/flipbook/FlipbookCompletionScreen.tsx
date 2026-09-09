@@ -35,7 +35,7 @@ export function FlipbookCompletionScreen() {
   const selectedVideoUrl = videoUrls[selectedVideoIndex - 1] || videoUrls[0];
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
   const publicCode = publicId || 'M7p4XaV';
-  const formattedPublicId = publicCode.toUpperCase();
+  const formattedPublicId = publicCode;
   const qrDisplayUrl = qrUrl || `https://myphotobooth.com/${publicCode}`;
   const motionGifUrl = outputGifUrl
     ? `${outputGifUrl}?variant=motion`
@@ -313,8 +313,8 @@ export function FlipbookCompletionScreen() {
               Scan to see your copy!
             </p>
 
-            {/* Public ID in Pixel Font */}
-            <p className="mt-1 font-['PressStart2P','Arcade_Gamer',monospace] text-lg sm:text-xl font-bold text-[#008037] tracking-wider uppercase">
+            {/* Public ID in Nunito Font */}
+            <p className="mt-1 font-['Nunito',sans-serif] text-xl sm:text-2xl font-extrabold text-[#008037] tracking-wider">
               {formattedPublicId}
             </p>
 

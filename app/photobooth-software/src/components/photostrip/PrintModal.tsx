@@ -107,7 +107,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
     }
   };
 
-  const formattedPublicId = (publicId || 'M7P4XAV').toUpperCase();
+  const formattedPublicId = publicId || 'M7p4XaV';
 
   const stripDate = (() => {
     if (eventDate) {
@@ -206,8 +206,8 @@ export const PrintModal: React.FC<PrintModalProps> = ({
               Scan to see your copy!
             </p>
 
-            {/* Public ID in Pixel Font */}
-            <p className="mt-1 font-['PressStart2P','Arcade_Gamer',monospace] text-lg sm:text-xl font-bold text-[#008037] tracking-wider uppercase">
+            {/* Public ID in Nunito Font */}
+            <p className="mt-1 font-['Nunito',sans-serif] text-xl sm:text-2xl font-extrabold text-[#008037] tracking-wider">
               {formattedPublicId}
             </p>
 

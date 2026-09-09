@@ -65,7 +65,7 @@ describe('FlipbookCompletionScreen layout and session lifecycle', () => {
 
     // QR Code helper & Public ID
     expect(screen.getByText('Scan to see your copy!')).toBeDefined();
-    expect(screen.getByText('K9X2BQ1')).toBeDefined();
+    expect(screen.getByText('k9X2bQ1')).toBeDefined();
 
     // Action buttons
     expect(screen.getByRole('button', { name: /Session Done!/i })).toBeDefined();

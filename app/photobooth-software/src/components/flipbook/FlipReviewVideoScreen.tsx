@@ -2,14 +2,17 @@ import { useState, useCallback } from 'react';
 import { useFlipbookStore } from '../../store/flipbook-store';
 import { useCountdown } from '../../hooks/useCountdown';
 import { boothApi } from '../../services/api';
+import { LoopingMotionPreview } from './LoopingMotionPreview';
 
 function VideoCardItem({
   url,
+  frames,
   index,
   isSelected,
   onSelect,
 }: {
   url?: string;
+  frames?: string[];
   index: number;
   isSelected: boolean;
   onSelect: () => void;
@@ -31,35 +34,34 @@ function VideoCardItem({
       >
         {url && !hasError ? (
           <video
+            ref={(el) => {
+              if (el) {
+                el.defaultMuted = true;
+                el.muted = true;
+                try {
+                  const playPromise = el.play();
+                  if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch(() => {});
+                  }
+                } catch {
+                  // ignore playback error in environments without full media engines
+                }
+              }
+            }}
             src={url}
             autoPlay
             loop
             muted
             playsInline
             preload="auto"
-            onLoadedData={(e) => {
-              const el = e.currentTarget;
-              el.muted = true;
-              el.currentTime = 0.001;
-              el.play().catch(() => {});
-            }}
             onError={() => setHasError(true)}
             className="size-full object-cover pointer-events-none"
           />
+        ) : frames && frames.length > 0 ? (
+          <LoopingMotionPreview frames={frames} className="size-full object-cover pointer-events-none" />
         ) : (
           <div className="flex size-full items-center justify-center text-sm font-bold text-white/50 bg-[#176754]">
             VIDEO {index}
-          </div>
-        )}
-
-        {/* Selected Checkmark Overlay */}
-        {isSelected && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 backdrop-blur-[0.5px]">
-            <img
-              src="/assets/images/check-mark.svg"
-              alt="Selected"
-              className="size-10 sm:size-12 drop-shadow-md"
-            />
           </div>
         )}
       </button>
@@ -76,6 +78,7 @@ export function FlipReviewVideoScreen() {
   const {
     sessionId,
     videoUrls,
+    videoFrames,
     selectedCoverIndex,
     selectedVideoIndex,
     setSelectedVideoIndex,
@@ -161,6 +164,7 @@ export function FlipReviewVideoScreen() {
               key={index}
               index={index}
               url={videoUrls[index - 1]}
+              frames={videoFrames[index - 1]}
               isSelected={selectedVideoIndex === index}
               onSelect={() => setSelectedVideoIndex(index)}
             />
