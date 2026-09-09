@@ -313,8 +313,8 @@ export function FlipbookCompletionScreen() {
               Scan to see your copy!
             </p>
 
-            {/* Public ID in Nunito Font */}
-            <p className="mt-1 font-['Nunito',sans-serif] text-xl sm:text-2xl font-extrabold text-[#008037] tracking-wider">
+            {/* Public ID in Pixel Font */}
+            <p className="mt-1 font-['PressStart2P','Arcade_Gamer',monospace] text-lg sm:text-xl font-bold text-[#008037] tracking-wider">
               {formattedPublicId}
             </p>
 

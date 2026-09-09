@@ -19,9 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@photobooth/ui": ["../../packages/ui/src/index.ts"],
-      "@photobooth/public-output": ["../../packages/public-output/src/index.ts"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
