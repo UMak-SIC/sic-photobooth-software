@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { type Event } from './EventRow';
 import { boothApi } from '../../services/api';
 
@@ -94,6 +94,28 @@ export function EventSelectScreen({
   const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const eventListRef = useRef<HTMLDivElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateScrollControls = () => {
+    const eventList = eventListRef.current;
+    if (!eventList) return;
+
+    setCanScrollUp(eventList.scrollTop > 0);
+    setCanScrollDown(eventList.scrollTop + eventList.clientHeight < eventList.scrollHeight - 1);
+  };
+
+  useEffect(() => {
+    updateScrollControls();
+  }, [events]);
+
+  const scrollEventList = (direction: 'up' | 'down') => {
+    eventListRef.current?.scrollBy({
+      top: direction === 'up' ? -220 : 220,
+      behavior: 'smooth',
+    });
+  };
 
   useEffect(() => {
     if (preview) return;
@@ -239,10 +261,15 @@ export function EventSelectScreen({
         </div>
 
         {/* Main Content: Permanent 2-Column Split (Never collapses so operator stays on right side) */}
-        <div className="mx-auto my-auto grid w-full max-w-5xl flex-1 grid-cols-[1.75fr_1fr] items-center gap-8 lg:gap-12 min-h-0 py-1">
+        <div className="mx-auto my-auto grid w-full max-w-5xl flex-1 grid-cols-[1.85fr_1fr] items-center gap-2 lg:gap-2 min-h-0 py-1">
           {/* Left Column: Event Cards List */}
-          <div className="flex w-full flex-col overflow-hidden">
-            <div className="w-full flex flex-col gap-3.5 overflow-y-auto overflow-x-hidden pl-5 pr-1 py-1 max-h-[440px] event-list-scroll">
+          <div className="flex w-full min-w-0 items-center gap-3 overflow-hidden">
+            <div
+              ref={eventListRef}
+              onScroll={updateScrollControls}
+              data-testid="event-list"
+              className="w-full min-w-0 flex flex-col gap-3.5 overflow-hidden pr-1 py-1 max-h-[440px]"
+            >
               {events.map((event, idx) => {
                 const isSelected = event.id === selectedId;
                 const stripeColor = STRIPE_COLORS[idx % STRIPE_COLORS.length];
@@ -339,6 +366,31 @@ export function EventSelectScreen({
                   </div>
                 );
               })}
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-10 pr-1">
+              <button
+                type="button"
+                aria-label="Scroll events up"
+                onClick={() => scrollEventList('up')}
+                disabled={!canScrollUp}
+                className="flex size-17 items-center justify-center rounded-full bg-white text-[#4a5568] shadow-[0_5px_14px_rgba(0,0,0,0.12)] transition-all hover:bg-[#f8faf9] hover:text-[#276d4e] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <svg className="size-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m5 15 7-7 7 7" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                aria-label="Scroll events down"
+                onClick={() => scrollEventList('down')}
+                disabled={!canScrollDown}
+                className="flex size-17 items-center justify-center rounded-full bg-white text-[#4a5568] shadow-[0_5px_14px_rgba(0,0,0,0.12)] transition-all hover:bg-[#f8faf9] hover:text-[#276d4e] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+              >
+                <svg className="size-11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m5 9 7 7 7-7" />
+                </svg>
+              </button>
             </div>
           </div>
 

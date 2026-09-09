@@ -32,6 +32,29 @@ describe('EventSelectScreen', () => {
     expect(screen.getByText('Annual gathering of students and alumni in tech')).toBeDefined();
   });
 
+  it('uses the down control to scroll an overflowing event list', () => {
+    render(<EventSelectScreen preview />);
+
+    const eventList = screen.getByTestId('event-list');
+    Object.defineProperties(eventList, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 900 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+    eventList.scrollBy = vi.fn();
+    fireEvent.scroll(eventList);
+
+    const scrollDownButton = screen.getByRole('button', { name: 'Scroll events down' });
+    expect((scrollDownButton as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(scrollDownButton);
+
+    expect(eventList.scrollBy).toHaveBeenCalledWith({
+      top: 220,
+      behavior: 'smooth',
+    });
+  });
+
   it('creates an event with short description and displays the new card', async () => {
     const mockEvents: EventItem[] = [];
     vi.spyOn(boothApi, 'listEvents').mockResolvedValue(mockEvents);

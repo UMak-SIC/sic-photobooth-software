@@ -74,14 +74,14 @@ export function ExperienceChoiceScreen({
             <p className="mt-1.5 text-sm sm:text-base font-semibold tracking-[0.14em] text-[#4a5568] uppercase">
               SIC PHOTOBOOTH
             </p>
-            <h1 className="w-full text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] font-bold tracking-tight text-[#1d1f26]">
+            <h1 className="mt-2 w-full text-2xl sm:text-3xl md:text-4xl lg:text-[2.65rem] font-bold tracking-tight text-[#1d1f26]">
               What are we creating today?
             </h1>
           </div>
         </div>
 
         {/* Main Content: Two Choice Cards */}
-        <div className="mx-auto my-auto flex w-full max-w-5xl flex-1 items-center justify-center gap-8 sm:gap-12 md:gap-16 py-1">
+        <div className="mx-auto my-auto flex w-full max-w-5xl flex-1 -translate-y-4 items-center justify-center gap-8 sm:gap-12 md:gap-16 py-1">
           {/* Card 1: Photo Strip */}
           <button
             type="button"

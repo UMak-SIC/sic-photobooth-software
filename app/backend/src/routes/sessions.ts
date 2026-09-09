@@ -105,7 +105,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // 0b. List active templates for Photo Strip (unifies with canonical templateRepository)
   fastify.get('/api/templates', async (_request, reply) => {
     try {
-      const all = await templateRepository.list();
+      const all = await templateRepository.list('photo_strip');
       return reply.send({
         success: true,
         data: all.filter((t) => t.active).map(toTemplateDto),
