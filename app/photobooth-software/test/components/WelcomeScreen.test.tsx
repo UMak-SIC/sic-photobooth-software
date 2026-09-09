@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WelcomeScreen } from './WelcomeScreen';
-import { useFlipbookStore } from '../store/flipbook-store';
-import { usePhotoStripStore } from '../store/photostrip-store';
-import { useSessionStore } from '../store/session-store';
-import { boothApi, type SessionInfo, type EventItem } from '../services/api';
+import { WelcomeScreen } from '../../src/components/WelcomeScreen';
+import { useFlipbookStore } from '../../src/store/flipbook-store';
+import { usePhotoStripStore } from '../../src/store/photostrip-store';
+import { useSessionStore } from '../../src/store/session-store';
+import { boothApi, type SessionInfo, type EventItem } from '../../src/services/api';
 
 describe('WelcomeScreen revised flow: Event Selection before Experience Choice', () => {
   afterEach(() => {

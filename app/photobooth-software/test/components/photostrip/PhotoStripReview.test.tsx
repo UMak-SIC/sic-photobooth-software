@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PhotoStripReview, type ReviewTemplate } from './PhotoStripReview';
+import { PhotoStripReview, type ReviewTemplate } from '../../../src/components/photostrip/PhotoStripReview';
 
 const mockTemplate: ReviewTemplate = {
   id: 'template-1',

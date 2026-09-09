@@ -157,6 +157,24 @@ const DEFAULT_TEMPLATES: ReviewTemplate[] = [
 
 const TEMPLATES_PER_PAGE = 6;
 
+function dedupeOverlays(overlays: ReviewTemplate['overlays'] = []) {
+  const seen = new Set<string>();
+  return overlays.filter((overlay) => {
+    const key = [
+      overlay.path || overlay.assetPath || '',
+      overlay.x,
+      overlay.y,
+      overlay.width,
+      overlay.height,
+      overlay.rotation ?? 0,
+      overlay.zIndex ?? 2,
+    ].join('|');
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   preview = false,
   onSelectTemplate,
@@ -221,6 +239,8 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
   const selectedTemplate =
     templates.find((t) => t.id === selectedId) || filteredTemplates[0] || DEFAULT_TEMPLATES[0];
 
+  const visibleOverlays = useMemo(() => dedupeOverlays(selectedTemplate.overlays), [selectedTemplate.overlays]);
+
   const handleOrientationChange = (ori: 'portrait' | 'landscape') => {
     setOrientationFilter(ori);
     setCurrentPage(0);
@@ -248,9 +268,11 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
     }
   }, [selectedTemplate, onSelectTemplate]);
 
-  // 60-second countdown auto-confirming the selected template if unattended
+  const TEMPLATE_SELECTION_SECONDS = 45;
+
+  // Auto-confirm the selected template if unattended
   const { timeLeft } = useCountdown({
-    seconds: 45,
+    seconds: TEMPLATE_SELECTION_SECONDS,
     autoStart: !preview,
     onExpire: () => {
       handleConfirm();
@@ -265,15 +287,40 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
     <div className="relative flex h-full min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#f4f6f5] select-none font-['Nunito',sans-serif]">
       {/* Centered Kiosk Display Frame matching ExperienceChoiceScreen */}
       <div className="relative flex h-[800px] max-h-[800px] w-full max-w-[1180px] flex-col justify-between overflow-hidden px-6 pt-3 pb-0 sm:px-10 sm:pt-4 sm:pb-0 text-[#1a202c]">
-        {/* Top Right Arcade Gamer Countdown Timer */}
-        <div className="absolute top-3 right-6 sm:top-4 sm:right-10 z-30 flex items-center">
-          <span
-            className="font-['PressStart2P','Arcade_Gamer',monospace] text-[28px] sm:text-[34px] md:text-[38px] font-bold text-[#008037] leading-none tracking-normal drop-shadow-xs"
+        {/* Centered Arcade Gamer Countdown Timer */}
+        <div className="absolute top-3 left-1/2 z-30 flex -translate-x-1/2 items-center sm:top-4">
+          <div
+            className="relative flex size-20 items-center justify-center sm:size-24"
             aria-live="polite"
             aria-label={`Auto continue in ${timeLeft} seconds`}
           >
-            {timeLeft}
-          </span>
+            <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64" aria-hidden="true">
+              <circle
+                cx="32"
+                cy="32"
+                r="27"
+                className="stroke-[#c4c9c6]"
+                strokeWidth="4"
+                fill="white"
+              />
+              <circle
+                cx="32"
+                cy="32"
+                r="27"
+                className="stroke-[#3f4642] transition-all duration-300 ease-linear"
+                strokeWidth="4"
+                strokeDasharray={169.65}
+                strokeDashoffset={
+                  169.65 * (1 - Math.max(0, Math.min(1, timeLeft / TEMPLATE_SELECTION_SECONDS)))
+                }
+                strokeLinecap="round"
+                fill="transparent"
+              />
+            </svg>
+            <span className="absolute font-['PressStart2P','Arcade_Gamer',monospace] text-xl font-bold leading-none text-[#3f4642] drop-shadow-xs sm:text-2xl">
+              {timeLeft}
+            </span>
+          </div>
         </div>
 
         {/* Main Content: Left Selector Grid & Right Large Preview */}
@@ -389,11 +436,21 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                                   e.currentTarget.style.display = 'none';
                                 }}
                                 className="absolute inset-0 size-full object-cover"
+                                style={
+                                  template.background
+                                    ? {
+                                        left: `${(template.background.x / cardWidth) * 100}%`,
+                                        top: `${(template.background.y / cardHeight) * 100}%`,
+                                        width: `${(template.background.width / cardWidth) * 100}%`,
+                                        height: `${(template.background.height / cardHeight) * 100}%`,
+                                      }
+                                    : undefined
+                                }
                               />
                             )}
 
                             {/* Overlays */}
-                            {template.overlays?.map((overlay, idx) => {
+                            {dedupeOverlays(template.overlays).map((overlay, idx) => {
                               const overlayUrl = resolveAssetUrl(overlay.path || overlay.assetPath || null);
                               if (!overlayUrl) return null;
                               return (
@@ -545,8 +602,8 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                       height: isLandscape ? 'auto' : '100%',
                       width: isLandscape ? '100%' : 'auto',
                       maxHeight: '530px',
-                      maxWidth: isLandscape ? '100%' : '340px',
-                      aspectRatio: isLandscape ? '3/2' : '2/3',
+                      maxWidth: '100%',
+                      aspectRatio: `${cardWidth} / ${cardHeight}`,
                     }}
                   >
                     {/* Background Image */}
@@ -558,11 +615,21 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                           e.currentTarget.style.display = 'none';
                         }}
                         className="absolute inset-0 size-full object-cover"
+                        style={
+                          selectedTemplate.background
+                            ? {
+                                left: `${(selectedTemplate.background.x / cardWidth) * 100}%`,
+                                top: `${(selectedTemplate.background.y / cardHeight) * 100}%`,
+                                width: `${(selectedTemplate.background.width / cardWidth) * 100}%`,
+                                height: `${(selectedTemplate.background.height / cardHeight) * 100}%`,
+                              }
+                            : undefined
+                        }
                       />
                     )}
 
                     {/* Overlays */}
-                    {selectedTemplate.overlays?.map((overlay, idx) => {
+                    {visibleOverlays.map((overlay, idx) => {
                       const overlayUrl = resolveAssetUrl(overlay.path || overlay.assetPath || null);
                       if (!overlayUrl) return null;
                       return (

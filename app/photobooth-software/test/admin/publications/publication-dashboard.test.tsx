@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { PublicationDashboard } from './publication-dashboard';
+import { PublicationDashboard } from '../../../src/admin/publications/publication-dashboard';
 
 const failedPublication = {
   id: 'd0b692d8-ef13-4b79-922d-c5bb31056d67',

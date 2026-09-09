@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PrintModal } from './PrintModal';
+import { PrintModal } from '../../../src/components/photostrip/PrintModal';
 
 describe('PrintModal completion & print screen', () => {
   beforeEach(() => {

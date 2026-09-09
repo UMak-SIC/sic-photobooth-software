@@ -45,7 +45,8 @@ const DEFAULT_FRAMES: FrameItem[] = [
   },
 ];
 
-const FRAMES_PER_PAGE = 8;
+const FRAMES_PER_PAGE = 6;
+const FRAME_SELECTION_SECONDS = 60;
 
 interface FrameSelectScreenProps {
   onBack?: () => void;
@@ -172,9 +173,9 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
     }
   }, [selectedFrame, loading, sessionId, setSelectedFrame, setError, confirmFrameSelection]);
 
-  // 60-second countdown auto-confirming the selected frame if unattended
+  // Auto-confirm the selected frame if unattended
   const { timeLeft } = useCountdown({
-    seconds: 60,
+    seconds: FRAME_SELECTION_SECONDS,
     autoStart: true,
     onExpire: () => {
       handleConfirm();
@@ -200,28 +201,46 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
     <div className="relative flex h-full min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#f4f6f5] select-none font-['Nunito',sans-serif]">
       {/* Centered Kiosk Display Frame matching TemplatePicker */}
       <div className="relative flex h-[800px] max-h-[800px] w-full max-w-[1180px] flex-col justify-between overflow-hidden px-6 pt-2 pb-3 sm:px-10 sm:pt-3 sm:pb-3 text-[#1a202c]">
-        {/* Top Header Row with Title and Arcade Countdown Timer */}
-        <div className="relative flex items-center w-full shrink-0 mb-2 pt-2">
-          {/* Arcade Gamer Green Countdown Timer */}
-          <div className="absolute right-0 top-2 flex items-center pt-1">
-            <span
-              className="font-['PressStart2P','Arcade_Gamer',monospace] text-[28px] sm:text-[34px] md:text-[38px] font-bold text-[#008037] leading-none tracking-normal drop-shadow-xs"
-              aria-live="polite"
-              aria-label={`Auto continue in ${timeLeft} seconds`}
-            >
-              {timeLeft}
-            </span>
-          </div>
-        </div>
-
         {/* Main Content: Left 2-Column Grid & Right 4-Tier Booklet Preview */}
         <div className="flex flex-1 min-h-0 w-full gap-8 lg:gap-15 items-stretch overflow-visible">
           {/* Left Column: 2-Column Grid */}
           <div className="flex flex-col flex-1 min-w-0 h-full overflow-visible">
-            <div className="shrink-0 mb-2 text-center">
+            <div className="shrink-0 mb-2 flex items-center justify-center gap-5 pt-2 text-center">
               <h1 className="text-xl sm:text-2xl lg:text-[32px] font-bold tracking-tight text-[#1d1f26]">
                 Pick your Frame
               </h1>
+              <div
+                className="relative flex size-16 items-center justify-center sm:size-20"
+                aria-live="polite"
+                aria-label={`Auto continue in ${timeLeft} seconds`}
+              >
+                <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64" aria-hidden="true">
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="27"
+                    className="stroke-[#c4c9c6]"
+                    strokeWidth="4"
+                    fill="white"
+                  />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="27"
+                    className="stroke-[#3f4642] transition-all duration-300 ease-linear"
+                    strokeWidth="4"
+                    strokeDasharray={169.65}
+                    strokeDashoffset={
+                      169.65 * (1 - Math.max(0, Math.min(1, timeLeft / FRAME_SELECTION_SECONDS)))
+                    }
+                    strokeLinecap="round"
+                    fill="transparent"
+                  />
+                </svg>
+                <span className="absolute font-['PressStart2P','Arcade_Gamer',monospace] text-lg font-bold leading-none text-[#3f4642] drop-shadow-xs sm:text-xl">
+                  {timeLeft}
+                </span>
+              </div>
             </div>
 
             {errorMessage && (
@@ -254,7 +273,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                 aria-label="Flipbook Frame Selection"
                 className="flex flex-1 min-h-0 flex-col pr-4 lg:pr-6 pb-1 pt-1 mr-1"
               >
-                <div className="grid flex-none grid-cols-2 gap-4 lg:gap-5 pb-2 pt-1">
+                <div className="grid flex-none grid-cols-2 gap-x-6 gap-y-8 lg:gap-x-8 lg:gap-y-9 pb-2 pt-1">
                   {visibleFrames.map((frame, index) => {
                     const frameIndex = currentPage * FRAMES_PER_PAGE + index;
                     const isSelected = frame.id === selectedId;
@@ -268,7 +287,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                         aria-checked={isSelected}
                         onClick={() => setSelectedId(frame.id)}
                         onKeyDown={(e) => handleKeyDown(e, frameIndex)}
-                        className={`group flex flex-col items-start rounded-2xl bg-white p-2 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
+                        className={`group flex scale-[1.02] flex-col items-start rounded-2xl bg-white p-2 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
                           isSelected
                             ? 'border-2 border-[#058d51] ring-2 ring-[#058d51]/40'
                             : 'border border-gray-200/80 hover:border-gray-300'
@@ -276,7 +295,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                       >
                         {/* Preview Artboard inside white card */}
                         <div
-                          className={`relative w-full aspect-[16/5] rounded-xl overflow-hidden border ${
+                          className={`relative w-full aspect-[8/3] rounded-xl overflow-hidden border ${
                             isSelected ? 'border-[#058d51]/50' : 'border-gray-200'
                           } bg-gradient-to-r from-[#d8b4fe] via-[#f472b6] to-[#c084fc]`}
                         >

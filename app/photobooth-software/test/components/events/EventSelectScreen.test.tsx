@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventSelectScreen } from './EventSelectScreen';
-import { boothApi, type EventItem } from '../../services/api';
+import { EventSelectScreen } from '../../../src/components/events/EventSelectScreen';
+import { boothApi, type EventItem } from '../../../src/services/api';
 
 describe('EventSelectScreen', () => {
   afterEach(() => {
