@@ -318,7 +318,7 @@ export function EventSelectScreen({
                         {/* Left: Date */}
                         <div className="flex items-center gap-2">
                           <img
-                            src="/assets/images/calendar-icon.png"
+                            src="/assets/images/calendar-icon.svg"
                             alt="Calendar icon"
                             className="size-4 sm:size-4.5 object-contain"
                           />
@@ -328,7 +328,7 @@ export function EventSelectScreen({
                         {/* Right: Operator */}
                         <div className="flex items-center gap-2">
                           <img
-                            src="/assets/images/operator-icon.png"
+                            src="/assets/images/operator-icon.svg"
                             alt="Operator icon"
                             className="size-4 sm:size-4.5 object-contain"
                           />
@@ -444,7 +444,7 @@ export function EventSelectScreen({
                   <div className="flex items-center gap-1.5 text-base sm:text-[17px] font-bold text-[#2d3748]">
                     <span>Event Date</span>
                     <img
-                      src="/assets/images/calendar-icon.png"
+                      src="/assets/images/calendar-icon.svg"
                       alt=""
                       aria-hidden="true"
                       className="size-4.5 object-contain inline-block"
@@ -464,7 +464,7 @@ export function EventSelectScreen({
                   <div className="flex items-center gap-1.5 text-base sm:text-[17px] font-bold text-[#2d3748]">
                     <span>Who&apos;s the Operator?</span>
                     <img
-                      src="/assets/images/operator-icon.png"
+                      src="/assets/images/operator-icon.svg"
                       alt=""
                       aria-hidden="true"
                       className="size-4.5 object-contain inline-block"
