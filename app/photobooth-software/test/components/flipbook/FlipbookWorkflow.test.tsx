@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FlipbookWorkflow } from './FlipbookWorkflow';
-import { useFlipbookStore } from '../../store/flipbook-store';
-import { useSessionStore } from '../../store/session-store';
-import { boothApi, type SessionInfo, type EventItem } from '../../services/api';
+import { FlipbookWorkflow } from '../../../src/components/flipbook/FlipbookWorkflow';
+import { useFlipbookStore } from '../../../src/store/flipbook-store';
+import { useSessionStore } from '../../../src/store/session-store';
+import { boothApi, type SessionInfo, type EventItem } from '../../../src/services/api';
 
 describe('FlipbookWorkflow event selection and navigation', () => {
   afterEach(() => {

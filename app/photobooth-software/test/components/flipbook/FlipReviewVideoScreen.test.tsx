@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FlipReviewVideoScreen } from './FlipReviewVideoScreen';
-import { useFlipbookStore } from '../../store/flipbook-store';
-import { boothApi } from '../../services/api';
+import { FlipReviewVideoScreen } from '../../../src/components/flipbook/FlipReviewVideoScreen';
+import { useFlipbookStore } from '../../../src/store/flipbook-store';
+import { boothApi } from '../../../src/services/api';
 
 describe('FlipReviewVideoScreen layout and selection', () => {
   afterEach(() => {
@@ -76,6 +76,12 @@ describe('FlipReviewVideoScreen layout and selection', () => {
     });
 
     expect(submitSpy).toHaveBeenCalledWith('session-flip-456', 2, 1);
+  });
+  it('does not render check mark icon to avoid distraction', () => {
+    render(<FlipReviewVideoScreen />);
+
+    const checkmarks = screen.queryByAltText('Selected');
+    expect(checkmarks).toBeNull();
   });
 });
 

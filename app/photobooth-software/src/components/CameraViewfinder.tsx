@@ -131,7 +131,11 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
 
   const renderTimer = () => (
     <div className="z-30 flex items-center justify-center select-none">
-      <div className="relative flex items-center justify-center size-14 sm:size-17 md:size-21">
+      <div
+        className={`relative flex items-center justify-center size-16 sm:size-20 md:size-24 ${
+          timeLeft > 0 && timeLeft <= 3 ? 'scale-125' : ''
+        }`}
+      >
         <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64">
           <circle
             cx="32"
@@ -145,7 +149,9 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
             cx="32"
             cy="32"
             r="26"
-            className="stroke-white transition-all duration-300 ease-linear"
+            className={`transition-all duration-300 ease-linear ${
+              timeLeft <= 1 ? 'stroke-red-500' : timeLeft <= 3 ? 'stroke-amber-300' : 'stroke-white'
+            }`}
             strokeWidth="4"
             strokeDasharray={163.36}
             strokeDashoffset={
@@ -155,7 +161,9 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
             fill="transparent"
           />
         </svg>
-        <span className="absolute font-['Arcade_Gamer','PressStart2P',monospace] text-white text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+        <span className={`absolute font-['Arcade_Gamer','PressStart2P',monospace] text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${
+          timeLeft <= 1 ? 'text-red-500' : timeLeft <= 3 ? 'text-amber-300' : 'text-white'
+        }`}>
           {isCapturing ? '📸' : timeLeft}
         </span>
       </div>
@@ -231,7 +239,7 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
             <div className="absolute left-4 sm:left-6 md:left-8 top-20 sm:top-24 bottom-6 z-30 flex flex-col items-center justify-center pointer-events-none">
               {renderSlots(1, true)}
             </div>
-            <div className="absolute top-5 right-5 sm:top-7 sm:right-8 z-30">
+            <div className="absolute top-5 left-1/2 -translate-x-1/2 sm:top-7 z-30">
               {renderTimer()}
             </div>
           </>
@@ -257,7 +265,7 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
               <div className="absolute top-4 left-5 sm:top-6 sm:left-7 z-20">
                 {renderShotCount()}
               </div>
-              <div className="absolute top-4 right-5 sm:top-6 sm:right-7 z-20">
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 sm:top-6 z-20">
                 {renderTimer()}
               </div>
               <div className="absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center px-4 pointer-events-none">
@@ -289,7 +297,7 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
           <div className="absolute left-4 sm:left-6 md:left-8 top-20 sm:top-24 bottom-6 z-30 flex flex-col items-center justify-center pointer-events-none">
             {renderSlots(activeSlotIndex, true)}
           </div>
-          <div className="absolute top-5 right-5 sm:top-7 sm:right-8 z-30">
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 sm:top-7 z-30">
             {renderTimer()}
           </div>
         </>
@@ -346,7 +354,7 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
             <div className="absolute top-4 left-5 sm:top-6 sm:left-7 z-20">
               {renderShotCount()}
             </div>
-            <div className="absolute top-4 right-5 sm:top-6 sm:right-7 z-20">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 sm:top-6 z-20">
               {renderTimer()}
             </div>
             <div className="absolute bottom-4 left-0 right-0 z-20 flex items-center justify-center px-4 pointer-events-none">
@@ -355,9 +363,9 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
           </>
         )}
 
-        {/* Center Retaking Notification Pill */}
+        {/* Top-Right Retaking Notification Pill */}
         {isRetaking && (
-          <div className="absolute top-5 left-1/2 -translate-x-1/2 z-20 rounded-full bg-[#eab308]/90 px-5 py-2 text-xs sm:text-sm font-black text-black backdrop-blur-sm shadow-md uppercase tracking-wider font-['Arcade_Gamer','PressStart2P',monospace]">
+          <div className="absolute top-5 right-5 sm:top-7 sm:right-8 z-20 rounded-full bg-[#eab308]/90 px-5 py-2 text-xs sm:text-sm font-black text-black backdrop-blur-sm shadow-md uppercase tracking-wider font-['Arcade_Gamer','PressStart2P',monospace]">
             RETAKING #{activeSlotIndex}
           </div>
         )}

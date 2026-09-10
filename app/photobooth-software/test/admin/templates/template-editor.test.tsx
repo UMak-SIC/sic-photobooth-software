@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { TemplateEditor } from './template-editor';
-import { flipbookPlacements } from './presets';
-import type { Template, TemplateDraft } from './types';
+import { TemplateEditor } from '../../../src/admin/templates/template-editor';
+import { flipbookPlacements } from '../../../src/admin/templates/presets';
+import type { Template, TemplateDraft } from '../../../src/admin/templates/types';
 
 const mockDraft: TemplateDraft = {
   name: 'Test Template',

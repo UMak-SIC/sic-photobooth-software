@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FlipReviewCoverScreen } from './FlipReviewCoverScreen';
-import { useFlipbookStore } from '../../store/flipbook-store';
+import { FlipReviewCoverScreen } from '../../../src/components/flipbook/FlipReviewCoverScreen';
+import { useFlipbookStore } from '../../../src/store/flipbook-store';
 
 describe('FlipReviewCoverScreen layout and selection', () => {
   afterEach(() => {

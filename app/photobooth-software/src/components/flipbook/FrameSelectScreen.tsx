@@ -45,6 +45,9 @@ const DEFAULT_FRAMES: FrameItem[] = [
   },
 ];
 
+const FRAMES_PER_PAGE = 6;
+const FRAME_SELECTION_SECONDS = 60;
+
 interface FrameSelectScreenProps {
   onBack?: () => void;
 }
@@ -68,6 +71,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
   const [selectedId, setSelectedId] = useState<string>(DEFAULT_FRAMES[0].id);
   const [loading, setLoading] = useState(false);
   const [fetchingFrames, setFetchingFrames] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -79,6 +83,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
         if (Array.isArray(data) && data.length > 0) {
           setFrames(data);
           setSelectedId((prev) => (data.some((f) => f.id === prev) ? prev : data[0].id));
+          setCurrentPage(0);
         }
       })
       .catch((err) => {
@@ -96,6 +101,26 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
   }, []);
 
   const selectedFrame = frames.find((f) => f.id === selectedId) || frames[0] || DEFAULT_FRAMES[0];
+  const pageCount = Math.max(1, Math.ceil(frames.length / FRAMES_PER_PAGE));
+  const visibleFrames = frames.slice(
+    currentPage * FRAMES_PER_PAGE,
+    (currentPage + 1) * FRAMES_PER_PAGE,
+  );
+
+  useEffect(() => {
+    if (currentPage >= pageCount) {
+      setCurrentPage(pageCount - 1);
+    }
+  }, [currentPage, pageCount]);
+
+  const handlePageChange = (page: number) => {
+    const nextPage = Math.max(0, Math.min(page, pageCount - 1));
+    setCurrentPage(nextPage);
+    const firstFrame = frames[nextPage * FRAMES_PER_PAGE];
+    if (firstFrame) {
+      setSelectedId(firstFrame.id);
+    }
+  };
   const previewCoverUrl = coverUrls[selectedCoverIndex - 1] || coverUrls[0];
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
   const motionGifUrl = outputGifUrl
@@ -148,9 +173,9 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
     }
   }, [selectedFrame, loading, sessionId, setSelectedFrame, setError, confirmFrameSelection]);
 
-  // 60-second countdown auto-confirming the selected frame if unattended
+  // Auto-confirm the selected frame if unattended
   const { timeLeft } = useCountdown({
-    seconds: 60,
+    seconds: FRAME_SELECTION_SECONDS,
     autoStart: true,
     onExpire: () => {
       handleConfirm();
@@ -174,48 +199,50 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
 
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-[#f4f6f5] select-none font-['Nunito',sans-serif]">
-      {/* Custom Green Scrollbar Styles */}
-      <style>{`
-        .custom-green-scrollbar::-webkit-scrollbar {
-          width: 10px;
-        }
-        .custom-green-scrollbar::-webkit-scrollbar-track {
-          background: #e2ede8;
-          border-radius: 9999px;
-        }
-        .custom-green-scrollbar::-webkit-scrollbar-thumb {
-          background: #058d51;
-          border-radius: 9999px;
-        }
-        .custom-green-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #047241;
-        }
-      `}</style>
-
       {/* Centered Kiosk Display Frame matching TemplatePicker */}
       <div className="relative flex h-[800px] max-h-[800px] w-full max-w-[1180px] flex-col justify-between overflow-hidden px-6 pt-2 pb-3 sm:px-10 sm:pt-3 sm:pb-3 text-[#1a202c]">
-        {/* Top Header Row with Title and Arcade Countdown Timer */}
-        <div className="flex items-center justify-between w-full shrink-0 mb-2 pt-2">
-          <h1 className="text-xl sm:text-2xl lg:text-[32px] font-bold tracking-tight text-[#1d1f26] mt-4 sm:mt-4">
-            Pick your Frame
-          </h1>
-
-          {/* Arcade Gamer Green Countdown Timer */}
-          <div className="flex items-center pt-1">
-            <span
-              className="font-['PressStart2P','Arcade_Gamer',monospace] text-[28px] sm:text-[34px] md:text-[38px] font-bold text-[#008037] leading-none tracking-normal drop-shadow-xs"
-              aria-live="polite"
-              aria-label={`Auto continue in ${timeLeft} seconds`}
-            >
-              {timeLeft}
-            </span>
-          </div>
-        </div>
-
         {/* Main Content: Left 2-Column Grid & Right 4-Tier Booklet Preview */}
         <div className="flex flex-1 min-h-0 w-full gap-8 lg:gap-15 items-stretch overflow-visible">
           {/* Left Column: 2-Column Grid */}
           <div className="flex flex-col flex-1 min-w-0 h-full overflow-visible">
+            <div className="shrink-0 mb-2 flex items-center justify-center gap-5 pt-2 text-center">
+              <h1 className="text-xl sm:text-2xl lg:text-[32px] font-bold tracking-tight text-[#1d1f26]">
+                Pick your Frame
+              </h1>
+              <div
+                className="relative flex size-16 items-center justify-center sm:size-20"
+                aria-live="polite"
+                aria-label={`Auto continue in ${timeLeft} seconds`}
+              >
+                <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64" aria-hidden="true">
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="27"
+                    className="stroke-[#c4c9c6]"
+                    strokeWidth="4"
+                    fill="white"
+                  />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="27"
+                    className="stroke-[#3f4642] transition-all duration-300 ease-linear"
+                    strokeWidth="4"
+                    strokeDasharray={169.65}
+                    strokeDashoffset={
+                      169.65 * (1 - Math.max(0, Math.min(1, timeLeft / FRAME_SELECTION_SECONDS)))
+                    }
+                    strokeLinecap="round"
+                    fill="transparent"
+                  />
+                </svg>
+                <span className="absolute font-['PressStart2P','Arcade_Gamer',monospace] text-lg font-bold leading-none text-[#3f4642] drop-shadow-xs sm:text-xl">
+                  {timeLeft}
+                </span>
+              </div>
+            </div>
+
             {errorMessage && (
               <div className="mb-3 flex items-center gap-3 rounded-xl bg-[#b91c1c] px-4 py-2 text-white shadow-md">
                 <svg
@@ -244,10 +271,11 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
               <div
                 role="radiogroup"
                 aria-label="Flipbook Frame Selection"
-                className="flex-1 overflow-y-auto pr-4 lg:pr-6 custom-green-scrollbar pb-6 pt-1 mr-1"
+                className="flex flex-1 min-h-0 flex-col pr-4 lg:pr-6 pb-1 pt-1 mr-1"
               >
-                <div className="grid grid-cols-2 gap-4 lg:gap-5 pb-8 pt-1">
-                  {frames.map((frame, index) => {
+                <div className="grid flex-none grid-cols-2 gap-x-6 gap-y-8 lg:gap-x-8 lg:gap-y-9 pb-2 pt-1">
+                  {visibleFrames.map((frame, index) => {
+                    const frameIndex = currentPage * FRAMES_PER_PAGE + index;
                     const isSelected = frame.id === selectedId;
                     const frameCoverUrl = resolveAssetUrl(frame.coverPath ?? null);
 
@@ -258,8 +286,8 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                         role="radio"
                         aria-checked={isSelected}
                         onClick={() => setSelectedId(frame.id)}
-                        onKeyDown={(e) => handleKeyDown(e, index)}
-                        className={`group flex flex-col items-start rounded-2xl bg-white p-3 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
+                        onKeyDown={(e) => handleKeyDown(e, frameIndex)}
+                        className={`group flex scale-[1.02] flex-col items-start rounded-2xl bg-white p-2 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
                           isSelected
                             ? 'border-2 border-[#058d51] ring-2 ring-[#058d51]/40'
                             : 'border border-gray-200/80 hover:border-gray-300'
@@ -314,7 +342,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
 
                         {/* Title of the Frame under the preview thumbnail */}
                         <p
-                          className="text-base mt-2.5 font-bold truncate max-w-full tracking-tight"
+                          className="text-sm mt-1.5 font-bold truncate max-w-full tracking-tight"
                           style={{ color: isSelected ? '#058d51' : '#2d3748' }}
                         >
                           {frame.name}
@@ -322,6 +350,52 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                       </button>
                     );
                   })}
+                </div>
+
+                <div className="mt-auto flex shrink-0 items-center justify-center gap-4 py-2">
+                  {pageCount > 1 && (
+                    <button
+                      type="button"
+                      aria-label="Previous frame page"
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 0}
+                      className="flex size-14 items-center justify-center rounded-full bg-white text-[#4a5568] shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition hover:text-[#058d51] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <svg className="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m15 18-6-6 6-6" />
+                      </svg>
+                    </button>
+                  )}
+
+                  <div
+                    className="flex min-w-32 items-center justify-center gap-2.5 rounded-xl bg-white px-6 py-3.5 shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                    aria-label={`Frame page ${currentPage + 1} of ${pageCount}`}
+                  >
+                    {Array.from({ length: pageCount }, (_, page) => (
+                      <span
+                        key={page}
+                        className={`rounded-full border transition-all duration-300 ${
+                          page === currentPage
+                            ? 'size-4 border-[#058d51] bg-[#058d51] shadow-[0_0_0_3px_rgba(5,141,81,0.16)] animate-pulse'
+                            : 'size-3 border-[#64748b] bg-white'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {pageCount > 1 && (
+                    <button
+                      type="button"
+                      aria-label="Next frame page"
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === pageCount - 1}
+                      className="flex size-14 items-center justify-center rounded-full bg-white text-[#4a5568] shadow-[0_4px_12px_rgba(0,0,0,0.12)] transition hover:text-[#058d51] active:scale-95 disabled:cursor-not-allowed disabled:opacity-45"
+                    >
+                      <svg className="size-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m9 18 6-6-6-6" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -472,7 +546,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                 <button
                   type="button"
                   onClick={onBack}
-                  className="inline-flex items-center gap-2 px-5 sm:px-6 py-2 sm:py-2.5 rounded-full border-2 border-[#2d3748] text-[#2d3748] text-base sm:text-lg font-bold hover:bg-gray-100 transition active:scale-95 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 sm:px-6 py-2 sm:py-2.5 rounded-full border-2 border-[#2d3748] text-[#2d3748] text-base sm:text-lg font-bold opacity-70 hover:bg-gray-100 hover:opacity-100 transition active:scale-95 cursor-pointer"
                 >
                   <svg
                     className="size-5 stroke-current stroke-[2.5]"

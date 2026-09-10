@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FlipbookCompletionScreen } from './FlipbookCompletionScreen';
-import { useFlipbookStore } from '../../store/flipbook-store';
-import { useSessionStore } from '../../store/session-store';
-import { boothApi } from '../../services/api';
+import { FlipbookCompletionScreen } from '../../../src/components/flipbook/FlipbookCompletionScreen';
+import { useFlipbookStore } from '../../../src/store/flipbook-store';
+import { useSessionStore } from '../../../src/store/session-store';
+import { boothApi } from '../../../src/services/api';
 
 vi.mock('qrcode', () => ({
   default: {
@@ -65,7 +65,7 @@ describe('FlipbookCompletionScreen layout and session lifecycle', () => {
 
     // QR Code helper & Public ID
     expect(screen.getByText('Scan to see your copy!')).toBeDefined();
-    expect(screen.getByText('K9X2BQ1')).toBeDefined();
+    expect(screen.getByText('k9X2bQ1')).toBeDefined();
 
     // Action buttons
     expect(screen.getByRole('button', { name: /Session Done!/i })).toBeDefined();

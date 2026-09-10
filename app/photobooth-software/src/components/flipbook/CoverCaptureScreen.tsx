@@ -188,10 +188,14 @@ export function CoverCaptureScreen() {
           </div>
         </div>
 
-        {/* Top-Right: Circular Countdown Timer with SVG Ring */}
-        <div className="absolute top-4 right-5 sm:top-6 sm:right-7 z-20">
+        {/* Top-Center: Circular Countdown Timer with SVG Ring */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 sm:top-6 z-20">
           <div className="z-30 flex items-center justify-center select-none">
-            <div className="relative flex items-center justify-center size-14 sm:size-17 md:size-21">
+            <div
+              className={`relative flex items-center justify-center size-16 sm:size-20 md:size-24 ${
+                timeLeft > 0 && timeLeft <= 3 ? 'scale-125' : ''
+              }`}
+            >
               <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64">
                 <circle
                   cx="32"
@@ -205,7 +209,9 @@ export function CoverCaptureScreen() {
                   cx="32"
                   cy="32"
                   r="26"
-                  className="stroke-white transition-all duration-300 ease-linear"
+                  className={`transition-all duration-300 ease-linear ${
+                    timeLeft <= 1 ? 'stroke-red-500' : timeLeft <= 3 ? 'stroke-amber-300' : 'stroke-white'
+                  }`}
                   strokeWidth="4"
                   strokeDasharray={163.36}
                   strokeDashoffset={
@@ -223,7 +229,9 @@ export function CoverCaptureScreen() {
                   fill="transparent"
                 />
               </svg>
-              <span className="absolute font-['Arcade_Gamer','PressStart2P',monospace] text-white text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+              <span className={`absolute font-['Arcade_Gamer','PressStart2P',monospace] text-lg sm:text-xl md:text-2xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] ${
+                timeLeft <= 1 ? 'text-red-500' : timeLeft <= 3 ? 'text-amber-300' : 'text-white'
+              }`}>
                 {isCapturing ? '📸' : timeLeft}
               </span>
             </div>

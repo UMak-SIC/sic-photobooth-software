@@ -229,7 +229,7 @@ export class BoothApiClient {
   }
 
   public async listTemplates(): Promise<ReviewTemplate[]> {
-    const res = await fetch(`${API_BASE_URL}/templates?active=true`);
+    const res = await fetch(`${API_BASE_URL}/templates?type=photo_strip&active=true`);
     const body: ApiResponse<ReviewTemplate[]> = await res.json();
     if (!res.ok || !body.success || !body.data) {
       throw new Error(body.error?.message || 'Failed to list templates');

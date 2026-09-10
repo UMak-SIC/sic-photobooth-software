@@ -1,36 +1,154 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Captive Retrieval Portal (`app/captive-website`)
 
-## Getting Started
+The **Captive Retrieval Portal** is an offline-first Next.js web application running locally on the photobooth machine or local event gateway. It allows event guests to instantly retrieve, preview, and download their high-resolution photo strips and animated flipbook GIFs over the local event Wi-Fi network without requiring internet access.
 
-First, run the development server:
+---
+
+## Architecture & How It Works
+
+1. **Local Wi-Fi Network**: The photobooth broadcasts a local Wi-Fi network (SSID: `PHOTOBOOTH`, Gateway: `192.168.4.1` or the host machine's LAN IP).
+2. **Guest Connection**: Guests connect to the Wi-Fi on their smartphones.
+3. **Photo Lookup**:
+   - **Camera QR Scanner**: Scans the QR code on the printed photo card directly in the browser (`jsQR`).
+   - **Manual Code Input**: Guests can type the 7-character base-62 code (e.g. `7fK92pQ`).
+4. **Local Proxy to Fastify**: The portal securely fetches media and metadata from the local Fastify backend (`http://127.0.0.1:3000/photos/:id`) and streams the image directly to the guest device.
+
+---
+
+## Setup & Running on a New Device
+
+Follow these steps when setting up the photobooth on a new laptop, mini PC, or server.
+
+### 1. Prerequisites
+- **Node.js**: v20.x or higher
+- **pnpm**: v9.x or higher (`npm install -g pnpm`)
+- **Fastify Backend**: Must be running (`pnpm --filter @photobooth/backend dev`) on port `3000`.
+
+### 2. Install & Build Shared Packages
+From the **root of the monorepo**:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. Install all dependencies and link workspace packages
+pnpm install
+
+# 2. Build the shared workspace packages (@photobooth/ui and @photobooth/public-output)
+pnpm --filter @photobooth/public-output build
+pnpm --filter @photobooth/ui build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+> **Note**: Building the shared packages compiles TypeScript declaration files (`dist/`), preventing `@photobooth/ui` import errors during build.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Network Configuration for Mobile Access
 
-## Learn More
+To allow smartphones on the local Wi-Fi to reach the captive portal:
 
-To learn more about Next.js, take a look at the following resources:
+#### A. Find the Host Device's Local IP
+- **Windows**: Run `ipconfig` (look for *IPv4 Address*, e.g., `192.168.1.50` or `192.168.4.1`).
+- **macOS / Linux**: Run `ifconfig` or `ip a` (e.g., `192.168.1.50`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### B. Update `allowedDevOrigins` in `next.config.ts`
+Open [`app/captive-website/next.config.ts`](./next.config.ts) and ensure your device's local IP is listed:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```ts
+const nextConfig: NextConfig = {
+  transpilePackages: ['@photobooth/public-output', '@photobooth/ui'],
+  allowedDevOrigins: [
+    'localhost',
+    'localhost:5174',
+    '127.0.0.1',
+    '127.0.0.1:5174',
+    '192.168.1.50',        // <-- Add your device IP here
+    '192.168.1.50:5174',
+    '192.168.4.1',         // Default photobooth gateway
+    '192.168.4.1:5174',
+  ],
+};
+```
 
-## Deploy on Vercel
+#### C. Configure Backend CORS
+In [`app/backend/.env`](../backend/.env) (or environment variables), ensure the device's IP is allowed in `CORS_ORIGINS`:
+```env
+CORS_ORIGINS=http://localhost:5173,http://localhost:5174,http://127.0.0.1:5173,http://127.0.0.1:5174,http://192.168.1.50:5174,http://192.168.4.1
+```
+*(Or set `CORS_ORIGINS=*` for open local testing).*
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### D. Allow Inbound Firewall Ports
+Ensure your OS firewall permits inbound TCP connections on port `5174` (Captive Website) and `3000` (Fastify API):
+- **Windows (PowerShell as Administrator)**:
+  ```powershell
+  New-NetFirewallRule -DisplayName "Photobooth Captive Portal" -Direction Inbound -LocalPort 5174,3000 -Protocol TCP -Action Allow
+  ```
+- **Linux (`ufw`)**:
+  ```bash
+  sudo ufw allow 5174/tcp
+  sudo ufw allow 3000/tcp
+  ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Running the Application
+
+### Development Mode (Standard HTTP)
+```bash
+# From monorepo root:
+pnpm --filter captive-website dev
+
+# Or from inside app/captive-website:
+pnpm dev
+```
+- Listens on `0.0.0.0:5174`.
+- Access from the host machine: `http://localhost:5174`
+- Access from guest phones: `http://<YOUR_DEVICE_IP>:5174` (e.g. `http://192.168.1.50:5174`)
+
+### Development Mode with HTTPS (For Mobile Camera QR Scanning)
+Mobile browsers (Safari on iOS, Chrome on Android) require **HTTPS** to access phone cameras over a LAN IP.
+```bash
+pnpm --filter captive-website dev:https
+```
+- Uses local development certificates in `./certificates/`.
+- Access from guest phones: `https://<YOUR_DEVICE_IP>:5174` (accept self-signed certificate warning once).
+
+> **Tip**: If running standard HTTP without certificates, guests can always use the **"Or enter code manually"** input card, which requires zero camera permissions and works 100% reliably over plain HTTP.
+
+### Production Build & Start
+```bash
+# Build the application
+pnpm --filter captive-website build
+
+# Start production server
+pnpm --filter captive-website start
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `BACKEND_INTERNAL_URL` | `http://127.0.0.1:3000` | Internal server-side URL for Next.js to fetch photo metadata from Fastify backend. |
+| `NEXT_PUBLIC_API_URL` | `http://127.0.0.1:3000` | Fallback API URL for client-side fetches. |
+
+---
+
+## Troubleshooting & Common Issues
+
+### 1. Build Error: `Cannot find module '@photobooth/ui'`
+- **Cause**: Shared monorepo packages have not been compiled yet on the new machine.
+- **Solution**: Run `pnpm --filter @photobooth/public-output build` and `pnpm --filter @photobooth/ui build` from the monorepo root.
+
+### 2. Guest Phone Cannot Open the Website (Connection Refused / Timeout)
+- **Check 1**: Make sure Next.js is bound to `0.0.0.0` (already configured in `package.json` scripts: `next dev -H 0.0.0.0 --port 5174`).
+- **Check 2**: Verify the phone is connected to the **same Wi-Fi** network as the host machine.
+- **Check 3**: Check the host machine's firewall and ensure port `5174` is open for incoming TCP traffic.
+
+### 3. "Photo not found" Error on Guest Phone
+- **Check 1**: Ensure the Fastify backend is running (`pnpm --filter @photobooth/backend dev` on port `3000`).
+- **Check 2**: Verify that the session has been finalized/printed and approved in the photobooth software.
+- **Check 3**: Confirm that the 7-character code matches the code displayed on the photobooth screen or printed on the card.
+
+### 4. Camera QR Scanner Doesn't Open on Guest Phone
+- **Cause**: Mobile operating systems block `navigator.mediaDevices.getUserMedia` on non-localhost `http://` URLs.
+- **Solution**: Run `pnpm dev:https` to enable HTTPS, or instruct the guest to type the 7-character code into the manual input box.
+

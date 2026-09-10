@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PhotoStripWorkflow } from './PhotoStripWorkflow';
-import { usePhotoStripStore } from '../../store/photostrip-store';
-import { useSessionStore } from '../../store/session-store';
-import { boothApi } from '../../services/api';
+import { PhotoStripWorkflow } from '../../../src/components/photostrip/PhotoStripWorkflow';
+import { usePhotoStripStore } from '../../../src/store/photostrip-store';
+import { useSessionStore } from '../../../src/store/session-store';
+import { boothApi } from '../../../src/services/api';
 
 describe('PhotoStripWorkflow flow: layout confirmation and instructions screen', () => {
   afterEach(() => {

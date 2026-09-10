@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EventSelectScreen } from './EventSelectScreen';
-import { boothApi, type EventItem } from '../../services/api';
+import { EventSelectScreen } from '../../../src/components/events/EventSelectScreen';
+import { boothApi, type EventItem } from '../../../src/services/api';
 
 describe('EventSelectScreen', () => {
   afterEach(() => {
@@ -30,6 +30,29 @@ describe('EventSelectScreen', () => {
 
     expect(await screen.findByText('Tech Summit 2026')).toBeDefined();
     expect(screen.getByText('Annual gathering of students and alumni in tech')).toBeDefined();
+  });
+
+  it('uses the down control to scroll an overflowing event list', () => {
+    render(<EventSelectScreen preview />);
+
+    const eventList = screen.getByTestId('event-list');
+    Object.defineProperties(eventList, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 900 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+    eventList.scrollBy = vi.fn();
+    fireEvent.scroll(eventList);
+
+    const scrollDownButton = screen.getByRole('button', { name: 'Scroll events down' });
+    expect((scrollDownButton as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(scrollDownButton);
+
+    expect(eventList.scrollBy).toHaveBeenCalledWith({
+      top: 220,
+      behavior: 'smooth',
+    });
   });
 
   it('creates an event with short description and displays the new card', async () => {

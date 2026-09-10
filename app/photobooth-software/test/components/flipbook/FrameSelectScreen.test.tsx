@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FrameSelectScreen } from './FrameSelectScreen';
-import { useFlipbookStore } from '../../store/flipbook-store';
-import { boothApi, type FrameItem } from '../../services/api';
+import { FrameSelectScreen } from '../../../src/components/flipbook/FrameSelectScreen';
+import { useFlipbookStore } from '../../../src/store/flipbook-store';
+import { boothApi, type FrameItem } from '../../../src/services/api';
 
 describe('FrameSelectScreen layout and selection', () => {
   afterEach(() => {
