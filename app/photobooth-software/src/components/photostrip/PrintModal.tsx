@@ -13,7 +13,6 @@ export interface PrintModalProps {
   preview?: boolean;
   isPrinted?: boolean;
   copiesPrinted?: number;
-  eventDate?: string;
   onPrintConfirmed?: (copies: number, recordOnly?: boolean) => Promise<void> | void;
   onFinishSession?: () => void;
 }
@@ -24,7 +23,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
   outputImageUrl = '',
   preview = false,
   isPrinted: externalIsPrinted = false,
-  eventDate,
   onPrintConfirmed,
   onFinishSession,
 }) => {
@@ -109,28 +107,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({
 
   const formattedPublicId = publicId || 'M7p4XaV';
 
-  const stripDate = (() => {
-    if (eventDate) {
-      const parsed = new Date(eventDate);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      }
-      return eventDate;
-    }
-    return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  })();
-
   return (
     <>
       <div className="print-only-target" aria-hidden="true">
         {outputImageUrl ? (
           <div className="relative size-full">
             <img src={outputImageUrl} alt={`Photo Strip ${formattedPublicId}`} />
-            <div className="absolute bottom-3.5 left-4 pointer-events-none">
-             <span className="font-['Nunito',sans-serif] text-xs sm:text-sm font-bold tracking-wide text-white/80 bg-black/20 px-2 py-0.5 rounded">
-                {stripDate}
-              </span>
-            </div>
           </div>
         ) : null}
       </div>
@@ -149,12 +131,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                     alt={`Photo Strip Output ${formattedPublicId}`}
                     className="max-h-[calc(100dvh-120px)] w-auto object-contain rounded-2xl"
                   />
-                  {/* Date at the bottom left of the photostrip */}
-                  <div className="absolute bottom-3.5 left-4 pointer-events-none">
-                    <span className="text-xs sm:text-sm font-bold tracking-wide text-white bg-black/5 rounded-full p-2 px-3 drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)]">
-                      {stripDate}
-                    </span>
-                  </div>
                 </div>
               ) : (
                 <div className="flex size-full min-h-[420px] min-w-[240px] flex-col items-center justify-center rounded-2xl bg-[#f3f4f6] text-[#6b7280] font-bold p-8">
