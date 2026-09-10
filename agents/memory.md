@@ -46,6 +46,7 @@ Confirmed, durable knowledge that helps future agents make correct changes. Do n
 - 2026-09-06: Flipbook camera capture viewfinders (`CoverCaptureScreen.tsx` and `VideoRecordingScreen.tsx`) center the viewfinder in the viewport using `flex flex-col items-center justify-center` with a single bound video stream within the `aspect-[241/132]` container. Source: `app/photobooth-software/src/components/flipbook/CoverCaptureScreen.tsx`, `VideoRecordingScreen.tsx`.
 - 2026-09-05: Admin suite is implemented: Event Selection & Creation (`/admin/events`), Template Library & Editor with custom background/slots/rotation/export ZIP (`/admin/templates`, `/admin/templates/:id`), Frame Management (`/admin/frames`), and Publication Queue Dashboard with dead-letter retry (`/admin/publications`).
 - 2026-09-05: Captive Portal (`app/captive-website`) provides offline guest retrieval with mobile QR camera scanning (jsQR), manual code entry, media preview, direct download, and Web Share API.
+- 2026-09-10: The supported Arch/Fedora hotspot setup uses a fixed NetworkManager access point with standalone dnsmasq (DHCP plus wildcard DNS) and a Caddy `:80` catch-all reverse proxy to the captive app on `127.0.0.1:5174`. Do not use NetworkManager shared IPv4 mode because it conflicts with standalone dnsmasq. Source: `config/captive-portal/`.
 - 2026-09-07: Flipbook workflow order and dynamic frame slot sizing:
   - **Step Progression**: `Welcome` -> `Setup` (Event Select) -> `Instructions` -> `Frame Selection` (`frame_select`) -> `Cover Capture` (3 photos) -> `Video Capture` (3 clips) -> `Review Cover` -> `Review Video` -> `Processing` (GIF generation) -> `Complete` (Print/QR/Download).
   - **Full Sensor Capture & Dynamic Slot Viewfinder**: Cover photos and video clips are captured/recorded at the maximum native resolution of the camera stream (`video.videoWidth` $\times$ `video.videoHeight`, ideal 1080p/720p). Live viewfinders (`CoverCaptureScreen.tsx`, `VideoRecordingScreen.tsx`) are visually framed to the template slot aspect ratio (`min(100vw - 64px, (100dvh - 64px) * slotRatio)` with `object-cover`) to guide guest posing accurately.
@@ -61,4 +62,3 @@ Confirmed, durable knowledge that helps future agents make correct changes. Do n
 ```md
 - YYYY-MM-DD: Confirmed fact. Source: `path`, issue, or decision.
 ```
-

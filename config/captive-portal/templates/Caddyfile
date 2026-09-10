@@ -1,0 +1,10 @@
+# SIC Photobooth captive portal. Managed by config/captive-portal/install.sh.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	# DNS maps every requested hostname to this host, so this must not be host-specific.
+	reverse_proxy 127.0.0.1:{{CAPTIVE_WEBSITE_PORT}}
+}

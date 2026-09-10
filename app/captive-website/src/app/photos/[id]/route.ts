@@ -1,3 +1,5 @@
+import { isValidPublicId } from '@photobooth/public-output';
+
 const BACKEND_INTERNAL_URL =
   process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3000';
 
@@ -6,6 +8,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  if (!isValidPublicId(id)) {
+    return new Response('Photo not found', { status: 404 });
+  }
+
   try {
     const res = await fetch(`${BACKEND_INTERNAL_URL}/photos/${id}`, {
       cache: 'no-store',
