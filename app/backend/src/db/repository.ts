@@ -145,6 +145,27 @@ export class DatabaseRepository {
     }
   }
 
+  public async getEventById(id: string): Promise<EventData | null> {
+    try {
+      const result = await pool.query(
+        `
+          SELECT id, name, description, date::text, operator_name AS "operatorName", created_at AS "createdAt"
+          FROM events
+          WHERE id = $1
+        `,
+        [id],
+      );
+      return result.rows[0] || null;
+    } catch {
+      for (const event of this.inMemoryEvents.values()) {
+        if (event.id === id) {
+          return event;
+        }
+      }
+      return null;
+    }
+  }
+
   public async createEvent(
     name: string,
     date: string,

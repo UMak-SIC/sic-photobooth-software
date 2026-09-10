@@ -12,7 +12,7 @@ vi.mock('qrcode', () => ({
   },
 }));
 
-vi.mock('../../services/flipbook-pdf', () => ({
+vi.mock('../../../src/services/flipbook-pdf', () => ({
   generateFlipbookPdf: vi.fn().mockResolvedValue('blob:mock-pdf'),
   printPdfBlobUrl: vi.fn(),
 }));

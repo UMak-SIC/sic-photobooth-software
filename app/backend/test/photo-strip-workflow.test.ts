@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import sharp from 'sharp';
 import { buildApp } from '../src/app.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { sessionStateMachine } from '../src/services/session-state-machine.js';
-import { photoStripRenderer } from '../src/services/photo-strip-renderer.js';
+import {
+  photoStripRenderer,
+  formatDateToPill,
+  isDualStripLayout,
+  detectCutLayout,
+  generateDatePillSvg,
+} from '../src/services/photo-strip-renderer.js';
 import { dbRepository } from '../src/db/repository.js';
 
 describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
@@ -676,13 +683,234 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
     // 7. Duplicate confirm call returns same output idempotently without throwing INVALID_STATE
     const dupConfirmRes = await app.inject({
-      method: 'POST',
-      url: `/api/sessions/${sessionId}/photo-strip/confirm`,
-      headers: { 'x-session-token': token },
+       method: 'POST',
+       url: `/api/sessions/${sessionId}/photo-strip/confirm`,
+       headers: { 'x-session-token': token },
+     });
+     expect(dupConfirmRes.statusCode).toBe(200);
+     const dupBody = JSON.parse(dupConfirmRes.body);
+     expect(dupBody.data.publicId).toBe(confirmBody.data.publicId);
+   });
+
+  it('correctly formats dates as yyyy. mm. dd for the Date Pill badge', () => {
+    expect(formatDateToPill('2026-09-10')).toBe('2026. 09. 10');
+    expect(formatDateToPill('2025-01-05T12:00:00.000Z')).toBe('2025. 01. 05');
+    expect(formatDateToPill(new Date('2026-12-25T00:00:00Z'))).toMatch(/2026\. 12\. 25/);
+    expect(formatDateToPill()).toMatch(/^\d{4}\. \d{2}\. \d{2}$/);
+  });
+
+  it('auto-detects single vs dual-strip (vertical), horizontal cut, and 4-cut quad layouts', () => {
+    // 1. Single sheet postcards:
+    // a) 2 unique photos
+    const singlePlacements2 = [
+      { captureIndex: 1, x: 100, y: 120, width: 1000, height: 440, zIndex: 1 },
+      { captureIndex: 2, x: 100, y: 600, width: 1000, height: 440, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, singlePlacements2)).toBe('single');
+    expect(isDualStripLayout(1200, 1800, singlePlacements2)).toBe(false);
+
+    // b) 4 unique photos in a 2x2 grid on 1 postcard
+    const singlePostcardGrid4 = [
+      { captureIndex: 1, x: 90, y: 100, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 2, x: 690, y: 100, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 3, x: 90, y: 1000, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 4, x: 690, y: 1000, width: 420, height: 300, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, singlePostcardGrid4)).toBe('single');
+    expect(isDualStripLayout(1200, 1800, singlePostcardGrid4)).toBe(false);
+
+    // 2. Dual strip layout (cut in half vertically):
+    // a) 3 photos duplicated in left and right columns
+    const dualVertical3 = [
+      { captureIndex: 1, x: 90, y: 120, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 1, x: 690, y: 120, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 2, x: 90, y: 400, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 2, x: 690, y: 400, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 3, x: 90, y: 700, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 3, x: 690, y: 700, width: 420, height: 236, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, dualVertical3)).toBe('cut_2_vertical');
+    expect(isDualStripLayout(1200, 1800, dualVertical3)).toBe(true);
+
+    // b) 4 photos duplicated in left and right columns (8 slots total, MUST be cut_2_vertical, NOT cut_4)
+    const dualVertical4 = [
+      { captureIndex: 1, x: 90, y: 100, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 1, x: 690, y: 100, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 2, x: 90, y: 400, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 2, x: 690, y: 400, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 3, x: 90, y: 1000, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 3, x: 690, y: 1000, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 4, x: 90, y: 1300, width: 420, height: 236, zIndex: 1 },
+      { captureIndex: 4, x: 690, y: 1300, width: 420, height: 236, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, dualVertical4)).toBe('cut_2_vertical');
+    expect(isDualStripLayout(1200, 1800, dualVertical4)).toBe(true);
+
+    // 3. Horizontal cut layout (top/bottom split): top and bottom halves duplicate captures
+    const horizontalPlacements = [
+      { captureIndex: 1, x: 100, y: 100, width: 1000, height: 350, zIndex: 1 },
+      { captureIndex: 1, x: 100, y: 1000, width: 1000, height: 350, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, horizontalPlacements)).toBe('cut_2_horizontal');
+    expect(detectCutLayout(1200, 1800, horizontalPlacements, 'Horizontal Split')).toBe('cut_2_horizontal');
+
+    // 4. 4-Cut Quad layout: capture index 1 replicated in all 4 quadrants
+    const quadPlacements = [
+      { captureIndex: 1, x: 90, y: 100, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 1, x: 690, y: 100, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 1, x: 90, y: 1000, width: 420, height: 300, zIndex: 1 },
+      { captureIndex: 1, x: 690, y: 1000, width: 420, height: 300, zIndex: 1 },
+    ];
+    expect(detectCutLayout(1200, 1800, quadPlacements)).toBe('cut_4');
+    expect(detectCutLayout(1200, 1800, quadPlacements, '4-Cut Grid Frame')).toBe('cut_4');
+
+    // Explicit overrides
+    expect(detectCutLayout(1200, 1800, singlePlacements2, undefined, true)).toBe('cut_2_vertical');
+    expect(detectCutLayout(1200, 1800, quadPlacements, undefined, false, 'cut_2_horizontal')).toBe('cut_2_horizontal');
+  });
+
+  it('renders dual-strip (cut in half) photo strips with 2x stacked QR and Date Pills', async () => {
+    const publicId = 'M7p4XaV';
+    const qrUrl = `https://myphotobooth.com/${publicId}`;
+
+    const pngBuffer = await photoStripRenderer.renderStrip({
+      width: 1200,
+      height: 1800,
+      backgroundColor: '#ffffff',
+      placements: [
+        { captureIndex: 1, x: 90, y: 280, width: 420, height: 236, zIndex: 1 },
+        { captureIndex: 1, x: 690, y: 280, width: 420, height: 236, zIndex: 1 },
+        { captureIndex: 2, x: 90, y: 630, width: 420, height: 236, zIndex: 1 },
+        { captureIndex: 2, x: 690, y: 630, width: 420, height: 236, zIndex: 1 },
+      ],
+      overlays: [],
+      captures: [],
+      publicId,
+      qrUrl,
+      eventDate: '2026-09-10',
     });
-    expect(dupConfirmRes.statusCode).toBe(200);
-    const dupBody = JSON.parse(dupConfirmRes.body);
-    expect(dupBody.data.publicId).toBe(confirmBody.data.publicId);
+
+    expect(Buffer.isBuffer(pngBuffer)).toBe(true);
+    expect(pngBuffer.length).toBeGreaterThan(5000);
+    expect(pngBuffer[0]).toBe(0x89);
+    expect(pngBuffer[1]).toBe(0x50);
+  });
+
+  it('renders 4-cut quad photo strips with 4x stacked QR and Date Pills across all quadrants', async () => {
+    const publicId = 'K9p4XaV';
+    const qrUrl = `https://myphotobooth.com/${publicId}`;
+
+    const pngBuffer = await photoStripRenderer.renderStrip({
+      width: 1200,
+      height: 1800,
+      backgroundColor: '#f8fafc',
+      placements: [
+        { captureIndex: 1, x: 90, y: 100, width: 420, height: 320, zIndex: 1 },
+        { captureIndex: 2, x: 690, y: 100, width: 420, height: 320, zIndex: 1 },
+        { captureIndex: 3, x: 90, y: 1000, width: 420, height: 320, zIndex: 1 },
+        { captureIndex: 4, x: 690, y: 1000, width: 420, height: 320, zIndex: 1 },
+      ],
+      overlays: [],
+      captures: [],
+      publicId,
+      qrUrl,
+      eventDate: '2026-09-10',
+      templateName: '4-Cut Summer Quad',
+    });
+
+    expect(Buffer.isBuffer(pngBuffer)).toBe(true);
+    expect(pngBuffer.length).toBeGreaterThan(5000);
+    expect(pngBuffer[0]).toBe(0x89);
+    expect(pngBuffer[1]).toBe(0x50);
+  });
+
+  it('renders horizontal 2-cut photo strips with 2x stacked QR and Date Pills (top and bottom)', async () => {
+    const publicId = 'H2p4XaV';
+    const qrUrl = `https://myphotobooth.com/${publicId}`;
+
+    const pngBuffer = await photoStripRenderer.renderStrip({
+      width: 1200,
+      height: 1800,
+      backgroundColor: '#ffffff',
+      placements: [
+        { captureIndex: 1, x: 100, y: 150, width: 1000, height: 350, zIndex: 1 },
+        { captureIndex: 2, x: 100, y: 1050, width: 1000, height: 350, zIndex: 1 },
+      ],
+      overlays: [],
+      captures: [],
+      publicId,
+      qrUrl,
+      eventDate: '2026-09-10',
+      templateName: 'Horizontal Split 2-Cut',
+    });
+
+    expect(Buffer.isBuffer(pngBuffer)).toBe(true);
+    expect(pngBuffer.length).toBeGreaterThan(5000);
+    expect(pngBuffer[0]).toBe(0x89);
+    expect(pngBuffer[1]).toBe(0x50);
+  });
+
+  it('renders date pill text optically centered vertically', async () => {
+    const width = 140;
+    const height = 30;
+    const pillBuffer = generateDatePillSvg('2026. 09. 10', width, height);
+    const pngBuf = await sharp(pillBuffer).png().toBuffer();
+    const raw = await sharp(pngBuf).raw().toBuffer({ resolveWithObject: true });
+
+    let minRow = height;
+    let maxRow = 0;
+    // Scan middle area of pill to inspect pure text pixels (excluding rounded end borders)
+    const xStart = Math.round(width * 0.25);
+    const xEnd = Math.round(width * 0.75);
+    for (let y = 0; y < height; y++) {
+      for (let x = xStart; x <= xEnd; x++) {
+        const idx = (y * width + x) * raw.info.channels;
+        const r = raw.data[idx];
+        const g = raw.data[idx + 1];
+        const b = raw.data[idx + 2];
+        // Look for crisp white text pixels (pure white fill)
+        if (r > 220 && g > 220 && b > 220) {
+          if (y < minRow) minRow = y;
+          if (y > maxRow) maxRow = y;
+        }
+      }
+    }
+
+    const topPadding = minRow;
+    const bottomPadding = height - 1 - maxRow;
+    const diff = Math.abs(topPadding - bottomPadding);
+    console.log(`Pill 140x30 vertical text centering: topPadding=${topPadding}px, bottomPadding=${bottomPadding}px, diff=${diff}px, textHeight=${maxRow - minRow + 1}px`);
+    expect(diff).toBeLessThanOrEqual(1);
+
+    // Also test single strip 160x34 size
+    const widthSingle = 160;
+    const heightSingle = 34;
+    const pillBufferSingle = generateDatePillSvg('2026. 09. 10', widthSingle, heightSingle);
+    const pngBufSingle = await sharp(pillBufferSingle).png().toBuffer();
+    const rawSingle = await sharp(pngBufSingle).raw().toBuffer({ resolveWithObject: true });
+
+    let minRowSingle = heightSingle;
+    let maxRowSingle = 0;
+    const xStartSingle = Math.round(widthSingle * 0.25);
+    const xEndSingle = Math.round(widthSingle * 0.75);
+    for (let y = 0; y < heightSingle; y++) {
+      for (let x = xStartSingle; x <= xEndSingle; x++) {
+        const idx = (y * widthSingle + x) * rawSingle.info.channels;
+        const r = rawSingle.data[idx];
+        const g = rawSingle.data[idx + 1];
+        const b = rawSingle.data[idx + 2];
+        if (r > 220 && g > 220 && b > 220) {
+          if (y < minRowSingle) minRowSingle = y;
+          if (y > maxRowSingle) maxRowSingle = y;
+        }
+      }
+    }
+
+    const topPaddingSingle = minRowSingle;
+    const bottomPaddingSingle = heightSingle - 1 - maxRowSingle;
+    const diffSingle = Math.abs(topPaddingSingle - bottomPaddingSingle);
+    console.log(`Pill 160x34 vertical text centering: topPadding=${topPaddingSingle}px, bottomPadding=${bottomPaddingSingle}px, diff=${diffSingle}px, textHeight=${maxRowSingle - minRowSingle + 1}px`);
+    expect(diffSingle).toBeLessThanOrEqual(1);
   });
 });
 
