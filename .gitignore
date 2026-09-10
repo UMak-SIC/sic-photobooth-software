@@ -27,3 +27,6 @@ app/storage/
 # Local dev certificates
 certificates/
 *.pem
+
+# Rendered captive-portal configuration includes the hotspot passphrase.
+config/captive-portal/generated/

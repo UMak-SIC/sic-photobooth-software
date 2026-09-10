@@ -10,6 +10,7 @@ import { photoRoutes } from './routes/photos.js';
 import { eventRoutes } from './routes/events.js';
 import { templateRoutes } from './templates/routes.js';
 import { publicationRoutes } from './routes/publications.js';
+import { analyticsRoutes } from './routes/analytics.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -59,6 +60,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(eventRoutes);
   await app.register(templateRoutes);
   await app.register(publicationRoutes);
+  await app.register(analyticsRoutes);
 
   // 6. Global Error Handler
   app.setErrorHandler((error: FastifyError | Error, _request, reply) => {

@@ -7,6 +7,7 @@ import { useTemplateStore } from './templates/template-store';
 import { draftFromTemplate, emptyDraft, type Template } from './templates/types';
 import { PublicationDashboard } from './publications/publication-dashboard';
 import { AdminEventsPage } from '../pages/AdminEventsPage';
+import { AdminAnalyticsPage } from './analytics/AdminAnalyticsPage';
 
 
 export function AdminRouter() {
@@ -101,6 +102,7 @@ export function AdminRouter() {
     );
 
   if (path === '/admin/events') return <AdminFrame onNavigate={navigate}><AdminEventsPage /></AdminFrame>;
+  if (path === '/admin/analytics') return <AdminFrame onNavigate={navigate}><AdminAnalyticsPage /></AdminFrame>;
   if (path === '/admin/frames')
     return (
       <AdminFrame onNavigate={navigate}>
@@ -190,6 +192,7 @@ function AdminFrame({ children, onNavigate }: { children: React.ReactNode; onNav
         <nav aria-label="Administration">
           {[
             ['/admin/events', 'Events'],
+            ['/admin/analytics', 'Analytics & KPIs'],
             ['/admin/templates', 'Templates'],
             ['/admin/frames', 'Flipbook frames'],
             ['/admin/publications', 'Publications'],

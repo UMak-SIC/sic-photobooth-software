@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { pool } from './pool.js';
 import type { SessionData, SessionState } from '../services/session-state-machine.js';
 import type { SessionType } from '@photobooth/public-output';
+import { classifyTemplateLayout } from '../services/layout-classifier.js';
 
 export interface EventData {
   id: string;
@@ -2002,6 +2003,396 @@ export class DatabaseRepository {
     }
     return null;
   }
+
+  /**
+   * Aggregates and calculates full KPI & analytics metrics across sessions.
+   */
+  public async getAnalyticsData(filters: {
+    eventId?: string;
+    startDate?: string;
+    endDate?: string;
+  } = {}): Promise<AnalyticsData> {
+    const { eventId, startDate, endDate } = filters;
+    const startIso = startDate ? new Date(startDate).toISOString() : null;
+    const endIso = endDate ? new Date(endDate).toISOString() : null;
+
+    interface RawSessionRow {
+      id: string;
+      eventId: string;
+      type: 'photo_strip' | 'flipbook';
+      state: string;
+      templateId?: string | null;
+      frameId?: string | null;
+      templateSnapshot?: any;
+      isPrinted: boolean;
+      copiesPrinted: number;
+      createdAt: Date | string;
+      templateName?: string | null;
+      templateType?: string | null;
+    }
+
+    let rows: RawSessionRow[] = [];
+
+    try {
+      const query = `
+        SELECT
+          s.id,
+          s.event_id AS "eventId",
+          s.type,
+          s.state,
+          s.template_id AS "templateId",
+          s.frame_id AS "frameId",
+          s.template_snapshot AS "templateSnapshot",
+          s.is_printed AS "isPrinted",
+          s.copies_printed AS "copiesPrinted",
+          s.created_at AS "createdAt",
+          COALESCE(t.name, s.template_snapshot->>'name') AS "templateName",
+          t.type AS "templateType"
+        FROM sessions s
+        LEFT JOIN templates t ON s.template_id = t.id
+        WHERE s.state IN ('booth_confirmed', 'printed')
+          AND ($1::UUID IS NULL OR s.event_id = $1::UUID)
+          AND ($2::TIMESTAMPTZ IS NULL OR s.created_at >= $2::TIMESTAMPTZ)
+          AND ($3::TIMESTAMPTZ IS NULL OR s.created_at <= $3::TIMESTAMPTZ)
+        ORDER BY s.created_at ASC
+      `;
+      const res = await pool.query(query, [
+        eventId || null,
+        startIso,
+        endIso,
+      ]);
+      rows = res.rows;
+    } catch {
+      // In-memory fallback for test environments
+      const sessions = Array.from(this.inMemorySessions.values()).filter((s) => {
+        if (s.state !== 'booth_confirmed' && s.state !== 'printed') return false;
+        if (eventId && s.eventId !== eventId) return false;
+        const createdTime = new Date(s.createdAt).getTime();
+        if (startDate && createdTime < new Date(startDate).getTime()) return false;
+        if (endDate && createdTime > new Date(endDate).getTime()) return false;
+        return true;
+      });
+
+      rows = sessions.map((s) => {
+        const snap = s.templateSnapshot as any;
+        return {
+          id: s.id,
+          eventId: s.eventId,
+          type: s.type,
+          state: s.state,
+          templateId: s.templateId,
+          frameId: s.frameId,
+          templateSnapshot: snap,
+          isPrinted: s.isPrinted,
+          copiesPrinted: s.copiesPrinted || (s.isPrinted ? 1 : 0),
+          createdAt: s.createdAt,
+          templateName: snap?.name || (s.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template'),
+          templateType: s.type,
+        };
+      });
+    }
+
+    // 1. Accumulators
+    let totalSessions = 0;
+    let completedSessions = 0;
+    let printedSessions = 0;
+    let totalPrints = 0;
+    let photoStripSessions = 0;
+    let photoStripPrints = 0;
+    let flipbookSessions = 0;
+    let flipbookPrints = 0;
+    let totalReprintSessions = 0; // sessions with > 1 copy
+
+    let oneCopyCount = 0;
+    let twoCopiesCount = 0;
+    let threeCopiesCount = 0;
+    let fourPlusCopiesCount = 0;
+
+    const templateMap = new Map<string, {
+      templateId: string;
+      name: string;
+      type: 'photo_strip' | 'flipbook';
+      layoutCategory: string;
+      layoutLabel: string;
+      totalSessions: number;
+      totalPrints: number;
+      reprintSessions: number;
+    }>();
+
+    const layoutMap = new Map<string, {
+      category: string;
+      label: string;
+      description: string;
+      totalSessions: number;
+      totalPrints: number;
+      reprintSessions: number;
+    }>();
+
+    const timeseriesMap = new Map<string, {
+      date: string;
+      totalSessions: number;
+      totalPrints: number;
+      photoStripPrints: number;
+      flipbookPrints: number;
+    }>();
+
+    for (const row of rows) {
+      totalSessions++;
+      completedSessions++;
+
+      const copies = Math.max(1, row.copiesPrinted || (row.isPrinted ? 1 : 0));
+      totalPrints += copies;
+      if (row.isPrinted) printedSessions++;
+
+      const isReprint = copies > 1;
+      if (isReprint) totalReprintSessions++;
+
+      // Copies distribution
+      if (copies === 1) oneCopyCount++;
+      else if (copies === 2) twoCopiesCount++;
+      else if (copies === 3) threeCopiesCount++;
+      else fourPlusCopiesCount++;
+
+      // Type breakdown
+      if (row.type === 'photo_strip') {
+        photoStripSessions++;
+        photoStripPrints += copies;
+      } else {
+        flipbookSessions++;
+        flipbookPrints += copies;
+      }
+
+      // Template & Layout resolution
+      const snap = row.templateSnapshot || {};
+      const templateName = row.templateName || snap.name || (row.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template');
+      const templateId = row.templateId || row.frameId || snap.id || templateName;
+      const placements = snap.placements || [];
+
+      const layoutInfo = classifyTemplateLayout(
+        row.type,
+        placements,
+        snap.outputWidth || 1200,
+        snap.outputHeight || 1800,
+      );
+
+      // Template stats
+      if (!templateMap.has(templateId)) {
+        templateMap.set(templateId, {
+          templateId,
+          name: templateName,
+          type: row.type,
+          layoutCategory: layoutInfo.category,
+          layoutLabel: layoutInfo.label,
+          totalSessions: 0,
+          totalPrints: 0,
+          reprintSessions: 0,
+        });
+      }
+      const tStat = templateMap.get(templateId)!;
+      tStat.totalSessions++;
+      tStat.totalPrints += copies;
+      if (isReprint) tStat.reprintSessions++;
+
+      // Layout stats
+      if (!layoutMap.has(layoutInfo.category)) {
+        layoutMap.set(layoutInfo.category, {
+          category: layoutInfo.category,
+          label: layoutInfo.label,
+          description: layoutInfo.description,
+          totalSessions: 0,
+          totalPrints: 0,
+          reprintSessions: 0,
+        });
+      }
+      const lStat = layoutMap.get(layoutInfo.category)!;
+      lStat.totalSessions++;
+      lStat.totalPrints += copies;
+      if (isReprint) lStat.reprintSessions++;
+
+      // Timeseries date (YYYY-MM-DD)
+      const d = new Date(row.createdAt);
+      const dateKey = !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : 'Unknown';
+      if (!timeseriesMap.has(dateKey)) {
+        timeseriesMap.set(dateKey, {
+          date: dateKey,
+          totalSessions: 0,
+          totalPrints: 0,
+          photoStripPrints: 0,
+          flipbookPrints: 0,
+        });
+      }
+      const tsStat = timeseriesMap.get(dateKey)!;
+      tsStat.totalSessions++;
+      tsStat.totalPrints += copies;
+      if (row.type === 'photo_strip') {
+        tsStat.photoStripPrints += copies;
+      } else {
+        tsStat.flipbookPrints += copies;
+      }
+    }
+
+    const avgCopiesOverall = totalSessions > 0 ? Number((totalPrints / totalSessions).toFixed(2)) : 0;
+    const overallReprintRate = totalSessions > 0 ? Number(((totalReprintSessions / totalSessions) * 100).toFixed(1)) : 0;
+
+    // Build Templates array sorted by total prints descending
+    const templates: TemplateRanking[] = Array.from(templateMap.values())
+      .map((t) => ({
+        ...t,
+        averageCopies: t.totalSessions > 0 ? Number((t.totalPrints / t.totalSessions).toFixed(2)) : 0,
+        reprintRate: t.totalSessions > 0 ? Number(((t.reprintSessions / t.totalSessions) * 100).toFixed(1)) : 0,
+        shareOfPrintsPercent: totalPrints > 0 ? Number(((t.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.totalPrints - a.totalPrints);
+
+    // Build Layouts array sorted by reprint rate descending (highlighting reprint drivers)
+    const layoutBreakdown: LayoutCategoryBreakdown[] = Array.from(layoutMap.values())
+      .map((l) => ({
+        ...l,
+        averageCopies: l.totalSessions > 0 ? Number((l.totalPrints / l.totalSessions).toFixed(2)) : 0,
+        reprintRate: l.totalSessions > 0 ? Number(((l.reprintSessions / l.totalSessions) * 100).toFixed(1)) : 0,
+        sharePercent: totalPrints > 0 ? Number(((l.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.reprintRate - a.reprintRate || b.totalPrints - a.totalPrints);
+
+    // Build Type Comparison
+    const typeComparison: TypeComparison[] = [
+      {
+        type: 'photo_strip',
+        label: 'Photo Strips',
+        sessions: photoStripSessions,
+        totalPrints: photoStripPrints,
+        sharePercent: totalPrints > 0 ? Number(((photoStripPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies: photoStripSessions > 0 ? Number((photoStripPrints / photoStripSessions).toFixed(2)) : 0,
+        reprintRate: photoStripSessions > 0
+          ? Number(((rows.filter((r) => r.type === 'photo_strip' && (r.copiesPrinted > 1)).length / photoStripSessions) * 100).toFixed(1))
+          : 0,
+      },
+      {
+        type: 'flipbook',
+        label: 'Flipbooks',
+        sessions: flipbookSessions,
+        totalPrints: flipbookPrints,
+        sharePercent: totalPrints > 0 ? Number(((flipbookPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies: flipbookSessions > 0 ? Number((flipbookPrints / flipbookSessions).toFixed(2)) : 0,
+        reprintRate: flipbookSessions > 0
+          ? Number(((rows.filter((r) => r.type === 'flipbook' && (r.copiesPrinted > 1)).length / flipbookSessions) * 100).toFixed(1))
+          : 0,
+      },
+    ];
+
+    // Build Copies distribution
+    const copiesDistribution: CopiesDistribution = {
+      oneCopy: oneCopyCount,
+      twoCopies: twoCopiesCount,
+      threeCopies: threeCopiesCount,
+      fourPlusCopies: fourPlusCopiesCount,
+      oneCopyPercent: totalSessions > 0 ? Number(((oneCopyCount / totalSessions) * 100).toFixed(1)) : 0,
+      twoCopiesPercent: totalSessions > 0 ? Number(((twoCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+      threeCopiesPercent: totalSessions > 0 ? Number(((threeCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+      fourPlusCopiesPercent: totalSessions > 0 ? Number(((fourPlusCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+    };
+
+    // Sort timeseries chronologically
+    const timeseries = Array.from(timeseriesMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    return {
+      summary: {
+        totalSessions,
+        completedSessions,
+        printedSessions,
+        totalPrints,
+        averageCopiesPerSession: avgCopiesOverall,
+        overallReprintRate,
+        photoStripSessions,
+        photoStripPrints,
+        flipbookSessions,
+        flipbookPrints,
+      },
+      typeComparison,
+      templates,
+      layoutBreakdown,
+      copiesDistribution,
+      timeseries,
+    };
+  }
+}
+
+export interface AnalyticsSummary {
+  totalSessions: number;
+  completedSessions: number;
+  printedSessions: number;
+  totalPrints: number;
+  averageCopiesPerSession: number;
+  overallReprintRate: number;
+  photoStripSessions: number;
+  photoStripPrints: number;
+  flipbookSessions: number;
+  flipbookPrints: number;
+}
+
+export interface TypeComparison {
+  type: 'photo_strip' | 'flipbook';
+  label: string;
+  sessions: number;
+  totalPrints: number;
+  sharePercent: number;
+  averageCopies: number;
+  reprintRate: number;
+}
+
+export interface TemplateRanking {
+  templateId: string;
+  name: string;
+  type: 'photo_strip' | 'flipbook';
+  layoutCategory: string;
+  layoutLabel: string;
+  totalSessions: number;
+  totalPrints: number;
+  averageCopies: number;
+  reprintSessions: number;
+  reprintRate: number;
+  shareOfPrintsPercent: number;
+}
+
+export interface LayoutCategoryBreakdown {
+  category: string;
+  label: string;
+  description: string;
+  totalSessions: number;
+  totalPrints: number;
+  averageCopies: number;
+  reprintSessions: number;
+  reprintRate: number;
+  sharePercent: number;
+}
+
+export interface CopiesDistribution {
+  oneCopy: number;
+  twoCopies: number;
+  threeCopies: number;
+  fourPlusCopies: number;
+  oneCopyPercent: number;
+  twoCopiesPercent: number;
+  threeCopiesPercent: number;
+  fourPlusCopiesPercent: number;
+}
+
+export interface TimeseriesPoint {
+  date: string;
+  totalSessions: number;
+  totalPrints: number;
+  photoStripPrints: number;
+  flipbookPrints: number;
+}
+
+export interface AnalyticsData {
+  summary: AnalyticsSummary;
+  typeComparison: TypeComparison[];
+  templates: TemplateRanking[];
+  layoutBreakdown: LayoutCategoryBreakdown[];
+  copiesDistribution: CopiesDistribution;
+  timeseries: TimeseriesPoint[];
 }
 
 export const dbRepository = new DatabaseRepository();
+

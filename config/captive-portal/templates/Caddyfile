@@ -1,0 +1,14 @@
+# SIC Photobooth captive portal. Managed by config/captive-portal/install.sh.
+{
+	auto_https off
+	admin off
+}
+
+:80 {
+	# DNS maps probe hostnames here. Redirect them so the portal always uses the
+	# gateway origin, which avoids device-specific hosts and backend CORS failures.
+	@externalHost not host {{GATEWAY_IP}}
+	redir @externalHost http://{{GATEWAY_IP}}{uri} temporary
+
+	reverse_proxy 127.0.0.1:{{CAPTIVE_WEBSITE_PORT}}
+}
