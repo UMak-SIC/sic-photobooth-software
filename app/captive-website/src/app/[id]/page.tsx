@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Film, Image as ImageIcon, Calendar, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar } from 'lucide-react';
 import { parsePublicId, type PublicOutputMetadata } from '@photobooth/public-output';
 import { StatusBanner } from '@photobooth/ui';
 import { BrandMark } from '../../components/BrandMark';
@@ -69,23 +69,19 @@ export default async function OutputPage({
 
   if (!publicId) {
     return (
-      <main className="min-h-screen bg-[#061715] bg-ambient-radial text-[#e8fff5] flex flex-col items-center selection:bg-[#48c4a1]/30 selection:text-white">
-        <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#061715]/85 px-5 py-3.5 backdrop-blur-xl md:px-10">
+      <main className="portal-shell flex h-[100dvh] flex-col items-center overflow-hidden selection:bg-[#48c4a1] selection:text-white">
+        <header className="w-full shrink-0 px-5 py-4 md:px-10">
           <div className="mx-auto flex max-w-2xl items-center justify-between">
-            <Link href="/" className="flex items-center gap-3.5 hover:opacity-90 transition">
+            <Link href="/" className="flex items-center gap-3.5">
               <BrandMark />
               <div>
-                <p className="text-[10px] font-black tracking-[0.24em] text-[#76d2bb] uppercase">
-                  SIC PHOTOBOOTH
-                </p>
-                <h1 className="text-base font-black tracking-tight text-white sm:text-lg">
-                  Guest Retrieval Portal
-                </h1>
+                <p className="text-sm font-black tracking-tight text-white">UMak SIC Photobooth</p>
+                <p className="text-xs text-[#9ec4b9]">Local guest gallery</p>
               </div>
             </Link>
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-[#b3d9ce] hover:text-white hover:border-white/30 transition shadow-sm"
+              className="portal-action inline-flex items-center gap-2 rounded-xl border border-[#1c4a40] bg-[#0b2420] px-4 py-2.5 text-xs font-bold text-[#d8ffef] hover:border-[#a8f3dd] hover:bg-[#164137]"
             >
               <ArrowLeft className="size-3.5" />
               <span>Scan Another</span>
@@ -93,7 +89,7 @@ export default async function OutputPage({
           </div>
         </header>
 
-        <div className="w-full max-w-2xl px-5 py-10 flex flex-col items-center text-center gap-6">
+        <div className="flex w-full max-w-2xl flex-1 items-center px-5 text-center">
           <div className="w-full text-left my-6">
             <StatusBanner
               variant="not_found_local"
@@ -109,24 +105,20 @@ export default async function OutputPage({
   const { output, error } = await getPhotoData(publicId);
 
   return (
-    <main className="min-h-screen bg-[#061715] bg-ambient-radial text-[#e8fff5] flex flex-col items-center selection:bg-[#48c4a1]/30 selection:text-white">
+    <main className="portal-shell flex h-[100dvh] flex-col items-center overflow-hidden selection:bg-[#48c4a1] selection:text-white">
       {/* Top Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#061715]/85 px-5 py-3.5 backdrop-blur-xl md:px-10">
+      <header className="w-full shrink-0 px-5 py-4 md:px-10">
         <div className="mx-auto flex max-w-2xl items-center justify-between">
-          <Link href="/" className="flex items-center gap-3.5 hover:opacity-90 transition">
+          <Link href="/" className="flex items-center gap-3.5">
             <BrandMark />
             <div>
-              <p className="text-[10px] font-black tracking-[0.24em] text-[#76d2bb] uppercase">
-                SIC PHOTOBOOTH
-              </p>
-              <h1 className="text-base font-black tracking-tight text-white sm:text-lg">
-                Guest Retrieval Portal
-              </h1>
+                <p className="text-sm font-black tracking-tight text-white">UMak SIC Photobooth</p>
+                <p className="text-xs text-[#9ec4b9]">Local guest gallery</p>
             </div>
           </Link>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-bold text-[#b3d9ce] hover:text-white hover:border-white/30 transition shadow-sm"
+              className="portal-action inline-flex items-center gap-2 rounded-xl border border-[#1c4a40] bg-[#0b2420] px-4 py-2.5 text-xs font-bold text-[#d8ffef] hover:border-[#a8f3dd] hover:bg-[#164137]"
           >
             <ArrowLeft className="size-3.5" />
             <span>Scan Another</span>
@@ -135,7 +127,7 @@ export default async function OutputPage({
       </header>
 
       {/* Main Content */}
-      <div className="w-full max-w-2xl px-5 py-8 sm:py-10 flex flex-col items-center text-center gap-7 pb-safe">
+      <div className="flex min-h-0 w-full max-w-2xl flex-1 flex-col items-center px-5 py-4 text-center sm:py-5">
         {/* Error State */}
         {error || !output ? (
           <div className="w-full text-left my-6">
@@ -149,69 +141,43 @@ export default async function OutputPage({
           </div>
         ) : (
           /* Success Output Display */
-          <div className="w-full flex flex-col items-center gap-7">
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-4">
             {/* Title & Format Pill */}
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#146a56]/50 border border-[#48c4a1]/40 px-4 py-1.5 text-xs font-bold text-[#a8f3dd] shadow-sm mb-3">
-                {output.sessionType === 'flipbook' ? (
-                  <Film className="size-3.5 text-[#48c4a1]" />
-                ) : (
-                  <ImageIcon className="size-3.5 text-[#48c4a1]" />
-                )}
-                <span>
-                  {output.sessionType === 'flipbook'
-                    ? 'Animated Flipbook'
-                    : 'High-Res Photo Strip'}
-                </span>
-              </div>
-              <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">
-                Your memory is ready!
+              <h2 className="text-2xl font-black tracking-[-0.04em] text-white sm:text-3xl">
+                Your photo is ready.
               </h2>
               <div className="mt-2 flex items-center justify-center gap-3 text-xs text-[#9ec4b9]">
                 <span>{output.eventName}</span>
-                <span>•</span>
+                <span aria-hidden="true">/</span>
                 <span className="flex items-center gap-1">
                   <Calendar className="size-3 text-[#48c4a1]" />
                   {output.eventDate}
                 </span>
-                <span>•</span>
-                <span className="font-mono bg-white/5 px-2 py-0.5 rounded-md text-[#a8f3dd]">
+                <span aria-hidden="true">/</span>
+                <span className="rounded-md bg-[#0b2420] px-2 py-0.5 font-mono text-[#a8f3dd]">
                   {output.publicId}
                 </span>
               </div>
             </div>
 
-            {/* Immersive Media Canvas Box with Ambient Backlight Aura */}
-            <div className="relative w-full flex items-center justify-center">
-              {/* Backlight Glow */}
-              <div className="absolute -inset-4 rounded-3xl bg-[#48c4a1]/15 blur-2xl pointer-events-none" />
-
-              <div className="relative flex items-center justify-center overflow-hidden rounded-3xl border-4 border-[#146a56] shadow-[0_25px_60px_rgba(0,0,0,0.7)] bg-black/90 p-2 sm:p-3">
+            <div className="flex min-h-0 flex-1 w-full justify-center">
+              <div className="portal-panel flex min-h-0 items-center justify-center overflow-hidden rounded-[1.25rem] p-2 sm:p-3">
                 <img
                   src={output.mediaUrl}
                   alt={output.sessionType === 'flipbook' ? 'Animated Flipbook' : 'Photo Strip'}
-                  className="w-auto h-auto max-h-[70vh] max-w-full rounded-2xl object-contain shadow-md"
+                  className="h-auto max-h-[calc(100dvh-17rem)] max-w-full rounded-2xl object-contain"
                 />
 
-                {/* Live Format Badge */}
-                <div className="absolute top-4 right-4 inline-flex items-center gap-1.5 rounded-full bg-[#146a56]/90 backdrop-blur-md px-3.5 py-1 text-[11px] font-black text-white shadow-md border border-white/10">
-                  <span className="size-1.5 rounded-full bg-[#a8f3dd] animate-ping" />
-                  {output.mediaType === 'image/gif' ? 'LOOPING GIF' : 'HQ PHOTO'}
-                </div>
               </div>
             </div>
 
-            {/* Client Action Buttons (Download & Share) */}
             <OutputActions output={output} />
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <footer className="mt-auto w-full border-t border-white/10 py-6 text-center text-xs text-[#64877d] bg-[#061715]/60 backdrop-blur-sm">
-        <p>Society of Innovative Computing · Local Photobooth Gateway</p>
-      </footer>
     </main>
   );
 }
-

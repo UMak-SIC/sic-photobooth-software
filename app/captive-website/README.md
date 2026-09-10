@@ -11,7 +11,8 @@ The **Captive Retrieval Portal** is an offline-first Next.js web application run
 3. **Photo Lookup**:
    - **Camera QR Scanner**: Scans the QR code on the printed photo card directly in the browser (`jsQR`).
    - **Manual Code Input**: Guests can type the 7-character base-62 code (e.g. `7fK92pQ`).
-4. **Local Proxy to Fastify**: The portal securely fetches media and metadata from the local Fastify backend (`http://127.0.0.1:3000/photos/:id`) and streams the image directly to the guest device.
+4. **Captive HTTP Interception**: On the photobooth hotspot, dnsmasq resolves every hostname to the gateway and Caddy proxies every HTTP request on port `80` to this app. This triggers the guest device's captive-network sign-in UI without exposing the app's internal port.
+5. **Local Proxy to Fastify**: The portal securely fetches media and metadata from the local Fastify backend (`http://127.0.0.1:3000/photos/:id`) and streams the image directly to the guest device.
 
 ---
 
@@ -121,6 +122,10 @@ pnpm --filter captive-website build
 pnpm --filter captive-website start
 ```
 
+- Listens only on `127.0.0.1:5174`.
+- The hotspot gateway exposes it to guests through Caddy on port `80`; use `./config/captive-portal/install.sh` to configure the supported Arch/Fedora appliance setup.
+- Do not expose port `5174` to the hotspot in production.
+
 ---
 
 ## Environment Variables
@@ -151,4 +156,3 @@ pnpm --filter captive-website start
 ### 4. Camera QR Scanner Doesn't Open on Guest Phone
 - **Cause**: Mobile operating systems block `navigator.mediaDevices.getUserMedia` on non-localhost `http://` URLs.
 - **Solution**: Run `pnpm dev:https` to enable HTTPS, or instruct the guest to type the 7-character code into the manual input box.
-

@@ -6,7 +6,7 @@
     "dev": "next dev -H 0.0.0.0 --port 5174",
     "dev:https": "next dev -H 0.0.0.0 --port 5174 --experimental-https --experimental-https-key ./certificates/localhost-key.pem --experimental-https-cert ./certificates/localhost.pem",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1 --port 5174",
     "lint": "eslint",
     "typecheck": "tsc --noEmit"
   },

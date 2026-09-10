@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useSyncExternalStore } from 'react';
 import jsQR from 'jsqr';
 import {
   QRCodeReader,
@@ -24,6 +24,10 @@ import { parsePublicId, isValidPublicId } from '@photobooth/public-output';
 
 interface QrScannerProps {
   onScanSuccess: (publicId: string) => void;
+}
+
+function getLiveCameraAvailable() {
+  return window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 }
 
 function extractIdFromQrData(raw: string): string | null {
@@ -97,6 +101,8 @@ function decodeImageDataWithZXing(imageData: ImageData): string | null {
 export function QrScanner({ onScanSuccess }: QrScannerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameIdRef = useRef<number | null>(null);
   const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,6 +113,11 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [previewThumb, setPreviewThumb] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const liveCameraAvailable = useSyncExternalStore(
+    () => () => {},
+    getLiveCameraAvailable,
+    () => false,
+  );
 
   const triggerErrorToast = useCallback((msg: string) => {
     if (toastTimeoutRef.current) {
@@ -133,7 +144,7 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
     setCameraState('idle');
   }, []);
 
-  const scanFrame = useCallback(() => {
+  function scanFrame() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
@@ -175,9 +186,9 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
     }
 
     animationFrameIdRef.current = requestAnimationFrame(scanFrame);
-  }, [onScanSuccess, stopCamera]);
+  }
 
-  const startCamera = useCallback(async () => {
+  async function startCamera() {
     stopCamera();
     setErrorMessage(null);
     setCameraState('requesting');
@@ -228,10 +239,15 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
       setCameraState('denied');
       triggerErrorToast('Camera permission was not granted or is restricted.');
     }
-  }, [facingMode, scanFrame, stopCamera, triggerErrorToast]);
+  }
 
   // Handle Tab Switch
   const handleTabChange = (tab: 'snap' | 'live') => {
+    if (tab === 'live' && !liveCameraAvailable) {
+      triggerErrorToast('Live video needs HTTPS. Use Scan with camera instead.');
+      return;
+    }
+
     setActiveTab(tab);
     setErrorMessage(null);
     if (tab === 'snap') {
@@ -294,7 +310,8 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
       }
 
       // 2. Multi-Scale and Multi-Crop Passes (Full Downscaled + Center Crops)
-      const canvas = canvasRef.current || document.createElement('canvas');
+      // Keep image decoding separate from the live camera canvas.
+      const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
       if (ctx) {
@@ -425,30 +442,32 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
   };
 
   return (
-    <div className="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-[#0e2a24] to-[#071d1a] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+    <div className="portal-panel relative w-full overflow-hidden rounded-[1.25rem]">
       {/* Hidden processing canvas & native input hooks */}
-      <canvas ref={canvasRef} className="sr-only opacity-0 pointer-events-none" />
+      <canvas ref={canvasRef} className="sr-only pointer-events-none" />
       <input
         id="qr-camera-input"
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
         onChange={handleImageFile}
-        className="sr-only opacity-0 absolute size-0 pointer-events-none"
+        className="sr-only"
       />
       <input
         id="qr-gallery-input"
+        ref={galleryInputRef}
         type="file"
         accept="image/*"
         onChange={handleImageFile}
-        className="sr-only opacity-0 absolute size-0 pointer-events-none"
+        className="sr-only"
       />
 
       {/* Floating Error Toast */}
       {errorMessage && (
-        <div className="fixed bottom-6 inset-x-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-2xl border border-rose-500/30 bg-[#150a0c]/95 px-4 py-3 text-left text-xs font-semibold text-rose-200 shadow-[0_10px_40px_rgba(0,0,0,0.8)] backdrop-blur-xl animate-fade-in sm:bottom-8 sm:inset-x-auto">
+        <div className="fixed bottom-6 inset-x-4 z-50 mx-auto flex max-w-md items-center justify-between gap-3 rounded-xl border border-[#9d3947] bg-[#150a0c] px-4 py-3 text-left text-xs font-semibold text-rose-200 sm:bottom-8 sm:inset-x-auto">
           <div className="flex items-center gap-2.5">
-            <div className="grid size-7 shrink-0 place-items-center rounded-xl bg-rose-500/20 text-rose-400">
+            <div className="grid size-7 shrink-0 place-items-center rounded-xl bg-[#5b202b] text-rose-200">
               <AlertCircle className="size-4" />
             </div>
             <p className="leading-snug">{errorMessage}</p>
@@ -456,7 +475,7 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="grid size-6 shrink-0 place-items-center rounded-lg text-rose-400/80 hover:bg-rose-500/20 hover:text-rose-200 transition"
+            className="portal-action grid size-6 shrink-0 place-items-center rounded-lg text-rose-200 hover:bg-[#5b202b]"
           >
             <X className="size-3.5" />
           </button>
@@ -464,66 +483,63 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
       )}
 
       {/* Top Header & Tab Switcher Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-black/40 px-4 py-3 sm:px-6">
+      <div className="flex items-center gap-2 border-b border-[#1c4a40] bg-[#071b17] px-4 py-3 sm:px-6">
         {/* Tab Controls */}
-        <div className="flex items-center gap-1.5 rounded-2xl bg-white/5 p-1 border border-white/10 shadow-inner">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-xl border border-[#1c4a40] bg-[#0b2420] p-1">
           <button
             type="button"
             onClick={() => handleTabChange('snap')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
+            className={`portal-action inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold ${
               activeTab === 'snap'
-                ? 'bg-[#a8f3dd] text-[#145142] shadow-sm'
+                ? 'bg-[#a8f3dd] text-[#145142]'
                 : 'text-[#9ec4b9] hover:text-white'
             }`}
           >
             <Camera className="size-3.5" />
-            <span>Snap Photo</span>
-            <span
-              className={`rounded-full px-1.5 py-0.2 text-[9px] font-black uppercase ${
-                activeTab === 'snap' ? 'bg-[#145142]/20 text-[#145142]' : 'bg-emerald-500/20 text-[#a8f3dd]'
-              }`}
-            >
-              Fast
-            </span>
+            <span>Photo</span>
           </button>
 
           <button
             type="button"
             onClick={() => handleTabChange('live')}
-            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
+            className={`portal-action inline-flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-bold ${
               activeTab === 'live'
-                ? 'bg-[#a8f3dd] text-[#145142] shadow-sm'
-                : 'text-[#9ec4b9] hover:text-white'
+                ? 'bg-[#a8f3dd] text-[#145142]'
+                : liveCameraAvailable
+                  ? 'cursor-pointer text-[#9ec4b9] hover:text-white'
+                  : 'cursor-not-allowed text-[#64877d]'
             }`}
+            title={liveCameraAvailable ? 'Scan with live video' : 'Live video requires HTTPS'}
           >
             <Video className="size-3.5" />
-            <span>Live Video</span>
+            <span>Live camera</span>
           </button>
         </div>
 
         {/* Gallery Upload Button */}
-        <label
-          htmlFor="qr-gallery-input"
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
           title="Upload QR Code from Gallery"
-          className="flex items-center justify-center size-9 rounded-xl bg-white/5 border border-white/10 text-[#a8f3dd] hover:bg-white/15 hover:text-white transition active:scale-95 shadow-sm cursor-pointer"
+          className="portal-action flex size-10 shrink-0 items-center justify-center rounded-xl border border-[#1c4a40] bg-[#0b2420] text-[#a8f3dd] hover:bg-[#164137] hover:text-white"
         >
           <Upload className="size-4" />
-        </label>
+        </button>
       </div>
 
       {/* Viewport / Action Area */}
-      <div className="relative aspect-[4/3] w-full overflow-hidden bg-black/90 flex items-center justify-center">
+      <div className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#071411]">
         {/* Tab 1: Snap Photo Mode View */}
         {activeTab === 'snap' && (
           <div className="flex size-full flex-col items-center justify-center p-6 text-center text-white">
             {isProcessingImage ? (
               /* Decoding Image Progress State */
               <div className="flex flex-col items-center justify-center gap-3">
-                <div className="relative size-24 rounded-2xl overflow-hidden border-2 border-[#a8f3dd] shadow-[0_0_25px_rgba(168,243,221,0.4)]">
+                <div className="relative size-24 overflow-hidden rounded-xl border-2 border-[#a8f3dd]">
                   {previewThumb && (
-                    <img src={previewThumb} alt="QR Thumbnail" className="size-full object-cover blur-[2px]" />
+                    <img src={previewThumb} alt="QR Thumbnail" className="size-full object-cover" />
                   )}
-                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#071411]">
                     <Loader2 className="size-8 animate-spin text-[#a8f3dd]" />
                   </div>
                 </div>
@@ -536,31 +552,32 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
               /* Default Snap Camera CTA */
               <div className="flex flex-col items-center justify-center gap-3 max-w-sm">
                 <div className="relative">
-                  <div className="absolute -inset-2 rounded-full bg-[#a8f3dd]/20 blur-lg animate-pulse-slow" />
-                  <label
-                    htmlFor="qr-camera-input"
-                    className="relative grid size-20 place-items-center rounded-full bg-gradient-to-tr from-[#146a56] to-[#48c4a1] border-2 border-[#a8f3dd] text-white shadow-[0_10px_30px_rgba(72,196,161,0.4)] transition hover:scale-105 active:scale-95 cursor-pointer"
+                   <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                     className="portal-action relative grid size-20 place-items-center rounded-full border-2 border-[#a8f3dd] bg-[#146a56] text-white hover:bg-[#1d8068]"
                   >
                     <Camera className="size-8 text-[#071d1a]" />
-                  </label>
+                  </button>
                 </div>
 
                 <div className="mt-2">
                   <h3 className="text-base sm:text-lg font-black text-white">
-                    Snap a Photo of Your QR
+                     Scan your QR code
                   </h3>
                   <p className="mt-1 text-xs text-[#9ec4b9] leading-relaxed">
                     Point your camera at the printed QR code on your slip or card to retrieve your photo instantly.
                   </p>
                 </div>
 
-                <label
-                  htmlFor="qr-camera-input"
-                  className="mt-2 inline-flex items-center gap-2 rounded-2xl bg-[#a8f3dd] px-6 py-3 text-xs font-black text-[#145142] shadow-[0_10px_25px_rgba(168,243,221,0.25)] transition hover:bg-[#90e8d0] active:scale-[0.98] cursor-pointer"
-                >
-                  <Camera className="size-4 text-[#145142]" />
-                  <span>Open Camera to Snap</span>
-                </label>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                     className="portal-action mt-2 inline-flex items-center gap-2 rounded-xl bg-[#a8f3dd] px-5 py-3 text-xs font-black text-[#145142] hover:bg-[#c7fbe9]"
+                  >
+                    <Camera className="size-4 text-[#145142]" />
+                     <span>Open camera</span>
+                  </button>
               </div>
             )}
           </div>
@@ -582,19 +599,19 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
             {cameraState === 'active' && (
               <>
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center p-6">
-                  <div className="relative size-52 sm:size-60 rounded-2xl border border-white/20 shadow-[0_0_0_9999px_rgba(3,27,22,0.5)]">
+                    <div className="relative size-52 rounded-xl border border-[#a8f3dd] bg-[#061715] sm:size-60">
                     {/* Reticle Corners */}
-                    <div className="absolute -left-1 -top-1 size-6 border-l-[3px] border-t-[3px] border-[#a8f3dd] rounded-tl-lg shadow-[0_0_10px_rgba(168,243,221,0.6)]" />
-                    <div className="absolute -right-1 -top-1 size-6 border-r-[3px] border-t-[3px] border-[#a8f3dd] rounded-tr-lg shadow-[0_0_10px_rgba(168,243,221,0.6)]" />
-                    <div className="absolute -bottom-1 -left-1 size-6 border-b-[3px] border-l-[3px] border-[#a8f3dd] rounded-bl-lg shadow-[0_0_10px_rgba(168,243,221,0.6)]" />
-                    <div className="absolute -bottom-1 -right-1 size-6 border-b-[3px] border-r-[3px] border-[#a8f3dd] rounded-br-lg shadow-[0_0_10px_rgba(168,243,221,0.6)]" />
+                    <div className="absolute -left-1 -top-1 size-6 rounded-tl-lg border-l-[3px] border-t-[3px] border-[#a8f3dd]" />
+                    <div className="absolute -right-1 -top-1 size-6 rounded-tr-lg border-r-[3px] border-t-[3px] border-[#a8f3dd]" />
+                    <div className="absolute -bottom-1 -left-1 size-6 rounded-bl-lg border-b-[3px] border-l-[3px] border-[#a8f3dd]" />
+                    <div className="absolute -bottom-1 -right-1 size-6 rounded-br-lg border-b-[3px] border-r-[3px] border-[#a8f3dd]" />
 
                     {/* Laser Scan line */}
-                    <div className="absolute inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#a8f3dd] to-transparent shadow-[0_0_12px_#a8f3dd] animate-[scan_2.2s_ease-in-out_infinite]" />
+                    <div className="absolute inset-x-5 top-1/2 h-px bg-[#a8f3dd]" />
                   </div>
 
-                  <div className="absolute bottom-4 flex items-center gap-2 rounded-full bg-black/75 px-4 py-1.5 text-xs font-semibold text-[#a8f3dd] backdrop-blur-md border border-white/10 shadow-lg">
-                    <ScanLine className="size-3.5 text-[#48c4a1] animate-pulse" />
+                  <div className="absolute bottom-4 flex items-center gap-2 rounded-xl border border-[#1c4a40] bg-[#071411] px-4 py-1.5 text-xs font-semibold text-[#a8f3dd]">
+                    <ScanLine className="size-3.5 text-[#48c4a1]" />
                     Align QR code within reticle
                   </div>
                 </div>
@@ -605,7 +622,7 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
                     type="button"
                     onClick={toggleCameraFacing}
                     title="Switch Camera"
-                    className="flex items-center justify-center size-10 rounded-full bg-black/60 text-white backdrop-blur-md border border-white/15 hover:bg-black/80 hover:border-white/30 transition active:scale-95 shadow-md"
+                    className="portal-action flex size-10 items-center justify-center rounded-xl border border-[#2a6457] bg-[#071411] text-white hover:border-[#a8f3dd] hover:bg-[#0e2a24]"
                   >
                     <RefreshCw className="size-4 text-[#a8f3dd]" />
                   </button>
@@ -625,7 +642,7 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
             {/* Denied / HTTP Notice State */}
             {cameraState === 'denied' && (
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center text-white max-w-sm">
-                <div className="grid size-12 place-items-center rounded-2xl bg-white/5 border border-white/10 text-white/80 mb-2.5 shadow-inner">
+                <div className="mb-2.5 grid size-12 place-items-center rounded-xl border border-[#1c4a40] bg-[#0b2420] text-white">
                   <CameraOff className="size-5 text-[#9ec4b9]" />
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-[#e8fff5]">Live Video Notice</h3>
@@ -637,7 +654,7 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
                   <button
                     type="button"
                     onClick={() => handleTabChange('snap')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-[#a8f3dd] px-5 py-3 text-xs font-black text-[#145142] shadow-[0_10px_25px_rgba(168,243,221,0.3)] transition hover:bg-[#90e8d0] active:scale-[0.98]"
+                    className="portal-action inline-flex items-center gap-2 rounded-xl bg-[#a8f3dd] px-5 py-3 text-xs font-black text-[#145142] hover:bg-[#c7fbe9]"
                   >
                     <Camera className="size-4" />
                     <span>Use Snap Photo Mode</span>
@@ -651,6 +668,3 @@ export function QrScanner({ onScanSuccess }: QrScannerProps) {
     </div>
   );
 }
-
-
-
