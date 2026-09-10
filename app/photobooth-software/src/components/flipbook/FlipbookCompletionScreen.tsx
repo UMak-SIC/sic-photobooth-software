@@ -7,7 +7,7 @@ import { FlipbookPrintModal } from './FlipbookPrintModal';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
 import { fireCelebrationConfetti } from '../../utils/confetti';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export function FlipbookCompletionScreen() {
   const {

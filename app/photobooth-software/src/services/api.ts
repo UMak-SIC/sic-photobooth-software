@@ -1,14 +1,25 @@
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 
 export const API_BASE_URL =
-  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || '';
 
 export const resolveAssetUrl = (relativeUrl: string | null): string | null => {
   if (!relativeUrl) return null;
-  if (relativeUrl.startsWith('http://') || relativeUrl.startsWith('https://') || relativeUrl.startsWith('data:')) {
+  if (
+    relativeUrl.startsWith('http://') ||
+    relativeUrl.startsWith('https://') ||
+    relativeUrl.startsWith('data:') ||
+    relativeUrl.startsWith('blob:')
+  ) {
     return relativeUrl;
   }
-  return new URL(relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`, API_BASE_URL).toString();
+  if (API_BASE_URL) {
+    return new URL(
+      relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`,
+      API_BASE_URL,
+    ).toString();
+  }
+  return relativeUrl.startsWith('/') ? relativeUrl : `/${relativeUrl}`;
 };
 
 export interface ApiResponse<T = unknown> {

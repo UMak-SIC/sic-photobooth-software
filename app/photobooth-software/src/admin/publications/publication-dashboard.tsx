@@ -112,7 +112,7 @@ export function PublicationDashboard() {
   const currentPage = Math.min(page, pageCount);
   const visiblePublications = publications.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const imageUrl = (publication: Publication, preview = false) =>
-    `${import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000'}/photos/${publication.publicId}${preview ? '?preview=true' : ''}`;
+    `${import.meta.env.VITE_BACKEND_URL ?? ''}/photos/${publication.publicId}${preview ? '?preview=true' : ''}`;
   const closePreview = () => {
     setPreview(null);
     setZoom(1);

@@ -192,7 +192,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
   }, [videoUrl, motionFrames]);
 
   const frameName = frame?.name || 'SIC Seal';
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  const API_BASE_URL = import.meta.env.VITE_API_URL || '';
   const resolveAssetUrl = (p: string | null | undefined) => {
     if (!p) return null;
     return p.startsWith('http') ? p : `${API_BASE_URL}${p}`;
