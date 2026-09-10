@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { runMigrations } from '../src/db/migrations.js';
 import { sessionStateMachine } from '../src/services/session-state-machine.js';
+import { dbRepository } from '../src/db/repository.js';
 
 describe('Flipbook Workflow & State Transitions', () => {
   let app: FastifyInstance;
@@ -305,5 +306,51 @@ describe('Flipbook Workflow & State Transitions', () => {
     expect(errorBody.success).toBe(false);
     expect(errorBody.error.code).toBe('LIMIT_EXCEEDED');
     expect(errorBody.error.message).toContain('Maximum retake limit of 4 reached');
+  });
+
+  it('allows recording prints and additional copies on flipbook sessions in booth_confirmed and printed state', async () => {
+    // 1. Create flipbook session
+    const createRes = await app.inject({
+      method: 'POST',
+      url: '/api/sessions',
+      payload: {
+        eventName: 'Flipbook Event',
+        eventDate: '2026-09-05',
+        operatorName: 'SIC Operator',
+        type: 'flipbook',
+      },
+    });
+    const { sessionId, token } = JSON.parse(createRes.body).data;
+
+    // Simulate session moving to booth_confirmed
+    await dbRepository.updateSessionState(sessionId, 'booth_confirmed');
+
+    // 2. Initial print (1 copy) -> state becomes printed, copiesPrinted = 1
+    const print1Res = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/print`,
+      headers: { 'x-session-token': token },
+      payload: { copies: 1, recordOnly: true },
+    });
+    expect(print1Res.statusCode).toBe(200);
+    const print1Body = JSON.parse(print1Res.body);
+    expect(print1Body.success).toBe(true);
+    expect(print1Body.data.state).toBe('printed');
+    expect(print1Body.data.isPrinted).toBe(true);
+    expect(print1Body.data.copiesPrinted).toBe(1);
+
+    // 3. Confirm additional copies in modal (e.g. 2 copies) -> state stays printed, copiesPrinted = 3
+    const print2Res = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/print`,
+      headers: { 'x-session-token': token },
+      payload: { copies: 2, recordOnly: true },
+    });
+    expect(print2Res.statusCode).toBe(200);
+    const print2Body = JSON.parse(print2Res.body);
+    expect(print2Body.success).toBe(true);
+    expect(print2Body.data.state).toBe('printed');
+    expect(print2Body.data.isPrinted).toBe(true);
+    expect(print2Body.data.copiesPrinted).toBe(3);
   });
 });

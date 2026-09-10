@@ -47,6 +47,10 @@ interface FlipbookState {
   errorMessage: string | null;
   isProcessing: boolean;
 
+  // Print tracking
+  isPrinted: boolean;
+  copiesPrinted: number;
+
   // Actions
   setSession: (sessionId: string, token: string) => void;
   setSelectedEvent: (event: FlipbookEventData | null) => void;
@@ -58,6 +62,7 @@ interface FlipbookState {
   setSelectedCoverIndex: (index: number) => void;
   setSelectedVideoIndex: (index: number) => void;
   setConfirmedOutput: (publicId: string, qrUrl: string, gifUrl?: string) => void;
+  recordPrintSuccess: (copies: number) => void;
   setError: (error: string | null) => void;
   setProcessing: (isProcessing: boolean) => void;
   resetFlipbook: () => void;
@@ -82,6 +87,8 @@ const initialState = {
   outputGifUrl: null,
   errorMessage: null,
   isProcessing: false,
+  isPrinted: false,
+  copiesPrinted: 0,
 };
 
 export const useFlipbookStore = create<FlipbookState>((set) => ({
@@ -128,6 +135,12 @@ export const useFlipbookStore = create<FlipbookState>((set) => ({
       currentStep: 'complete',
       isProcessing: false,
     }),
+
+  recordPrintSuccess: (copies: number) =>
+    set((state) => ({
+      isPrinted: true,
+      copiesPrinted: state.copiesPrinted + copies,
+    })),
 
   setError: (errorMessage) => set({ errorMessage }),
 

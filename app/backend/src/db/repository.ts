@@ -128,6 +128,7 @@ export interface LocalPublicationOutput {
   publicId: string;
   filePath: string;
   mediaType: string;
+  sessionId?: string;
 }
 
 export class DatabaseRepository {
@@ -1210,7 +1211,7 @@ export class DatabaseRepository {
   public async getPublicationOutput(id: string): Promise<LocalPublicationOutput | null> {
     try {
       const result = await pool.query(
-        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType"
+        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType", o.session_id AS "sessionId"
          FROM publication_records p
          JOIN generated_outputs o ON o.id = p.output_id
          WHERE p.id = $1`,
@@ -1219,7 +1220,16 @@ export class DatabaseRepository {
       if (result.rows[0]) return result.rows[0];
     } catch {}
     const publication = this.inMemoryPublications.get(id);
-    return publication ? this.inMemoryOutputs.get(publication.publicId) ?? null : null;
+    if (!publication) return null;
+    const output = this.inMemoryOutputs.get(publication.publicId);
+    return output
+      ? {
+          publicId: output.publicId,
+          filePath: output.filePath,
+          mediaType: output.mediaType,
+          sessionId: output.sessionId,
+        }
+      : null;
   }
 
   public async retryPublication(id: string): Promise<PublicationRecord | null> {
@@ -2084,7 +2094,7 @@ export class DatabaseRepository {
           frameId: s.frameId,
           templateSnapshot: snap,
           isPrinted: s.isPrinted,
-          copiesPrinted: s.copiesPrinted || (s.isPrinted ? 1 : 0),
+          copiesPrinted: s.copiesPrinted || 0,
           createdAt: s.createdAt,
           templateName: snap?.name || (s.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template'),
           templateType: s.type,
@@ -2140,9 +2150,9 @@ export class DatabaseRepository {
       totalSessions++;
       completedSessions++;
 
-      const copies = Math.max(1, row.copiesPrinted || (row.isPrinted ? 1 : 0));
+      const copies = row.copiesPrinted || 0;
       totalPrints += copies;
-      if (row.isPrinted) printedSessions++;
+      if (row.isPrinted || copies > 0) printedSessions++;
 
       const isReprint = copies > 1;
       if (isReprint) totalReprintSessions++;
@@ -2151,7 +2161,7 @@ export class DatabaseRepository {
       if (copies === 1) oneCopyCount++;
       else if (copies === 2) twoCopiesCount++;
       else if (copies === 3) threeCopiesCount++;
-      else fourPlusCopiesCount++;
+      else if (copies >= 4) fourPlusCopiesCount++;
 
       // Type breakdown
       if (row.type === 'photo_strip') {

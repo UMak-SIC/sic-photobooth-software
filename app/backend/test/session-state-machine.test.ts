@@ -53,6 +53,8 @@ describe('SessionStateMachine', () => {
       expect(machine.isValidTransition('flipbook', 'video_capture', 'review')).toBe(true);
       expect(machine.isValidTransition('flipbook', 'review', 'processing')).toBe(true);
       expect(machine.isValidTransition('flipbook', 'processing', 'booth_confirmed')).toBe(true);
+      expect(machine.isValidTransition('flipbook', 'booth_confirmed', 'printed')).toBe(true);
+      expect(machine.isValidTransition('flipbook', 'printed', 'printed')).toBe(true);
       // Timeout recovery transition back to cover_capture
       expect(machine.isValidTransition('flipbook', 'processing', 'cover_capture')).toBe(true);
     });

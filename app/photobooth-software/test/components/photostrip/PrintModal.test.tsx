@@ -2,6 +2,13 @@
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PrintModal } from '../../../src/components/photostrip/PrintModal';
+import * as flipbookPdf from '../../../src/services/flipbook-pdf';
+
+vi.mock('../../../src/services/flipbook-pdf', () => ({
+  generatePhotoStripPdf: vi.fn().mockResolvedValue({ blob: new Blob(['mock-pdf']), url: 'blob:mock-pdf', filename: 'photostrip-mock.pdf' }),
+  uploadPdfBlob: vi.fn().mockResolvedValue(true),
+  printPdfBlobUrl: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe('PrintModal completion & print screen', () => {
   beforeEach(() => {
@@ -40,8 +47,7 @@ describe('PrintModal completion & print screen', () => {
     expect(screen.getByRole('button', { name: /Print/i })).toBeDefined();
   });
 
-  it('triggers window.print and confirms print on clicking Print button', () => {
-    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+  it('generates 300 DPI 4R PDF and opens record prompt on clicking Print button without immediately recording copies', async () => {
     const onPrintConfirmedMock = vi.fn();
 
     render(
@@ -56,8 +62,13 @@ describe('PrintModal completion & print screen', () => {
     const printButton = screen.getByRole('button', { name: /Print/i });
     fireEvent.click(printButton);
 
-    expect(printSpy).toHaveBeenCalled();
-    expect(onPrintConfirmedMock).toHaveBeenCalledWith(1, false);
+    await waitFor(() => {
+      expect(flipbookPdf.generatePhotoStripPdf).toHaveBeenCalledWith('blob:output-image', 'M7P4XAV', 1);
+      expect(flipbookPdf.printPdfBlobUrl).toHaveBeenCalledWith('blob:mock-pdf');
+    });
+
+    expect(onPrintConfirmedMock).not.toHaveBeenCalled();
+    expect(screen.getByText(/After printing, record the printed copy count/i)).toBeDefined();
   });
 
   it('calls onFinishSession when clicking Session Done! after printing', () => {
@@ -125,7 +136,7 @@ describe('PrintModal completion & print screen', () => {
     fireEvent.click(printButton);
 
     // After clicking print, showPrintRecord is set to true -> banner appears
-    expect(screen.getByText(/After printing, record the printed copy count/i)).toBeDefined();
+    expect(await screen.findByText(/After printing, record the printed copy count/i)).toBeDefined();
     expect(screen.getByRole('button', { name: /Record copies/i })).toBeDefined();
 
     const recordBtn = screen.getByRole('button', { name: /Record copies/i });

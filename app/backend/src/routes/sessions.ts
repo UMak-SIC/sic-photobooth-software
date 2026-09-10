@@ -1096,6 +1096,45 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
+  // 10a. Upload and Store 4R 300 DPI PDF for a Session
+  fastify.post<{ Params: { id: string } }>('/api/sessions/:id/pdf', async (request, reply) => {
+    const { id } = request.params;
+    const session = await dbRepository.getSessionById(id);
+    if (!session) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
+      });
+    }
+
+    const latestOutput = await dbRepository.getLatestOutputForSession(id);
+    if (!latestOutput) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'OUTPUT_NOT_FOUND', message: 'Output record not yet created' },
+      });
+    }
+
+    const file = await request.file();
+    if (!file) {
+      return reply.status(400).send({
+        success: false,
+        error: { code: 'NO_FILE', message: 'No PDF file uploaded' },
+      });
+    }
+
+    const buffer = await file.toBuffer();
+    await storageService.savePdf(id, latestOutput.publicId, buffer);
+
+    return reply.send({
+      success: true,
+      data: {
+        publicId: latestOutput.publicId,
+        saved: true,
+      },
+    });
+  });
+
   // 10b. Confirm Photo Strip Output (generates 300 DPI 4R PNG, public ID, QR, and queues publication)
   fastify.post<{ Params: { id: string } }>(
     '/api/sessions/:id/photo-strip/confirm',
@@ -1288,7 +1327,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       let printJobId: string | undefined;
 
-      if (!recordOnly) {
+      if (!recordOnly && session.type !== 'flipbook') {
         const output = await dbRepository.getLatestOutputForSession(id);
         if (output && output.filePath) {
           const printResult = await printerService.printImage(output.filePath, copies);
@@ -1298,7 +1337,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               error: {
                 code: 'PRINT_FAILED',
                 message:
-                  'Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.',
+                  'Physical printing could not be completed by printer service. Please record copies manually.',
                 details: printResult.error,
               },
             });

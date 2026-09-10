@@ -425,6 +425,28 @@ export class BoothApiClient {
       throw new Error(body.error?.message || 'Failed to record print');
     }
   }
+
+  public async uploadSessionPdf(
+    sessionId: string,
+    pdfBlob: Blob,
+  ): Promise<void> {
+    if (!pdfBlob) return;
+    try {
+      const formData = new FormData();
+      formData.append('file', pdfBlob, 'output.pdf');
+      const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/pdf`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: formData,
+      });
+      const body: ApiResponse = await res.json().catch(() => ({ success: res.ok }));
+      if (!res.ok || !body.success) {
+        console.warn('Failed to upload session PDF to storage');
+      }
+    } catch (err) {
+      console.warn('Failed to upload session PDF to storage:', err);
+    }
+  }
 }
 
 export const boothApi = new BoothApiClient();

@@ -5,6 +5,7 @@ import { FlipbookCompletionScreen } from '../../../src/components/flipbook/Flipb
 import { useFlipbookStore } from '../../../src/store/flipbook-store';
 import { useSessionStore } from '../../../src/store/session-store';
 import { boothApi } from '../../../src/services/api';
+import * as flipbookPdf from '../../../src/services/flipbook-pdf';
 
 vi.mock('qrcode', () => ({
   default: {
@@ -13,8 +14,8 @@ vi.mock('qrcode', () => ({
 }));
 
 vi.mock('../../../src/services/flipbook-pdf', () => ({
-  generateFlipbookPdf: vi.fn().mockResolvedValue('blob:mock-pdf'),
-  printPdfBlobUrl: vi.fn(),
+  generateFlipbookPdf: vi.fn().mockResolvedValue({ blob: new Blob(['mock-pdf']), url: 'blob:mock-pdf', filename: 'flipbook-k9X2bQ1.pdf' }),
+  printPdfBlobUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('FlipbookCompletionScreen layout and session lifecycle', () => {
@@ -100,37 +101,72 @@ describe('FlipbookCompletionScreen layout and session lifecycle', () => {
     expect(sessionState.stage).toBe('choose_experience');
   });
 
-  it('opens print modal on clicking Print button', async () => {
-    render(<FlipbookCompletionScreen />);
-
-    const printButton = screen.getByRole('button', { name: /Print/i });
-    fireEvent.click(printButton);
-
-    expect(screen.getByText(/Flipbook Print Layout/i)).toBeDefined();
-  });
-
-  it('finishes session directly after print and returns to experience choice', async () => {
+  it('directly generates 300 DPI PDF, opens print dialog, and shows copies recovery dialog on clicking Print button', async () => {
     vi.spyOn(boothApi, 'recordPrint').mockResolvedValue(undefined);
 
     render(<FlipbookCompletionScreen />);
 
-    // Open print modal
     const printButton = screen.getByRole('button', { name: /Print/i });
     fireEvent.click(printButton);
 
-    expect(screen.getByText(/Flipbook Print Layout/i)).toBeDefined();
-
-    // Trigger Print inside modal
-    const printPdfBtn = screen.getByRole('button', { name: /Print.*PDF/i });
-    fireEvent.click(printPdfBtn);
-
+    // Check PDF generation and print dialog called directly without intermediate preview modal
     await waitFor(() => {
-      expect(boothApi.recordPrint).toHaveBeenCalled();
+      expect(flipbookPdf.generateFlipbookPdf).toHaveBeenCalledWith(
+        expect.objectContaining({
+          publicId: 'k9X2bQ1',
+          scope: 'all',
+          copies: 1,
+        }),
+        expect.any(Function)
+      );
+      expect(flipbookPdf.printPdfBlobUrl).toHaveBeenCalledWith('blob:mock-pdf');
     });
 
-    // Close modal
-    const doneModalBtn = screen.getByRole('button', { name: /^Done$/i });
-    fireEvent.click(doneModalBtn);
+    // Record prompt should appear asking for copies printed
+    await waitFor(() => {
+      expect(
+        screen.getByText(/After printing, record the printed copy count if needed/i)
+      ).toBeDefined();
+      expect(screen.getByLabelText(/Copies printed/i)).toBeDefined();
+      expect(screen.getByRole('button', { name: /Record copies/i })).toBeDefined();
+    });
+
+    // Ensure recordPrint was NOT called immediately on Print button click
+    expect(boothApi.recordPrint).not.toHaveBeenCalled();
+
+    // Change copies to 2 and click Record copies
+    const selectElem = screen.getByLabelText(/Copies printed/i);
+    fireEvent.change(selectElem, { target: { value: '2' } });
+
+    const recordCopiesBtn = screen.getByRole('button', { name: /Record copies/i });
+    fireEvent.click(recordCopiesBtn);
+
+    await waitFor(() => {
+      expect(boothApi.recordPrint).toHaveBeenCalledTimes(1);
+      expect(boothApi.recordPrint).toHaveBeenCalledWith('old-session-123', 2, true);
+      expect(useFlipbookStore.getState().copiesPrinted).toBe(2);
+    });
+
+    // Toast appears
+    expect(screen.getByText('2 copies recorded.')).toBeDefined();
+  });
+
+  it('finishes session after printing and returns to experience choice', async () => {
+    vi.spyOn(boothApi, 'recordPrint').mockResolvedValue(undefined);
+
+    render(<FlipbookCompletionScreen />);
+
+    // Click Print
+    const printButton = screen.getByRole('button', { name: /Print/i });
+    fireEvent.click(printButton);
+
+    await waitFor(() => {
+      expect(flipbookPdf.generateFlipbookPdf).toHaveBeenCalled();
+    });
+
+    // Dismiss copies dialog if present
+    const dismissBtn = screen.getByRole('button', { name: /Dismiss/i });
+    fireEvent.click(dismissBtn);
 
     // Click Session Done!
     const doneButton = screen.getByRole('button', { name: /^Session Done!$/i });
