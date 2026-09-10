@@ -31,8 +31,9 @@ export const PrintModal: React.FC<PrintModalProps> = ({
   const [hasPrinted, setHasPrinted] = useState<boolean>(externalIsPrinted);
   const [printError, setPrintError] = useState<string | null>(null);
   const [showPrintRecord, setShowPrintRecord] = useState<boolean>(false);
-  const [recoveryCopies, setRecoveryCopies] = useState<number>(1);
+  const [recoveryCopies, setRecoveryCopies] = useState<number | ''>(1);
   const [showUnprintedWarning, setShowUnprintedWarning] = useState<boolean>(false);
+  const [recordToast, setRecordToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!preview) {
@@ -59,6 +60,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({
     }
   }, [qrUrl, preview]);
 
+  useEffect(() => {
+    if (!recordToast) return;
+    const timeoutId = window.setTimeout(() => setRecordToast(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [recordToast]);
+
   const handleDirectPrint = () => {
     setPrintError(null);
     setShowUnprintedWarning(false);
@@ -72,12 +79,17 @@ export const PrintModal: React.FC<PrintModalProps> = ({
 
   const handleRecordManualCopies = async (copiesToRecord: number = 1) => {
     setIsPrinting(true);
+    setRecordToast(null);
     try {
       if (onPrintConfirmed) {
         await onPrintConfirmed(copiesToRecord, true);
       }
       setHasPrinted(true);
       setPrintError(null);
+      setShowPrintRecord(false);
+      setRecordToast(
+        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`,
+      );
     } catch (err) {
       console.error('Failed to record print status:', err);
       setPrintError(
@@ -189,48 +201,67 @@ export const PrintModal: React.FC<PrintModalProps> = ({
             {/* Warnings and Recovery */}
             {(printError || showPrintRecord) && (
               <div
-                className={`mt-4 flex w-full flex-col gap-2.5 rounded-xl border p-3.5 text-left text-xs font-bold shadow-md ${
-                  printError
-                    ? 'border-red-300 bg-red-50 text-red-800'
-                    : 'border-[#7bc6a5] bg-[#f0faf5] text-[#146a56]'
-                }`}
+                role="dialog"
+                aria-modal="true"
+                aria-label={printError ? 'Printing error' : 'Record printed copies'}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
               >
-                <div className="flex items-start justify-between gap-2">
-                  <p>
-                    {printError ||
-                      'After printing, record the printed copy count if needed.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPrintError(null);
-                      setShowPrintRecord(false);
-                    }}
-                    className="text-xs font-bold underline hover:opacity-80 cursor-pointer"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-                <div className="flex items-center gap-2 border-t border-current/15 pt-2">
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    aria-label="Printed copy count"
-                    value={recoveryCopies}
-                    onChange={(e) =>
-                      setRecoveryCopies(Math.max(1, parseInt(e.target.value, 10) || 1))
-                    }
-                    className="w-14 rounded border border-current/30 bg-white px-2 py-1 text-xs font-bold"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRecordManualCopies(recoveryCopies)}
-                    disabled={isPrinting}
-                    className="cursor-pointer rounded-lg px-3 py-1 text-xs font-bold text-white bg-[#146a56] hover:bg-[#0f5444]"
-                  >
-                    Record copies
-                  </button>
+                <div
+                  className={`flex w-full max-w-lg flex-col gap-6 rounded-2xl border p-6 text-left shadow-2xl sm:p-8 ${
+                    printError
+                      ? 'border-red-300 bg-red-50 text-red-800'
+                      : 'border-[#7bc6a5] bg-[#f0faf5] text-[#146a56]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <p className="text-base font-bold sm:text-lg">
+                      {printError ||
+                        'After printing, record the printed copy count if needed.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrintError(null);
+                        setShowPrintRecord(false);
+                      }}
+                      className="shrink-0 rounded-lg px-2 py-1 text-sm font-bold underline hover:opacity-80 cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 border-t border-current/15 pt-4 sm:gap-4">
+                    <label htmlFor="printed-copy-count" className="text-base font-bold sm:text-lg">
+                      Copies printed
+                    </label>
+                    <select
+                      id="printed-copy-count"
+                      aria-label="Printed copy count"
+                      value={recoveryCopies}
+                      onChange={(e) =>
+                        setRecoveryCopies(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      className="h-12 w-24 rounded-lg border border-current/30 bg-white px-3 text-lg font-bold"
+                    >
+                      <option value="">-</option>
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <option key={index + 1} value={index + 1}>
+                          {index + 1}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recoveryCopies !== '') {
+                          handleRecordManualCopies(recoveryCopies);
+                        }
+                      }}
+                      disabled={isPrinting || recoveryCopies === ''}
+                      className="ml-auto min-h-12 cursor-pointer rounded-lg bg-[#146a56] px-5 py-2 text-base font-bold text-white hover:bg-[#0f5444] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isPrinting ? 'Recording...' : 'Record copies'}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -314,6 +345,16 @@ export const PrintModal: React.FC<PrintModalProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {recordToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl bg-[#146a56] px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl"
+        >
+          {recordToast}
         </div>
       )}
     </>

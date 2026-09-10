@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { ReviewTemplate } from './PhotoStripReview';
+import { PHOTO_STRIP_CONFIG } from '../../config/photostrip';
 
 export interface PhotoStripInstructionsScreenProps {
   template?: ReviewTemplate | null;
@@ -9,7 +10,9 @@ export interface PhotoStripInstructionsScreenProps {
 export const PhotoStripInstructionsScreen: React.FC<PhotoStripInstructionsScreenProps> = ({
   onStart,
 }) => {
-  const [secondsRemaining, setSecondsRemaining] = useState<number>(10);
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(
+    PHOTO_STRIP_CONFIG.instructionsCountdownSeconds,
+  );
 
   useEffect(() => {
     if (secondsRemaining <= 0) {
@@ -49,7 +52,14 @@ export const PhotoStripInstructionsScreen: React.FC<PhotoStripInstructionsScreen
               className="stroke-[#167a5b] transition-all duration-300 ease-linear"
               strokeWidth="4"
               strokeDasharray={169.65}
-              strokeDashoffset={169.65 * (1 - Math.max(0, Math.min(1, secondsRemaining / 10)))}
+              strokeDashoffset={
+                169.65 *
+                (1 -
+                  Math.max(
+                    0,
+                    Math.min(1, secondsRemaining / PHOTO_STRIP_CONFIG.instructionsCountdownSeconds),
+                  ))
+              }
               strokeLinecap="round"
               fill="transparent"
             />

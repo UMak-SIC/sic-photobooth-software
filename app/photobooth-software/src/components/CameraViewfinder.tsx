@@ -3,7 +3,7 @@ import { useCamera } from '../hooks/useCamera';
 import { useCountdown } from '../hooks/useCountdown';
 
 export interface CameraViewfinderProps {
-  countdownSeconds?: 3 | 5 | 10;
+  countdownSeconds?: number;
   isCountingDown?: boolean;
   activeSlotIndex?: number;
   totalSlots?: number;
