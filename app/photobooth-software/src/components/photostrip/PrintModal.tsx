@@ -122,7 +122,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
 
   return (
     <>
-      {/* 1. Dedicated 4R Print Target (Only visible during print via global.css) */}
       <div className="print-only-target" aria-hidden="true">
         {outputImageUrl ? (
           <div className="relative size-full">

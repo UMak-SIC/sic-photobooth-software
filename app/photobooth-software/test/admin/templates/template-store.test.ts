@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { useTemplateStore } from './template-store';
-import type { Template } from './types';
+import { useTemplateStore } from '../../../src/admin/templates/template-store';
+import type { Template } from '../../../src/admin/templates/types';
 
 const template = {
   id: 'template-id',

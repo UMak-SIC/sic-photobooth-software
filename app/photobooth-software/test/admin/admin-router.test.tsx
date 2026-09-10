@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AdminRouter } from './admin-router';
+import { AdminRouter } from '../../src/admin/admin-router';
 
 vi.mock('./templates/api', () => ({
   templateApi: { list: vi.fn().mockResolvedValue([]) },

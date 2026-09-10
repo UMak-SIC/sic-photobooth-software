@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutPlacements, layoutPresets } from './presets';
+import { layoutPlacements, layoutPresets } from '../../../src/admin/templates/presets';
 
 describe('template layouts', () => {
   it('creates slots with valid dimensions', () => {

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TemplateLibrary } from './template-library';
-import type { Template } from './types';
+import { TemplateLibrary } from '../../../src/admin/templates/template-library';
+import type { Template } from '../../../src/admin/templates/types';
 
 const template = {
   id: 'template-1',

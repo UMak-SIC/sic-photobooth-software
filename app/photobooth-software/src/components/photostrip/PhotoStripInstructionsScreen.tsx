@@ -35,12 +35,29 @@ export const PhotoStripInstructionsScreen: React.FC<PhotoStripInstructionsScreen
     <div className="relative flex w-full min-h-[100vh] flex-col items-center justify-center overflow-hidden bg-[#f8fafc] px-6 py-10 sm:py-14 text-center select-none font-['Nunito',sans-serif]">
       {/* Top Countdown & Main Title */}
       <div className="flex flex-col items-center">
-        <span
-          className="text-[64px] sm:text-[55px] md:text-[65px] font-semibold text-[#167a5b] leading-none tracking-tight"
+        <div
+          className="relative flex size-24 items-center justify-center sm:size-28"
           aria-live="polite"
+          aria-label={`Starting camera in ${secondsRemaining} seconds`}
         >
-          {secondsRemaining}
-        </span>
+          <svg className="size-full -rotate-90 transform" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r="27" className="stroke-[#c4c9c6]" strokeWidth="4" fill="white" />
+            <circle
+              cx="32"
+              cy="32"
+              r="27"
+              className="stroke-[#167a5b] transition-all duration-300 ease-linear"
+              strokeWidth="4"
+              strokeDasharray={169.65}
+              strokeDashoffset={169.65 * (1 - Math.max(0, Math.min(1, secondsRemaining / 10)))}
+              strokeLinecap="round"
+              fill="transparent"
+            />
+          </svg>
+          <span className="absolute text-4xl font-semibold leading-none tracking-tight text-[#167a5b] sm:text-5xl">
+            {secondsRemaining}
+          </span>
+        </div>
         <span className="sr-only">Starting camera in {secondsRemaining}s</span>
 
         <h1 className="text-[30px] sm:text-[38px] md:text-[44px] font-bold tracking-tight text-[#1e293b]">
