@@ -57,12 +57,12 @@ export function VideoRecordingScreen() {
       setRecordingElapsed(Math.min(elapsed, FLIPBOOK_CONFIG.videoRecordingDurationSeconds));
     }, 50);
 
-    // Sample 19 discrete video motion frames during recording (every ~263ms across 5.0s)
+    // Sample 15 discrete video motion frames during recording (every ~333ms across 5.0s)
     const sampleIntervalMs = Math.round(
-      (FLIPBOOK_CONFIG.videoRecordingDurationSeconds * 1000) / 19,
+      (FLIPBOOK_CONFIG.videoRecordingDurationSeconds * 1000) / FLIPBOOK_CONFIG.motionFrameCount,
     );
     const frameSampleInterval = setInterval(() => {
-      if (videoRef.current && sampleCtx && sampledFrames.length < 19) {
+      if (videoRef.current && sampleCtx && sampledFrames.length < FLIPBOOK_CONFIG.motionFrameCount) {
         const video = videoRef.current;
         const vWidth = video.videoWidth > 0 ? video.videoWidth : 1280;
         const vHeight = video.videoHeight > 0 ? video.videoHeight : 720;

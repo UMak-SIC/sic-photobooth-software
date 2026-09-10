@@ -15,6 +15,12 @@ export interface FlipbookUiConfig {
   slotWidthInches: number;
   /** Photo slot height in inches */
   slotHeightInches: number;
+  /** Number of motion frames extracted from video clip */
+  motionFrameCount: number;
+  /** Total flipbook booklet frames (1 cover photo + 15 motion frames) */
+  totalFrameCount: number;
+  /** Playback delay in milliseconds per motion frame */
+  previewFrameDelayMs: number;
 }
 
 export const FLIPBOOK_CONFIG: FlipbookUiConfig = {
@@ -26,6 +32,9 @@ export const FLIPBOOK_CONFIG: FlipbookUiConfig = {
   frameHeightInches: 1.5,
   slotWidthInches: 2.41,
   slotHeightInches: 1.32,
+  motionFrameCount: 15,
+  totalFrameCount: 16,
+  previewFrameDelayMs: 333,
 };
 
 export const FLIPBOOK_LAYOUT = {

@@ -3,6 +3,7 @@ import { useFlipbookStore } from '../../store/flipbook-store';
 import { boothApi, type FrameItem, resolveAssetUrl } from '../../services/api';
 import { useCountdown } from '../../hooks/useCountdown';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
+import { FLIPBOOK_CONFIG } from '../../config/flipbook';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -497,7 +498,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                   >
                     {selectedMotionFrames.length > 0 || motionGifUrl ? (
                       <LoopingMotionPreview
-                        frames={selectedMotionFrames.slice(0, 19)}
+                        frames={selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount)}
                         motionGifUrl={motionGifUrl}
                         fallbackUrl={previewCoverUrl}
                       />
