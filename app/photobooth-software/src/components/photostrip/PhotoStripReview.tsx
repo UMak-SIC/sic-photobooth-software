@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { resolveAssetUrl } from '../../services/api';
 import { useCountdown } from '../../hooks/useCountdown';
+import { PHOTO_STRIP_CONFIG } from '../../config/photostrip';
 
 export interface ReviewPlacement {
   id?: string;
@@ -84,7 +85,6 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
   isConfirming = false,
   errorMessage,
   preview = false,
-  eventDate,
   onRetake,
   onAssignPhoto,
   onToggleVersion,
@@ -92,9 +92,9 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
 }) => {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(1);
 
-  // Auto continue timer (60s countdown) with safe single-dispatch
+  // Auto continue timer with safe single-dispatch
   const { timeLeft: secondsRemaining } = useCountdown({
-    seconds: 60,
+    seconds: PHOTO_STRIP_CONFIG.reviewCountdownSeconds,
     autoStart: !preview && !isConfirming,
     onExpire: () => {
       if (!isConfirming) {
@@ -158,17 +158,6 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
       onToggleVersion(selectedSlot);
     }
   };
-
-  const stripDate = (() => {
-    if (eventDate) {
-      const parsed = new Date(eventDate);
-      if (!isNaN(parsed.getTime())) {
-        return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      }
-      return eventDate;
-    }
-    return new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  })();
 
   const handleRetakeClick = () => {
     if (!selectedSlot || !canRetake) return;
@@ -319,12 +308,6 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
                 );
               })}
 
-              {/* Date at the bottom left of the photostrip */}
-              <div className="absolute bottom-3.5 left-4 pointer-events-none z-20">
-                <span className="font-['Nunito',sans-serif] text-xs sm:text-sm font-bold tracking-wide text-white/80 bg-black/20 px-2 py-0.5 rounded">
-                  {stripDate}
-                </span>
-              </div>
             </div>
           )}
         </div>

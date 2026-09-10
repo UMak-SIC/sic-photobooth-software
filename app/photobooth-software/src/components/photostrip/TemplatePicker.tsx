@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import type { ReviewTemplate } from './PhotoStripReview';
 import { boothApi, resolveAssetUrl } from '../../services/api';
 import { useCountdown } from '../../hooks/useCountdown';
+import { PHOTO_STRIP_CONFIG } from '../../config/photostrip';
 
 export interface TemplatePickerProps {
   preview?: boolean;
@@ -268,11 +269,9 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
     }
   }, [selectedTemplate, onSelectTemplate]);
 
-  const TEMPLATE_SELECTION_SECONDS = 45;
-
   // Auto-confirm the selected template if unattended
   const { timeLeft } = useCountdown({
-    seconds: TEMPLATE_SELECTION_SECONDS,
+    seconds: PHOTO_STRIP_CONFIG.templateSelectionSeconds,
     autoStart: !preview,
     onExpire: () => {
       handleConfirm();
@@ -311,7 +310,12 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                 strokeWidth="4"
                 strokeDasharray={169.65}
                 strokeDashoffset={
-                  169.65 * (1 - Math.max(0, Math.min(1, timeLeft / TEMPLATE_SELECTION_SECONDS)))
+                  169.65 *
+                  (1 -
+                    Math.max(
+                      0,
+                      Math.min(1, timeLeft / PHOTO_STRIP_CONFIG.templateSelectionSeconds),
+                    ))
                 }
                 strokeLinecap="round"
                 fill="transparent"
@@ -394,7 +398,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
               </div>
             ) : (
               <div className="flex flex-1 min-h-0 flex-col pt-1">
-                <div className="grid w-full flex-none grid-cols-3 gap-x-12 gap-y-2 pb-1 px-4">
+                <div className="grid w-full flex-none grid-cols-3 gap-x-1 gap-y-2 pb-1 px-4 md:gap-x-8 lg:gap-x-13 2xl:gap-x-12">
                   {visibleTemplates.map((template) => {
                     const isSelected = template.id === selectedId;
                     const cardWidth = template.outputWidth || (template.orientation === 'landscape' ? 1800 : 1200);
@@ -586,7 +590,7 @@ export const TemplatePicker: React.FC<TemplatePickerProps> = ({
                     alt=""
                     className="size-8 object-contain"
                   />
-                  <span>{selectedTemplate.countdownSeconds ?? 5}s timer</span>
+                  <span>{PHOTO_STRIP_CONFIG.photoCountdownSeconds}s timer</span>
                 </div>
               </div>
               {(() => {

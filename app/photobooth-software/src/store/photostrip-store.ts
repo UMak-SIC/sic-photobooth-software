@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
+import { PHOTO_STRIP_CONFIG } from '../config/photostrip';
 
 export type PhotoStripStep =
   | 'setup'
@@ -52,7 +53,7 @@ export interface PhotoStripState {
   activeSlotIndex: number;
   isRetaking: boolean;
   isCountingDown: boolean;
-  countdownSeconds: 3 | 5 | 10;
+  countdownSeconds: number;
   publicId: string | null;
   qrUrl: string | null;
   outputImageUrl: string | null;
@@ -92,7 +93,7 @@ const initialState = {
   activeSlotIndex: 1,
   isRetaking: false,
   isCountingDown: false,
-  countdownSeconds: 5 as const,
+  countdownSeconds: PHOTO_STRIP_CONFIG.photoCountdownSeconds,
   publicId: null,
   qrUrl: null,
   outputImageUrl: null,
@@ -128,7 +129,7 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       retakeCount: 0,
       activeSlotIndex: 1,
       isRetaking: false,
-      countdownSeconds: (selectedTemplate.countdownSeconds as 3 | 5 | 10) || 5,
+      countdownSeconds: PHOTO_STRIP_CONFIG.photoCountdownSeconds,
       currentStep: 'instructions',
     }),
 
