@@ -30,7 +30,7 @@ Activate the hotspot when the booth is running:
 nmcli connection up 'SIC PHOTOBOOTH'
 ```
 
-The NetworkManager profile only configures the access point and fixed gateway. dnsmasq provides DHCP and makes every DNS name resolve to the gateway. Caddy listens on `:80` without a hostname matcher and reverse-proxies every HTTP request to the captive Next.js app. This makes Apple, Android, and Windows HTTP connectivity checks receive the portal rather than their expected success response, triggering their captive-network sign-in UI.
+The NetworkManager profile only configures the access point and fixed gateway. dnsmasq provides DHCP and makes every DNS name resolve to the gateway. Caddy listens on `:80`, redirects every probe hostname to `http://192.168.4.1`, then reverse-proxies that canonical gateway origin to the captive Next.js app. This makes Apple, Android, and Windows HTTP connectivity checks receive a captive response rather than their expected success response, while keeping browser requests compatible with the local backend's CORS policy.
 
 Start the captive app in production mode before enabling the hotspot:
 
