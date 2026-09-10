@@ -17,6 +17,18 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 
 ## Entries
 
+### 2026-09-11: Android Captive Check Shows Photo-Not-Found Screen
+
+- Symptom: Opening Android's captive-network sign-in URL (`connectivitycheck.gstatic.com/generate_204`) showed the portal's invalid-photo screen.
+- Root cause: The hotspot forwarded the connectivity probe path to the app, where the dynamic `/:id` route treated `generate_204` as a photo ID.
+- Prevention: `app/captive-website/next.config.ts` rewrites `/generate_204` to the portal home before dynamic routes resolve. Captive traffic must be canonicalized to the gateway host rather than allowlisting a probe hostname.
+
+### 2026-09-11: Captive Portal Form Submits to the Home Page
+
+- Symptom: The portal rendered and direct photo URLs worked, but selecting `View my photo` performed a plain `GET /?` rather than navigating to the entered public ID.
+- Root cause: Wildcard DNS sent Android's `connectivitycheck.gstatic.com` request to the local gateway but preserved that hostname in the browser URL and `Host` header. The app rewrite rendered the home page without changing the browser origin. Next dev consequently blocked its client assets for the unallowlisted probe origin, leaving the form unhydrated.
+- Prevention: `config/captive-portal/templates/Caddyfile` redirects every non-gateway host to `http://192.168.4.1{uri}` before proxying to Next. Confirm an intercepted probe host returns `302 Location: http://192.168.4.1/...`; use `sudo systemctl restart caddy` to apply configuration because its admin API is intentionally disabled.
+
 ### 2026-09-09: Public Download Opens Cloudinary Instead
 
 - Symptom: Selecting Save photo strip opened the cross-origin Cloudinary asset instead of downloading it.

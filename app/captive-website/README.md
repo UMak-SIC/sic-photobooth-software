@@ -50,20 +50,17 @@ To allow smartphones on the local Wi-Fi to reach the captive portal:
 - **macOS / Linux**: Run `ifconfig` or `ip a` (e.g., `192.168.1.50`).
 
 #### B. Update `allowedDevOrigins` in `next.config.ts`
-Open [`app/captive-website/next.config.ts`](./next.config.ts) and ensure your device's local IP is listed:
+Open [`app/captive-website/next.config.ts`](./next.config.ts) and ensure your device's local IP is listed. `allowedDevOrigins` entries are hostnames only: do not include a scheme, port, path, or query string.
 
 ```ts
 const nextConfig: NextConfig = {
   transpilePackages: ['@photobooth/public-output', '@photobooth/ui'],
   allowedDevOrigins: [
     'localhost',
-    'localhost:5174',
     '127.0.0.1',
-    '127.0.0.1:5174',
-    '192.168.1.50',        // <-- Add your device IP here
-    '192.168.1.50:5174',
-    '192.168.4.1',         // Default photobooth gateway
-    '192.168.4.1:5174',
+    '192.168.1.50', // Add your device IP here
+    '192.168.4.1', // Default photobooth gateway
+    'connectivitycheck.gstatic.com', // Android captive-network sign-in
   ],
 };
 ```
