@@ -42,7 +42,7 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     vi.useRealTimers();
   });
 
-  it('renders 60 second timer, updated instruction copy, 4 Take A/B/C/D slots, and finished button', () => {
+  it('renders countdown timer, updated instruction copy, 4 Take A/B/C/D slots, and finished button', () => {
     render(
       <PhotoStripReview
         template={mockTemplate}
@@ -51,8 +51,8 @@ describe('PhotoStripReview Retake Bank workflow', () => {
       />
     );
 
-    // 60-second timer
-    expect(screen.getByText('60')).toBeDefined();
+    // Review timer
+    expect(screen.getByText('45')).toBeDefined();
 
     // Instruction copy
     expect(screen.getByText('Replacing 1 photo won’t touch the rest.')).toBeDefined();
@@ -142,7 +142,7 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     expect((retakeBtn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('auto-continues and confirms when 60-second timer counts down to 0', async () => {
+  it('auto-continues and confirms when timer counts down to 0', async () => {
     const onConfirmMock = vi.fn();
     render(
       <PhotoStripReview
@@ -153,11 +153,11 @@ describe('PhotoStripReview Retake Bank workflow', () => {
       />
     );
 
-    expect(screen.getByText('60')).toBeDefined();
+    expect(screen.getByText('45')).toBeDefined();
 
-    // Advance 60 seconds
+    // Advance 45 seconds
     act(() => {
-      vi.advanceTimersByTime(60000);
+      vi.advanceTimersByTime(45000);
     });
 
     expect(onConfirmMock).toHaveBeenCalledTimes(1);
