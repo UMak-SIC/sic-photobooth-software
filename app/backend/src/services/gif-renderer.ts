@@ -264,12 +264,7 @@ export class GifRenderer {
       }
       fs.writeFileSync(outputPath, gifBuffer);
 
-      // Clean up intermediate extracted frames
-      try {
-        fs.rmSync(framesDir, { recursive: true, force: true });
-      } catch {
-        // Ignore cleanup error
-      }
+      // Keep intermediate extracted frames on disk for printing and PDF generation
     })();
 
     // Timeout guard with 2-minute limit

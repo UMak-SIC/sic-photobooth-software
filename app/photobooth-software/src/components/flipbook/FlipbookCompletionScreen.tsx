@@ -209,11 +209,11 @@ export function FlipbookCompletionScreen() {
         <div className="flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-14 xl:gap-20 w-full max-w-7xl my-auto">
           {/* Left Column: Final Flipbook Booklet Stack Preview with section labels */}
           <div className="flex flex-col items-center justify-center w-full max-w-[350px] lg:max-w-[410px] xl:max-w-[450px]">
-            <div className="w-full rounded-2xl sm:rounded-3xl p-3 sm:p-4 transition-all flex flex-col gap-2.5">
+            <div className="w-full rounded-none p-3 sm:p-4 transition-all flex flex-col gap-2.5">
               {/* Instance 1: Front Cover */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Front Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -230,7 +230,7 @@ export function FlipbookCompletionScreen() {
                           SIC
                         </span>
                       </div>
-                      <div className="w-[50%] h-[80%] rounded-md bg-white border border-white/80 shadow-xs flex items-center justify-center">
+                      <div className="w-[50%] h-[80%] rounded-none bg-white border border-white/80 shadow-xs flex items-center justify-center">
                         <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">
                           Front Cover
                         </span>
@@ -246,7 +246,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 2: Cover Photo */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Cover Photo</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -260,7 +260,7 @@ export function FlipbookCompletionScreen() {
 
                   {/* Photo Slot */}
                   <div
-                    className="absolute rounded-md overflow-hidden bg-black/20 z-10 shadow-sm"
+                    className="absolute rounded-none overflow-hidden bg-black/20 z-10 shadow-sm"
                     style={getStripSlotStyle(selectedFrame)}
                   >
                     {previewCoverUrl ? (
@@ -281,7 +281,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 3: Motion Pages */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Motion Pages</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -295,7 +295,7 @@ export function FlipbookCompletionScreen() {
 
                   {/* Motion Slot */}
                   <div
-                    className="absolute rounded-md overflow-hidden bg-black/20 z-10 shadow-sm"
+                    className="absolute rounded-none overflow-hidden bg-black/20 z-10 shadow-sm"
                     style={getStripSlotStyle(selectedFrame)}
                   >
                     {selectedMotionFrames.length > 0 || motionGifUrl ? (
@@ -322,7 +322,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 4: Back Cover */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Back Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-center p-1 transition-colors duration-200 text-white bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-center p-1 transition-colors duration-200 text-white bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9]">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 overflow-hidden">
                       <img

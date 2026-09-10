@@ -8,6 +8,7 @@ import { storageService } from '../services/storage.js';
 import { deleteCloudPublication } from '../services/publishing-worker.js';
 import { printerService } from '../services/printer.js';
 import { templateRepository } from '../templates/repository.js';
+import { resolveFlipbookTemplate } from './sessions.js';
 
 const publicationIdSchema = z.object({ id: z.string().uuid() });
 const printBodySchema = z.object({
@@ -105,32 +106,56 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
 
     if (sessionId) {
       const session = await dbRepository.getSessionById(sessionId);
-      if (session?.frameId) {
-        const template = await templateRepository.get(session.frameId);
-        if (template) {
+      const targetFrameId = session?.frameId || session?.templateId || (session?.templateSnapshot as any)?.id;
+      if (targetFrameId) {
+        const resolvedTemplate = await resolveFlipbookTemplate(targetFrameId);
+        if (resolvedTemplate) {
           frame = {
-            id: template.id,
-            name: template.name,
-            coverPath: template.coverPath ? `/templates/${template.id}/cover` : null,
-            backgroundPath: template.backgroundPath ? `/templates/${template.id}/background` : null,
-            placements: template.placements,
+            id: resolvedTemplate.id,
+            name: resolvedTemplate.name,
+            coverPath: resolvedTemplate.coverPath
+              ? (resolvedTemplate.coverPath.startsWith('/') ? resolvedTemplate.coverPath : `/templates/${resolvedTemplate.id}/cover`)
+              : null,
+            backgroundPath: resolvedTemplate.backgroundPath
+              ? (resolvedTemplate.backgroundPath.startsWith('/') ? resolvedTemplate.backgroundPath : `/templates/${resolvedTemplate.id}/background`)
+              : null,
+            placements: resolvedTemplate.placements,
           };
-          if (template.backgroundPath) {
-            motionSheetUrl = `/templates/${template.id}/background`;
+          if (resolvedTemplate.backgroundPath) {
+            motionSheetUrl = resolvedTemplate.backgroundPath.startsWith('/')
+              ? resolvedTemplate.backgroundPath
+              : `/templates/${resolvedTemplate.id}/background`;
           }
-          if (template.coverPath) {
-            coverSheetUrl = `/templates/${template.id}/cover`;
+          if (resolvedTemplate.coverPath) {
+            coverSheetUrl = resolvedTemplate.coverPath.startsWith('/')
+              ? resolvedTemplate.coverPath
+              : `/templates/${resolvedTemplate.id}/cover`;
           }
-        } else {
-          const dbFrame = await dbRepository.getFrameById(session.frameId);
-          if (dbFrame) {
-            frame = dbFrame;
-            if (dbFrame.overlayPath) {
-              motionSheetUrl = dbFrame.overlayPath.startsWith('/')
-                ? dbFrame.overlayPath
-                : `/${dbFrame.overlayPath}`;
-            }
-          }
+        }
+      }
+
+      if (!frame && session?.templateSnapshot) {
+        const snap = session.templateSnapshot as any;
+        frame = {
+          id: snap.id || 'custom',
+          name: snap.name || 'Custom Frame',
+          coverPath: snap.coverPath
+            ? (snap.coverPath.startsWith('/') ? snap.coverPath : `/templates/${snap.id}/cover`)
+            : null,
+          backgroundPath: snap.backgroundPath
+            ? (snap.backgroundPath.startsWith('/') ? snap.backgroundPath : `/templates/${snap.id}/background`)
+            : null,
+          placements: snap.placements,
+        };
+        if (snap.backgroundPath) {
+          motionSheetUrl = snap.backgroundPath.startsWith('/')
+            ? snap.backgroundPath
+            : `/templates/${snap.id}/background`;
+        }
+        if (snap.coverPath) {
+          coverSheetUrl = snap.coverPath.startsWith('/')
+            ? snap.coverPath
+            : `/templates/${snap.id}/cover`;
         }
       }
     }
@@ -143,15 +168,23 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
           frame = {
             id: defaultTemplate.id,
             name: defaultTemplate.name,
-            coverPath: defaultTemplate.coverPath ? `/templates/${defaultTemplate.id}/cover` : null,
-            backgroundPath: defaultTemplate.backgroundPath ? `/templates/${defaultTemplate.id}/background` : null,
+            coverPath: defaultTemplate.coverPath
+              ? (defaultTemplate.coverPath.startsWith('/') ? defaultTemplate.coverPath : `/templates/${defaultTemplate.id}/cover`)
+              : null,
+            backgroundPath: defaultTemplate.backgroundPath
+              ? (defaultTemplate.backgroundPath.startsWith('/') ? defaultTemplate.backgroundPath : `/templates/${defaultTemplate.id}/background`)
+              : null,
             placements: defaultTemplate.placements,
           };
           if (defaultTemplate.backgroundPath) {
-            motionSheetUrl = `/templates/${defaultTemplate.id}/background`;
+            motionSheetUrl = defaultTemplate.backgroundPath.startsWith('/')
+              ? defaultTemplate.backgroundPath
+              : `/templates/${defaultTemplate.id}/background`;
           }
           if (defaultTemplate.coverPath) {
-            coverSheetUrl = `/templates/${defaultTemplate.id}/cover`;
+            coverSheetUrl = defaultTemplate.coverPath.startsWith('/')
+              ? defaultTemplate.coverPath
+              : `/templates/${defaultTemplate.id}/cover`;
           }
         }
       } catch {}

@@ -623,27 +623,6 @@ export class DatabaseRepository {
       }
     }
 
-    // Try finding the first active frame from DB as fallback
-    try {
-      const fallbackQuery = `
-        SELECT id, name, overlay_path AS "overlayPath", is_active AS "isActive"
-        FROM frames
-        WHERE is_active = true
-        ORDER BY created_at ASC
-        LIMIT 1
-      `;
-      const fbRes = await pool.query(fallbackQuery);
-      if (fbRes.rows[0]) {
-        const row = fbRes.rows[0];
-        return {
-          ...row,
-          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
-        };
-      }
-    } catch {
-      // ignore
-    }
-
     if (this.inMemoryFrames.has(frameId)) {
       return this.inMemoryFrames.get(frameId) || null;
     }
@@ -655,8 +634,9 @@ export class DatabaseRepository {
       return allFrames[idx];
     }
 
-    if (allFrames.length > 0) {
-      return allFrames[0];
+    const matched = allFrames.find((f) => f.name.toLowerCase().includes(frameId.toLowerCase()) || frameId.toLowerCase().includes(f.name.toLowerCase()));
+    if (matched) {
+      return matched;
     }
 
     return null;
@@ -685,11 +665,50 @@ export class DatabaseRepository {
   /**
    * Associates a frame with an active session and sets state to frame_selected.
    */
-  public async setSessionFrame(sessionId: string, frameId: string): Promise<SessionData | null> {
+  public async setSessionFrame(
+    sessionId: string,
+    frameId: string,
+    resolvedTemplate?: any,
+  ): Promise<SessionData | null> {
+    const snapshot = resolvedTemplate
+      ? {
+          id: resolvedTemplate.id || frameId,
+          name: resolvedTemplate.name,
+          type: 'flipbook',
+          coverPath: resolvedTemplate.coverPath || null,
+          backgroundPath: resolvedTemplate.backgroundPath || null,
+          placements:
+            resolvedTemplate.placements && resolvedTemplate.placements.length > 0
+              ? resolvedTemplate.placements
+              : this.defaultFlipbookPlacements,
+          overlays: resolvedTemplate.overlays || [],
+        }
+      : {
+          id: frameId,
+          type: 'flipbook',
+          placements: this.defaultFlipbookPlacements,
+          overlays: [],
+        };
+
     try {
       const query = `
         UPDATE sessions
-        SET frame_id = $2, state = 'frame_selected', last_activity_at = CURRENT_TIMESTAMP
+        SET
+          template_id = CASE
+            WHEN $2::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              AND EXISTS (SELECT 1 FROM templates WHERE id = $2::uuid)
+            THEN $2::uuid
+            ELSE NULL
+          END,
+          frame_id = CASE
+            WHEN $2::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              AND EXISTS (SELECT 1 FROM frames WHERE id = $2::uuid)
+            THEN $2::uuid
+            ELSE NULL
+          END,
+          template_snapshot = $3::jsonb,
+          state = 'frame_selected',
+          last_activity_at = CURRENT_TIMESTAMP
         WHERE id = $1
         RETURNING
           id,
@@ -707,12 +726,14 @@ export class DatabaseRepository {
           last_activity_at AS "lastActivityAt",
           cancelled_at AS "cancelledAt"
       `;
-      const res = await pool.query(query, [sessionId, frameId]);
+      const res = await pool.query(query, [sessionId, frameId, JSON.stringify(snapshot)]);
       return res.rows[0] || null;
     } catch {
       const session = this.inMemorySessions.get(sessionId);
       if (!session) return null;
       session.frameId = frameId;
+      session.templateId = frameId;
+      session.templateSnapshot = snapshot;
       session.state = 'frame_selected';
       session.lastActivityAt = new Date();
       return session;

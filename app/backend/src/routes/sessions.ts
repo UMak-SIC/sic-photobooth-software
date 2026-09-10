@@ -57,6 +57,91 @@ function stripToken<T extends { token: string }>(session: T | null): Omit<T, 'to
   return safe;
 }
 
+export async function resolveFlipbookTemplate(frameId?: string | null) {
+  if (!frameId) return null;
+
+  // 1. Try templateRepository by UUID
+  const template = await templateRepository.get(frameId);
+  if (template) return template;
+
+  // 2. Search templateRepository by slug, name, or id
+  const allTemplates = await templateRepository.list('flipbook');
+  const cleanId = frameId.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const matchedTemplate = allTemplates.find((t) => {
+    if (t.id === frameId) return true;
+    if (t.name.toLowerCase() === frameId.toLowerCase()) return true;
+    const cleanName = t.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleanName === cleanId || cleanName.includes(cleanId) || cleanId.includes(cleanName);
+  });
+  if (matchedTemplate) return matchedTemplate;
+
+  // 3. Search dbRepository frames by UUID, index, or name
+  const frame = await dbRepository.getFrameById(frameId);
+  if (frame) {
+    return {
+      id: frame.id,
+      name: frame.name,
+      type: 'flipbook' as const,
+      orientation: 'portrait' as const,
+      width: 1200 as const,
+      height: 1800 as const,
+      active: frame.isActive ?? true,
+      requiredCaptureCount: 1,
+      backgroundPath: frame.overlayPath ?? null,
+      coverPath: null,
+      sortOrder: null,
+      background: { x: 0, y: 0, width: 1200, height: 1800 },
+      placements: frame.placements && frame.placements.length > 0 ? frame.placements : [
+        { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+        { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+        { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+        { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+      ],
+      overlays: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  // 4. Fallback for standard named default frames
+  const DEFAULT_MAP: Record<string, string> = {
+    'gensic-arcade': 'GenSIC Arcade',
+    'umak-sic-classic': 'UMak SIC Classic',
+    'herons-welcome': 'Herons Welcome',
+    'pioneers-neon': 'Pioneers Neon',
+    'cyber-green': 'Cyber Green',
+    'retro-wave': 'Retro Wave',
+  };
+  const standardName = DEFAULT_MAP[frameId] || DEFAULT_MAP[cleanId];
+  if (standardName) {
+    return {
+      id: frameId,
+      name: standardName,
+      type: 'flipbook' as const,
+      orientation: 'portrait' as const,
+      width: 1200 as const,
+      height: 1800 as const,
+      active: true,
+      requiredCaptureCount: 1,
+      backgroundPath: null,
+      coverPath: null,
+      sortOrder: null,
+      background: { x: 0, y: 0, width: 1200, height: 1800 },
+      placements: [
+        { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+        { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
+        { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
+        { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+      ],
+      overlays: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+  }
+
+  return null;
+}
+
 export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // 0. List active frames for Flipbook
   fastify.get('/api/frames', async (_request, reply) => {
@@ -147,12 +232,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: {
           sessionId: session.id,
           token: session.token,
-          type: session.type,
           state: session.state,
-          eventId: session.eventId,
-          eventName: event.name,
-          eventDate: event.date,
-          createdAt: session.createdAt,
+          type: session.type,
         },
       });
     } catch (err: unknown) {
@@ -191,18 +272,18 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  // 3. Workflow State Transition
-  fastify.post<{ Params: { id: string } }>(
+  // 3. Update Session State (Generic Transition)
+  fastify.post<{ Params: { id: string }; Body: { targetState: string } }>(
     '/api/sessions/:id/transition',
     async (request, reply) => {
       const { id } = request.params;
       const sessionToken = request.headers['x-session-token'];
+      const { targetState } = request.body || {};
 
-      const parseResult = transitionSessionSchema.safeParse(request.body);
-      if (!parseResult.success) {
+      if (!targetState) {
         return reply.status(400).send({
           success: false,
-          error: { code: 'INVALID_REQUEST', message: 'Invalid target state' },
+          error: { code: 'INVALID_REQUEST', message: 'targetState is required' },
         });
       }
 
@@ -215,7 +296,6 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        // Strictly enforce session token authorization
         if (!isSessionAuthorized(sessionToken, session.token)) {
           return reply.status(403).send({
             success: false,
@@ -223,10 +303,15 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           });
         }
 
-        const targetState = parseResult.data.targetState as SessionState;
-        sessionStateMachine.assertValidTransition(session.type, session.state, targetState);
-
-        const updated = await dbRepository.updateSessionState(id, targetState);
+        sessionStateMachine.assertValidTransition(
+          session.type,
+          session.state,
+          targetState as SessionState,
+        );
+        const updated = await dbRepository.updateSessionState(
+          id,
+          targetState as SessionState,
+        );
 
         return reply.send({
           success: true,
@@ -236,7 +321,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const message = err instanceof Error ? err.message : String(err);
         return reply.status(400).send({
           success: false,
-          error: { code: 'INVALID_TRANSITION', message },
+          error: { code: 'INVALID_STATE_TRANSITION', message },
         });
       }
     },
@@ -273,20 +358,15 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
       sessionStateMachine.assertValidTransition(session.type, session.state, 'frame_selected');
 
-      const template = await templateRepository.get(parseResult.data.frameId);
-      let frameIdToStore = parseResult.data.frameId;
-      if (!template) {
-        const frame = await dbRepository.getFrameById(parseResult.data.frameId);
-        if (!frame) {
-          return reply.status(404).send({
-            success: false,
-            error: { code: 'FRAME_NOT_FOUND', message: 'Selected frame does not exist' },
-          });
-        }
-        frameIdToStore = frame.id;
+      const resolved = await resolveFlipbookTemplate(parseResult.data.frameId);
+      if (!resolved) {
+        return reply.status(404).send({
+          success: false,
+          error: { code: 'FRAME_NOT_FOUND', message: 'Selected frame does not exist' },
+        });
       }
 
-      const updated = await dbRepository.setSessionFrame(id, frameIdToStore);
+      const updated = await dbRepository.setSessionFrame(id, resolved.id, resolved);
 
       return reply.send({
         success: true,
@@ -388,11 +468,16 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         }
 
         if (session.state === 'created') {
-          const defaultFrame = await dbRepository.getFrameById('default');
-          if (defaultFrame) {
-            await dbRepository.setSessionFrame(id, defaultFrame.id);
+          const defaultTemplate = (await templateRepository.list('flipbook')).find((t) => t.active);
+          if (defaultTemplate) {
+            await dbRepository.setSessionFrame(id, defaultTemplate.id, defaultTemplate);
           } else {
-            await dbRepository.updateSessionState(id, 'frame_selected');
+            const defaultFrame = await dbRepository.getFrameById('default');
+            if (defaultFrame) {
+              await dbRepository.setSessionFrame(id, defaultFrame.id, defaultFrame);
+            } else {
+              await dbRepository.updateSessionState(id, 'frame_selected');
+            }
           }
         }
 
@@ -860,27 +945,22 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         let coverOverlayPath: string | null = null;
         let motionOverlayPath: string | null = null;
         let templatePlacements: Array<{ x: number; y: number; width: number; height: number }> | undefined = undefined;
-        if (session.frameId) {
-          const template = await templateRepository.get(session.frameId);
-          if (template) {
-            if (template.coverPath) {
-              coverOverlayPath = path.resolve(config.storageDir, template.coverPath);
+        const targetFrameId = session.frameId || session.templateId;
+        if (targetFrameId) {
+          const resolvedTemplate = await resolveFlipbookTemplate(targetFrameId);
+          if (resolvedTemplate) {
+            if (resolvedTemplate.coverPath) {
+              coverOverlayPath = resolvedTemplate.coverPath.startsWith('/')
+                ? path.resolve(process.cwd(), resolvedTemplate.coverPath.replace(/^\//, ''))
+                : path.resolve(config.storageDir, resolvedTemplate.coverPath);
             }
-            if (template.backgroundPath) {
-              motionOverlayPath = path.resolve(config.storageDir, template.backgroundPath);
+            if (resolvedTemplate.backgroundPath) {
+              motionOverlayPath = resolvedTemplate.backgroundPath.startsWith('/')
+                ? path.resolve(process.cwd(), resolvedTemplate.backgroundPath.replace(/^\//, ''))
+                : path.resolve(config.storageDir, resolvedTemplate.backgroundPath);
             }
-            if (template.placements && template.placements.length > 0) {
-              templatePlacements = template.placements;
-            }
-          } else {
-            const frame = await dbRepository.getFrameById(session.frameId);
-            if (frame) {
-              if (frame.overlayPath) {
-                motionOverlayPath = path.resolve(process.cwd(), frame.overlayPath);
-              }
-              if (frame.placements && frame.placements.length > 0) {
-                templatePlacements = frame.placements;
-              }
+            if (resolvedTemplate.placements && resolvedTemplate.placements.length > 0) {
+              templatePlacements = resolvedTemplate.placements;
             }
           }
         }
