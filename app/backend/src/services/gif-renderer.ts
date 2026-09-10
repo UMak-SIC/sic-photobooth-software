@@ -241,7 +241,7 @@ export class GifRenderer {
         hasWrittenFirstFrame = true;
       }
 
-      // Write video motion frames (e.g. 20 frames at 250ms each)
+      // Write video motion frames (e.g. 15 frames at 333ms each)
       for (let i = 0; i < frameFiles.length; i++) {
         const frameFile = frameFiles[i];
         const frameRgba = await processFrame(frameFile, motionOverlayBuffer);

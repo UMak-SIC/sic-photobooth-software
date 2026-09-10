@@ -113,9 +113,9 @@ export const flipbookConfig: FlipbookConfig = {
   videoRecordingDurationSeconds: 5.0,
   videoDurationMinSeconds: 3.5,
   videoDurationMaxSeconds: 6.5,
-  gifFrameCount: 19, // 19 video motion frames (Frame 01 is cover photo, Frames 02-20 are video frames)
+  gifFrameCount: 15, // 15 video motion frames (Frame 01 is cover photo, Frames 02-16 are video frames)
   gifCoverHoldMs: 3000, // 3 seconds static cover photo hold in GIF
-  gifFrameDelayMs: 250, // 250ms per frame (4 fps real-time playback matching 5s recording)
+  gifFrameDelayMs: 333, // 333ms per frame (~3 fps real-time playback matching 5s recording)
   gifOutputWidth: 482, // 2.41" photo slot width (482px)
   gifOutputHeight: 264, // 1.32" photo slot height (264px)
   slotWidthPx: 482, // 2.41" photo slot width (482px)

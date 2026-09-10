@@ -1188,7 +1188,12 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         const overlays = (templateSnapshot.overlays as unknown as TemplateOverlay[]) || [];
         const bgPath = templateSnapshot.backgroundPath as string | undefined;
 
-        // Render 300 DPI 4R PNG buffer
+        // Resolve event information for date pill
+        const event = session.eventId ? await dbRepository.getEventById(session.eventId) : null;
+        const eventDate = event?.date || new Date().toISOString().split('T')[0];
+        const eventName = event?.name || 'Photobooth Event';
+
+        // Render 300 DPI 4R PNG buffer with embedded QR & Date Pill
         const pngBuffer = await photoStripRenderer.renderStrip({
           width,
           height,
@@ -1198,6 +1203,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           captures: captures.map((c) => ({ captureIndex: c.captureIndex, filePath: c.filePath })),
           publicId,
           qrUrl,
+          eventDate,
+          eventName,
+          templateName: (templateSnapshot.name as string) || undefined,
         });
 
         // Save output to session directory

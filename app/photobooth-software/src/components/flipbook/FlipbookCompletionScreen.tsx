@@ -6,6 +6,7 @@ import { boothApi } from '../../services/api';
 import { FlipbookPrintModal } from './FlipbookPrintModal';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
 import { fireCelebrationConfetti } from '../../utils/confetti';
+import { FLIPBOOK_CONFIG } from '../../config/flipbook';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -225,7 +226,7 @@ export function FlipbookCompletionScreen() {
                   >
                     {selectedMotionFrames.length > 0 || motionGifUrl ? (
                       <LoopingMotionPreview
-                        frames={selectedMotionFrames.slice(0, 19)}
+                        frames={selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount)}
                         motionGifUrl={motionGifUrl}
                         fallbackUrl={previewCoverUrl}
                       />

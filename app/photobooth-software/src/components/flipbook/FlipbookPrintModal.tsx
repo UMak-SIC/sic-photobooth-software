@@ -4,6 +4,7 @@ import {
   generateFlipbookPdf,
   printPdfBlobUrl,
 } from '../../services/flipbook-pdf';
+import { FLIPBOOK_CONFIG } from '../../config/flipbook';
 
 interface FlipbookPrintModalProps {
   publicId: string;
@@ -85,7 +86,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
 
       if (!ctx) return;
 
-      const totalFrames = 19;
+      const totalFrames = FLIPBOOK_CONFIG.motionFrameCount;
       const extracted: string[] = [];
 
       // Aspect crop helper (16:9 ratio)
@@ -119,7 +120,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
         const calculated = ((i - 0.5) / totalFrames) * duration;
         const targetTime = Number.isFinite(calculated)
           ? Math.max(0.01, Math.min(duration - 0.05, calculated))
-          : (i - 0.5) * 0.25;
+          : (i - 0.5) * (duration / totalFrames);
 
         await new Promise<void>((resolve) => {
           let resolved = false;
@@ -200,11 +201,11 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
 
   const motionSheetUrl = resolveAssetUrl(frame?.backgroundPath);
   const slotsPerSheet = frame?.placements && frame.placements.length > 0 ? frame.placements.length : 4;
-  const totalSheets = Math.ceil(20 / slotsPerSheet);
+  const totalSheets = Math.ceil(FLIPBOOK_CONFIG.totalFrameCount / slotsPerSheet);
 
-  // Total 20 frames: Frame 01 (Cover Photo) + Frames 02-20 (19 Motion Frames)
+  // Total 16 frames: Frame 01 (Cover Photo) + Frames 02-16 (15 Motion Frames)
   const allMotionFrames = coverUrl
-    ? [coverUrl, ...frameSnapshots.slice(0, 19)]
+    ? [coverUrl, ...frameSnapshots.slice(0, FLIPBOOK_CONFIG.motionFrameCount)]
     : frameSnapshots;
 
   const getSheetSlotStyle = (slotIdx: number) => {
@@ -237,7 +238,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
   const sheetTabs = Array.from({ length: totalSheets }, (_, i) => {
     const sheetNum = i + 1;
     const startFrame = (sheetNum - 1) * slotsPerSheet + 1;
-    const endFrame = Math.min(20, sheetNum * slotsPerSheet);
+    const endFrame = Math.min(FLIPBOOK_CONFIG.totalFrameCount, sheetNum * slotsPerSheet);
     return {
       num: sheetNum,
       label: `Sheet ${sheetNum} · Frames ${String(startFrame).padStart(2, '0')}–${String(endFrame).padStart(2, '0')}`,
@@ -262,8 +263,8 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
             style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }}
           />
           {slotIndices.map((slotIdx) => {
-            const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
-            if (frameNumber > 20) return null; // Trailing unused slot on last sheet
+            const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 16
+            if (frameNumber > FLIPBOOK_CONFIG.totalFrameCount) return null; // Trailing unused slot on last sheet
             const frameSnapshot = allMotionFrames[frameNumber - 1];
             return (
               <div
@@ -301,10 +302,10 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
         style={{ width: '100%', height: '100%' }}
       >
         {slotIndices.map((slotIdx) => {
-          const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
-          const frameSnapshot = frameNumber <= 20 ? allMotionFrames[frameNumber - 1] : undefined;
+          const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 16
+          const frameSnapshot = frameNumber <= FLIPBOOK_CONFIG.totalFrameCount ? allMotionFrames[frameNumber - 1] : undefined;
 
-          if (frameNumber > 20) {
+          if (frameNumber > FLIPBOOK_CONFIG.totalFrameCount) {
             return (
               <div
                 key={slotIdx}
@@ -469,7 +470,7 @@ export const FlipbookPrintModal: React.FC<FlipbookPrintModalProps> = ({
 
         {/* Content Info */}
         <p className="mt-4 text-xs text-[#a8f3dd]/80">
-          Renders 300 DPI PNG gang sheets (1200 × 1800 px) packaged into a multi-page 4R PDF with 0 margins. <strong>{totalSheets === 1 ? 'Sheet 1' : `Sheets 1–${totalSheets}`}</strong> contain the 20 individual motion frames (Frame 01 Cover Photo + 19 Video Frames). Front &amp; Back covers are excluded.
+          Renders 300 DPI PNG gang sheets (1200 × 1800 px) packaged into a multi-page 4R PDF with 0 margins. <strong>{totalSheets === 1 ? 'Sheet 1' : `Sheets 1–${totalSheets}`}</strong> contain the {FLIPBOOK_CONFIG.totalFrameCount} individual motion frames (Frame 01 Cover Photo + {FLIPBOOK_CONFIG.motionFrameCount} Video Frames). Front &amp; Back covers are excluded.
         </p>
 
         {/* Sheet Selector Tabs */}

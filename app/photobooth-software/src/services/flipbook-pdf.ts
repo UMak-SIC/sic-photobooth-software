@@ -96,9 +96,10 @@ export async function renderGangSheetToPng(
     }
 
     // 2. Draw Motion Frame Slots on the sheet
+    const maxFrames = options.allMotionFrames?.length || 16;
     for (let slotIdx = 0; slotIdx < slotsPerSheet; slotIdx++) {
-      const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 20
-      if (frameNumber > 20) {
+      const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1; // 1 to 16
+      if (frameNumber > maxFrames) {
         // Trailing slots left empty with clean template background per contract
         continue;
       }
@@ -142,9 +143,10 @@ export async function renderGangSheetToPng(
   } else {
     // Clean Default Fallback
     const stripHeight = 1800 / slotsPerSheet;
+    const maxFrames = options.allMotionFrames?.length || 16;
     for (let slotIdx = 0; slotIdx < slotsPerSheet; slotIdx++) {
       const frameNumber = (sheetNum - 1) * slotsPerSheet + slotIdx + 1;
-      if (frameNumber > 20) {
+      if (frameNumber > maxFrames) {
         continue;
       }
 
@@ -217,7 +219,7 @@ export async function generateFlipbookPdf(
   const slotsPerSheet = options.frame?.placements && options.frame.placements.length > 0
     ? options.frame.placements.length
     : 4;
-  const totalSheets = Math.ceil(20 / slotsPerSheet);
+  const totalSheets = Math.ceil((options.allMotionFrames?.length || 16) / slotsPerSheet);
   const targetSheets = options.scope === 'all'
     ? Array.from({ length: totalSheets }, (_, i) => i + 1)
     : [options.activeSheet];
