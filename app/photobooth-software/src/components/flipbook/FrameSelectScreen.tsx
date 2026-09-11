@@ -288,7 +288,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                         aria-checked={isSelected}
                         onClick={() => setSelectedId(frame.id)}
                         onKeyDown={(e) => handleKeyDown(e, frameIndex)}
-                        className={`group flex scale-[1.02] flex-col items-start rounded-2xl bg-white p-2 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
+                        className={`group flex scale-[1.02] flex-col items-start rounded-none bg-white p-2 shadow-xs border transition-all duration-150 active:scale-95 cursor-pointer text-left outline-none hover:shadow-md ${
                           isSelected
                             ? 'border-2 border-[#058d51] ring-2 ring-[#058d51]/40'
                             : 'border border-gray-200/80 hover:border-gray-300'
@@ -296,7 +296,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                       >
                         {/* Preview Artboard inside white card */}
                         <div
-                          className={`relative w-full aspect-[8/3] rounded-xl overflow-hidden border ${
+                          className={`relative w-full aspect-[8/3] rounded-none overflow-hidden border ${
                             isSelected ? 'border-[#058d51]/50' : 'border-gray-200'
                           } bg-gradient-to-r from-[#d8b4fe] via-[#f472b6] to-[#c084fc]`}
                         >
@@ -320,7 +320,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                                   SIC
                                 </span>
                               </div>
-                              <div className="w-[45%] h-[75%] rounded-md bg-white/90 border border-white/80 flex items-center justify-center shadow-xs">
+                              <div className="w-[45%] h-[75%] rounded-none bg-white/90 border border-white/80 flex items-center justify-center shadow-xs">
                                 <span className="text-[8px] font-bold text-gray-400">PHOTO</span>
                               </div>
                               <span className="text-[11px] font-black text-white/95 tracking-tighter drop-shadow-xs">
@@ -409,7 +409,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
               {/* Instance 1: Front Cover */}
               <div className="flex flex-col w-full gap-0.5">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Front Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-md overflow-hidden shadow-xs border border-gray-200/80 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-xs border border-gray-200/80 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -426,7 +426,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
                           SIC
                         </span>
                       </div>
-                      <div className="w-[50%] h-[80%] rounded-md bg-white border border-white/80 shadow-xs flex items-center justify-center">
+                      <div className="w-[50%] h-[80%] rounded-none bg-white border border-white/80 shadow-xs flex items-center justify-center">
                         <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">
                           Front Cover
                         </span>
@@ -442,7 +442,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
               {/* Instance 2: Cover Photo */}
               <div className="flex flex-col w-full gap-0.5">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Cover Photo</span>
-                <div className="relative w-full aspect-[8/3] rounded-md overflow-hidden shadow-xs border border-gray-200/80 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-xs border border-gray-200/80 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -479,7 +479,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
               {/* Instance 3: Motion Pages */}
               <div className="flex flex-col w-full gap-0.5">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Motion Pages</span>
-                <div className="relative w-full aspect-[8/3] rounded-md overflow-hidden shadow-xs border border-gray-200/80 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-xs border border-gray-200/80 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -516,7 +516,7 @@ export function FrameSelectScreen({ onBack }: FrameSelectScreenProps = {}) {
               {/* Instance 4: Back Cover */}
               <div className="flex flex-col w-full gap-0.5">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Back Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-md overflow-hidden shadow-xs border border-gray-200/80 bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9] flex items-center justify-center text-white">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-xs border border-gray-200/80 bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9] flex items-center justify-center text-white">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 overflow-hidden">
                       <img

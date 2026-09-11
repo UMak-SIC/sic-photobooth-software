@@ -45,7 +45,7 @@ const FLIPBOOK_VALID_TRANSITIONS: Record<FlipbookState, FlipbookState[]> = {
   processing: ['frame_selected', 'booth_confirmed', 'cover_capture', 'cancelled'], // cover_capture on 2-min timeout recovery
   frame_selected: ['cover_capture', 'booth_confirmed', 'frame_selected', 'instructions', 'cancelled'],
   booth_confirmed: ['printed', 'frame_selected', 'instructions'],
-  printed: [],
+  printed: ['printed'],
   cancelled: [],
 };
 

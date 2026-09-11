@@ -270,6 +270,7 @@ export const PhotoStripWorkflow: React.FC = () => {
     return (
       <div className="flex flex-1 w-full min-h-[100vh] bg-[#ecfff8]">
         <PrintModal
+          sessionId={sessionId ?? undefined}
           publicId={publicId || 'M7p4XaV'}
           qrUrl={qrUrl || 'https://myphotobooth.com/M7p4XaV'}
           outputImageUrl={outputImageUrl || captures[0]?.dataUrl || ''}

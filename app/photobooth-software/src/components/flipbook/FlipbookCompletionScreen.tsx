@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import { useFlipbookStore } from '../../store/flipbook-store';
 import { useSessionStore } from '../../store/session-store';
 import { boothApi } from '../../services/api';
-import { FlipbookPrintModal } from './FlipbookPrintModal';
+import { generateFlipbookPdf, printPdfBlobUrl } from '../../services/flipbook-pdf';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
 import { fireCelebrationConfetti } from '../../utils/confetti';
 import { FLIPBOOK_CONFIG } from '../../config/flipbook';
@@ -16,24 +16,29 @@ export function FlipbookCompletionScreen() {
     publicId,
     qrUrl,
     coverUrls,
-    videoUrls,
     videoFrames,
     selectedCoverIndex,
     selectedVideoIndex,
     selectedFrame,
     outputGifUrl,
+    isPrinted: storeIsPrinted,
+    recordPrintSuccess,
     resetFlipbook,
   } = useFlipbookStore();
   const { backToExperienceChoice } = useSessionStore();
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
-  const [hasPrinted, setHasPrinted] = useState<boolean>(false);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [hasPrinted, setHasPrinted] = useState<boolean>(storeIsPrinted);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [printProgress, setPrintProgress] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
+  const [showPrintRecord, setShowPrintRecord] = useState<boolean>(false);
+  const [recoveryCopies, setRecoveryCopies] = useState<number | ''>(1);
   const [showUnprintedWarning, setShowUnprintedWarning] = useState<boolean>(false);
+  const [recordToast, setRecordToast] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
 
   const previewCoverUrl = coverUrls[selectedCoverIndex - 1] || coverUrls[0];
-  const selectedVideoUrl = videoUrls[selectedVideoIndex - 1] || videoUrls[0];
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
   const publicCode = publicId || 'M7p4XaV';
   const formattedPublicId = publicCode;
@@ -69,14 +74,91 @@ export function FlipbookCompletionScreen() {
     };
   }, [qrDisplayUrl]);
 
-  const handlePrintConfirmed = async (copies: number) => {
-    setHasPrinted(true);
-    if (sessionId) {
-      try {
-        await boothApi.recordPrint(sessionId, copies);
-      } catch (err) {
-        console.warn('Backend recordPrint failed:', err);
+  useEffect(() => {
+    if (!recordToast) return;
+    const timeoutId = window.setTimeout(() => setRecordToast(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [recordToast]);
+
+  const resolveAssetUrl = (p: string | null | undefined) => {
+    if (!p) return null;
+    return p.startsWith('http') ? p : `${API_BASE_URL}${p}`;
+  };
+
+  const coverSheetUrl = resolveAssetUrl(selectedFrame?.coverPath);
+  const motionSheetUrl = resolveAssetUrl(selectedFrame?.backgroundPath);
+
+  const handleDirectPrint = async () => {
+    setPrintError(null);
+    setShowUnprintedWarning(false);
+    setIsPrinting(true);
+    setPrintProgress('Preparing 300 DPI PDF...');
+
+    try {
+      // Assemble all 16 frames: Frame 01 (cover photo) + 15 motion frames
+      const allMotionFrames = previewCoverUrl
+        ? [previewCoverUrl, ...selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount)]
+        : selectedMotionFrames;
+
+      const { blob, url } = await generateFlipbookPdf(
+        {
+          publicId: publicCode,
+          frame: selectedFrame,
+          coverUrl: previewCoverUrl,
+          allMotionFrames,
+          motionSheetUrl,
+          scope: 'all',
+          activeSheet: 1,
+          copies: 1,
+        },
+        (curr, total) => {
+          setPrintProgress(`Rendering 300 DPI PNGs (${curr}/${total})...`);
+        }
+      );
+
+      // Persist generated 4R PDF in backend storage for instant admin reprint/retrieval
+      if (sessionId && !sessionId.startsWith('mock-')) {
+        void boothApi.uploadSessionPdf(sessionId, blob);
       }
+
+      setPrintProgress('Opening print dialog...');
+      await printPdfBlobUrl(url);
+
+      setHasPrinted(true);
+      setShowPrintRecord(true);
+    } catch (err) {
+      console.error('Direct PDF printing failed:', err);
+      setPrintError('PDF generation or printing failed. Please try again.');
+    } finally {
+      setIsPrinting(false);
+      setPrintProgress(null);
+    }
+  };
+
+  const handleRecordManualCopies = async (copiesToRecord: number = 1) => {
+    setIsPrinting(true);
+    setRecordToast(null);
+    try {
+      if (sessionId && !sessionId.startsWith('mock-')) {
+        await boothApi.recordPrint(sessionId, copiesToRecord, true);
+      }
+      recordPrintSuccess(copiesToRecord);
+      setHasPrinted(true);
+      setPrintError(null);
+      setShowPrintRecord(false);
+      setRecordToast(
+        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`
+      );
+    } catch (err) {
+      console.error('Failed to record print status:', err);
+      setHasPrinted(true);
+      setPrintError(null);
+      setShowPrintRecord(false);
+      setRecordToast(
+        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`
+      );
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -101,14 +183,6 @@ export function FlipbookCompletionScreen() {
     handleFinish();
   };
 
-  const resolveAssetUrl = (p: string | null | undefined) => {
-    if (!p) return null;
-    return p.startsWith('http') ? p : `${API_BASE_URL}${p}`;
-  };
-
-  const coverSheetUrl = resolveAssetUrl(selectedFrame?.coverPath);
-  const motionSheetUrl = resolveAssetUrl(selectedFrame?.backgroundPath);
-
   const getStripSlotStyle = (frame: typeof selectedFrame) => {
     const p = frame?.placements?.[0];
     if (!p) {
@@ -129,17 +203,17 @@ export function FlipbookCompletionScreen() {
 
   return (
     <>
-      {/* Main Screen Interface with exact PrintModal layout & typography */}
+      {/* Main Screen Interface */}
       <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-white px-6 sm:px-12 py-8 select-none font-['Nunito',sans-serif] text-[#1f2937]">
         {/* Main Content: 2-Column Split Layout */}
         <div className="flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-14 xl:gap-20 w-full max-w-7xl my-auto">
           {/* Left Column: Final Flipbook Booklet Stack Preview with section labels */}
           <div className="flex flex-col items-center justify-center w-full max-w-[350px] lg:max-w-[410px] xl:max-w-[450px]">
-            <div className="w-full rounded-2xl sm:rounded-3xl p-3 sm:p-4 transition-all flex flex-col gap-2.5">
+            <div className="w-full rounded-none p-3 sm:p-4 transition-all flex flex-col gap-2.5">
               {/* Instance 1: Front Cover */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Front Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-gradient-to-r from-[#d8b4fe] to-[#f472b6]">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -156,7 +230,7 @@ export function FlipbookCompletionScreen() {
                           SIC
                         </span>
                       </div>
-                      <div className="w-[50%] h-[80%] rounded-md bg-white border border-white/80 shadow-xs flex items-center justify-center">
+                      <div className="w-[50%] h-[80%] rounded-none bg-white border border-white/80 shadow-xs flex items-center justify-center">
                         <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider">
                           Front Cover
                         </span>
@@ -172,7 +246,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 2: Cover Photo */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Cover Photo</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -186,7 +260,7 @@ export function FlipbookCompletionScreen() {
 
                   {/* Photo Slot */}
                   <div
-                    className="absolute rounded-md overflow-hidden bg-black/20 z-10 shadow-sm"
+                    className="absolute rounded-none overflow-hidden bg-black/20 z-10 shadow-sm"
                     style={getStripSlotStyle(selectedFrame)}
                   >
                     {previewCoverUrl ? (
@@ -207,7 +281,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 3: Motion Pages */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Motion Pages</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-between p-1 transition-colors duration-200 bg-[#f3e8ff]">
                   {motionSheetUrl ? (
                     <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
                       <img
@@ -221,7 +295,7 @@ export function FlipbookCompletionScreen() {
 
                   {/* Motion Slot */}
                   <div
-                    className="absolute rounded-md overflow-hidden bg-black/20 z-10 shadow-sm"
+                    className="absolute rounded-none overflow-hidden bg-black/20 z-10 shadow-sm"
                     style={getStripSlotStyle(selectedFrame)}
                   >
                     {selectedMotionFrames.length > 0 || motionGifUrl ? (
@@ -248,7 +322,7 @@ export function FlipbookCompletionScreen() {
               {/* Instance 4: Back Cover */}
               <div className="flex flex-col w-full gap-0.5 text-left">
                 <span className="text-xs sm:text-sm font-bold text-[#1d1f26]">Back Cover</span>
-                <div className="relative w-full aspect-[8/3] rounded-lg sm:rounded-xl overflow-hidden shadow-sm flex items-center justify-center p-1 transition-colors duration-200 text-white bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9]">
+                <div className="relative w-full aspect-[8/3] rounded-none overflow-hidden shadow-sm flex items-center justify-center p-1 transition-colors duration-200 text-white bg-gradient-to-r from-[#d8b4fe] via-[#c084fc] to-[#e879f9]">
                   {coverSheetUrl ? (
                     <div className="absolute inset-0 overflow-hidden">
                       <img
@@ -319,6 +393,74 @@ export function FlipbookCompletionScreen() {
               {formattedPublicId}
             </p>
 
+            {/* Warnings and Copies Recovery Dialog */}
+            {(printError || showPrintRecord) && (
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={printError ? 'Printing error' : 'Record printed copies'}
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+              >
+                <div
+                  className={`flex w-full max-w-lg flex-col gap-6 rounded-2xl border p-6 text-left shadow-2xl sm:p-8 ${
+                    printError
+                      ? 'border-red-300 bg-red-50 text-red-800'
+                      : 'border-[#7bc6a5] bg-[#f0faf5] text-[#146a56]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-5">
+                    <p className="text-base font-bold sm:text-lg">
+                      {printError ||
+                        'After printing, record the printed copy count if needed.'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPrintError(null);
+                        setShowPrintRecord(false);
+                      }}
+                      className="shrink-0 rounded-lg px-2 py-1 text-sm font-bold underline hover:opacity-80 cursor-pointer"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 border-t border-current/15 pt-4 sm:gap-4">
+                    <label htmlFor="printed-copy-count" className="text-base font-bold sm:text-lg">
+                      Copies printed
+                    </label>
+                    <select
+                      id="printed-copy-count"
+                      aria-label="Printed copy count"
+                      value={recoveryCopies}
+                      onChange={(e) =>
+                        setRecoveryCopies(e.target.value === '' ? '' : Number(e.target.value))
+                      }
+                      className="h-12 w-24 rounded-lg border border-current/30 bg-white px-3 text-lg font-bold"
+                    >
+                      <option value="">-</option>
+                      {Array.from({ length: 5 }, (_, index) => (
+                        <option key={index + 1} value={index + 1}>
+                          {index + 1}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (recoveryCopies !== '') {
+                          handleRecordManualCopies(recoveryCopies);
+                        }
+                      }}
+                      disabled={isPrinting || recoveryCopies === ''}
+                      className="ml-auto min-h-12 cursor-pointer rounded-lg bg-[#146a56] px-5 py-2 text-base font-bold text-white hover:bg-[#0f5444] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isPrinting ? 'Recording...' : 'Record copies'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons Row */}
             <div className="flex items-center justify-center gap-4 sm:gap-6 w-full mt-6 sm:mt-8">
               {/* Session Done! Button */}
@@ -333,13 +475,18 @@ export function FlipbookCompletionScreen() {
               {/* Print Button */}
               <button
                 type="button"
-                onClick={() => {
-                  setShowUnprintedWarning(false);
-                  setIsPrintModalOpen(true);
-                }}
+                onClick={handleDirectPrint}
+                disabled={isPrinting}
                 className="flex-1 rounded-full px-7 sm:px-9 py-2.5 sm:py-3 bg-[#1e6147] hover:bg-[#164e39] active:scale-95 text-white font-bold text-xl sm:text-2xl transition shadow-md cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                Print
+                {isPrinting ? (
+                  <>
+                    <span className="inline-block size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    <span className="text-lg">{printProgress || 'Preparing PDF...'}</span>
+                  </>
+                ) : (
+                  'Print'
+                )}
               </button>
             </div>
           </div>
@@ -372,10 +519,7 @@ export function FlipbookCompletionScreen() {
             <div className="mt-6 flex flex-col gap-3 w-full">
               <button
                 type="button"
-                onClick={() => {
-                  setShowUnprintedWarning(false);
-                  setIsPrintModalOpen(true);
-                }}
+                onClick={handleDirectPrint}
                 className="w-full rounded-full bg-[#1e6147] hover:bg-[#164e39] active:scale-95 px-6 py-3.5 text-base sm:text-lg font-bold text-white shadow-md transition cursor-pointer"
               >
                 Print Now
@@ -399,17 +543,15 @@ export function FlipbookCompletionScreen() {
         </div>
       )}
 
-      {/* Print Handoff Modal */}
-      {isPrintModalOpen && (
-        <FlipbookPrintModal
-          publicId={publicCode}
-          coverUrl={previewCoverUrl}
-          videoUrl={selectedVideoUrl || undefined}
-          motionFrames={selectedMotionFrames}
-          frame={selectedFrame}
-          onPrintConfirmed={handlePrintConfirmed}
-          onClose={() => setIsPrintModalOpen(false)}
-        />
+      {/* Copies Record Confirmation Toast */}
+      {recordToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl bg-[#146a56] px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl"
+        >
+          {recordToast}
+        </div>
       )}
     </>
   );

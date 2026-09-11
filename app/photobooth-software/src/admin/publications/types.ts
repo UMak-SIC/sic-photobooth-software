@@ -17,3 +17,26 @@ export type Publication = {
   eventName: string;
   eventDate: string;
 };
+
+export type FlipbookPublicationData = {
+  publicId: string;
+  sessionId?: string;
+  mediaType: string;
+  frame?: {
+    id: string;
+    name: string;
+    coverPath?: string | null;
+    backgroundPath?: string | null;
+    placements?: Array<{
+      captureIndex: number;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }>;
+  } | null;
+  coverUrl: string | null;
+  motionFrameUrls: string[];
+  motionSheetUrl?: string | null;
+  coverSheetUrl?: string | null;
+};

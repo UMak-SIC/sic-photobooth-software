@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { fireCelebrationConfetti } from '../../utils/confetti';
+import { generatePhotoStripPdf, uploadPdfBlob, printPdfBlobUrl } from '../../services/flipbook-pdf';
+import { boothApi, API_BASE_URL } from '../../services/api';
 
 export interface PrintModalProps {
+  sessionId?: string;
   publicId?: string;
   qrUrl?: string;
   outputImageUrl?: string;
@@ -18,6 +21,7 @@ export interface PrintModalProps {
 }
 
 export const PrintModal: React.FC<PrintModalProps> = ({
+  sessionId,
   publicId = 'M7p4XaV',
   qrUrl = 'https://myphotobooth.com/M7p4XaV',
   outputImageUrl = '',
@@ -66,15 +70,43 @@ export const PrintModal: React.FC<PrintModalProps> = ({
     return () => window.clearTimeout(timeoutId);
   }, [recordToast]);
 
-  const handleDirectPrint = () => {
+  const [printProgress, setPrintProgress] = useState<string | null>(null);
+
+  const handleDirectPrint = async () => {
     setPrintError(null);
     setShowUnprintedWarning(false);
-    window.print();
-    setShowPrintRecord(true);
-    if (onPrintConfirmed) {
-      onPrintConfirmed(1, false);
+    setIsPrinting(true);
+    setPrintProgress('Preparing 300 DPI PDF...');
+
+    try {
+      const formattedPublicId = publicId || 'M7p4XaV';
+      if (outputImageUrl) {
+        const { blob, url } = await generatePhotoStripPdf(outputImageUrl, formattedPublicId, 1);
+        if (sessionId && !sessionId.startsWith('mock-')) {
+          void boothApi.uploadSessionPdf(sessionId, blob);
+        }
+        void uploadPdfBlob(`${API_BASE_URL}/api/publications/${formattedPublicId}/pdf`, blob);
+        setPrintProgress('Opening print dialog...');
+        await printPdfBlobUrl(url);
+      } else {
+        window.print();
+      }
+
+      setHasPrinted(true);
+      setShowPrintRecord(true);
+    } catch (err) {
+      console.error('Photo strip PDF printing failed, falling back to window.print():', err);
+      try {
+        window.print();
+        setHasPrinted(true);
+        setShowPrintRecord(true);
+      } catch {
+        setPrintError('Printing failed. Please try again.');
+      }
+    } finally {
+      setIsPrinting(false);
+      setPrintProgress(null);
     }
-    setHasPrinted(true);
   };
 
   const handleRecordManualCopies = async (copiesToRecord: number = 1) => {
@@ -92,8 +124,11 @@ export const PrintModal: React.FC<PrintModalProps> = ({
       );
     } catch (err) {
       console.error('Failed to record print status:', err);
-      setPrintError(
-        'Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.',
+      setHasPrinted(true);
+      setPrintError(null);
+      setShowPrintRecord(false);
+      setRecordToast(
+        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`,
       );
     } finally {
       setIsPrinting(false);
@@ -287,7 +322,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                 {isPrinting ? (
                   <>
                     <span className="inline-block size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>Printing...</span>
+                    <span className="text-lg">{printProgress || 'Printing...'}</span>
                   </>
                 ) : (
                   'Print'

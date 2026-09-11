@@ -128,6 +128,7 @@ export interface LocalPublicationOutput {
   publicId: string;
   filePath: string;
   mediaType: string;
+  sessionId?: string;
 }
 
 export class DatabaseRepository {
@@ -622,27 +623,6 @@ export class DatabaseRepository {
       }
     }
 
-    // Try finding the first active frame from DB as fallback
-    try {
-      const fallbackQuery = `
-        SELECT id, name, overlay_path AS "overlayPath", is_active AS "isActive"
-        FROM frames
-        WHERE is_active = true
-        ORDER BY created_at ASC
-        LIMIT 1
-      `;
-      const fbRes = await pool.query(fallbackQuery);
-      if (fbRes.rows[0]) {
-        const row = fbRes.rows[0];
-        return {
-          ...row,
-          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
-        };
-      }
-    } catch {
-      // ignore
-    }
-
     if (this.inMemoryFrames.has(frameId)) {
       return this.inMemoryFrames.get(frameId) || null;
     }
@@ -654,8 +634,9 @@ export class DatabaseRepository {
       return allFrames[idx];
     }
 
-    if (allFrames.length > 0) {
-      return allFrames[0];
+    const matched = allFrames.find((f) => f.name.toLowerCase().includes(frameId.toLowerCase()) || frameId.toLowerCase().includes(f.name.toLowerCase()));
+    if (matched) {
+      return matched;
     }
 
     return null;
@@ -684,11 +665,50 @@ export class DatabaseRepository {
   /**
    * Associates a frame with an active session and sets state to frame_selected.
    */
-  public async setSessionFrame(sessionId: string, frameId: string): Promise<SessionData | null> {
+  public async setSessionFrame(
+    sessionId: string,
+    frameId: string,
+    resolvedTemplate?: any,
+  ): Promise<SessionData | null> {
+    const snapshot = resolvedTemplate
+      ? {
+          id: resolvedTemplate.id || frameId,
+          name: resolvedTemplate.name,
+          type: 'flipbook',
+          coverPath: resolvedTemplate.coverPath || null,
+          backgroundPath: resolvedTemplate.backgroundPath || null,
+          placements:
+            resolvedTemplate.placements && resolvedTemplate.placements.length > 0
+              ? resolvedTemplate.placements
+              : this.defaultFlipbookPlacements,
+          overlays: resolvedTemplate.overlays || [],
+        }
+      : {
+          id: frameId,
+          type: 'flipbook',
+          placements: this.defaultFlipbookPlacements,
+          overlays: [],
+        };
+
     try {
       const query = `
         UPDATE sessions
-        SET frame_id = $2, state = 'frame_selected', last_activity_at = CURRENT_TIMESTAMP
+        SET
+          template_id = CASE
+            WHEN $2::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              AND EXISTS (SELECT 1 FROM templates WHERE id = $2::uuid)
+            THEN $2::uuid
+            ELSE NULL
+          END,
+          frame_id = CASE
+            WHEN $2::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              AND EXISTS (SELECT 1 FROM frames WHERE id = $2::uuid)
+            THEN $2::uuid
+            ELSE NULL
+          END,
+          template_snapshot = $3::jsonb,
+          state = 'frame_selected',
+          last_activity_at = CURRENT_TIMESTAMP
         WHERE id = $1
         RETURNING
           id,
@@ -706,12 +726,14 @@ export class DatabaseRepository {
           last_activity_at AS "lastActivityAt",
           cancelled_at AS "cancelledAt"
       `;
-      const res = await pool.query(query, [sessionId, frameId]);
+      const res = await pool.query(query, [sessionId, frameId, JSON.stringify(snapshot)]);
       return res.rows[0] || null;
     } catch {
       const session = this.inMemorySessions.get(sessionId);
       if (!session) return null;
       session.frameId = frameId;
+      session.templateId = frameId;
+      session.templateSnapshot = snapshot;
       session.state = 'frame_selected';
       session.lastActivityAt = new Date();
       return session;
@@ -1210,7 +1232,7 @@ export class DatabaseRepository {
   public async getPublicationOutput(id: string): Promise<LocalPublicationOutput | null> {
     try {
       const result = await pool.query(
-        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType"
+        `SELECT o.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType", o.session_id AS "sessionId"
          FROM publication_records p
          JOIN generated_outputs o ON o.id = p.output_id
          WHERE p.id = $1`,
@@ -1219,7 +1241,16 @@ export class DatabaseRepository {
       if (result.rows[0]) return result.rows[0];
     } catch {}
     const publication = this.inMemoryPublications.get(id);
-    return publication ? this.inMemoryOutputs.get(publication.publicId) ?? null : null;
+    if (!publication) return null;
+    const output = this.inMemoryOutputs.get(publication.publicId);
+    return output
+      ? {
+          publicId: output.publicId,
+          filePath: output.filePath,
+          mediaType: output.mediaType,
+          sessionId: output.sessionId,
+        }
+      : null;
   }
 
   public async retryPublication(id: string): Promise<PublicationRecord | null> {
@@ -2084,7 +2115,7 @@ export class DatabaseRepository {
           frameId: s.frameId,
           templateSnapshot: snap,
           isPrinted: s.isPrinted,
-          copiesPrinted: s.copiesPrinted || (s.isPrinted ? 1 : 0),
+          copiesPrinted: s.copiesPrinted || 0,
           createdAt: s.createdAt,
           templateName: snap?.name || (s.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template'),
           templateType: s.type,
@@ -2140,9 +2171,9 @@ export class DatabaseRepository {
       totalSessions++;
       completedSessions++;
 
-      const copies = Math.max(1, row.copiesPrinted || (row.isPrinted ? 1 : 0));
+      const copies = row.copiesPrinted || 0;
       totalPrints += copies;
-      if (row.isPrinted) printedSessions++;
+      if (row.isPrinted || copies > 0) printedSessions++;
 
       const isReprint = copies > 1;
       if (isReprint) totalReprintSessions++;
@@ -2151,7 +2182,7 @@ export class DatabaseRepository {
       if (copies === 1) oneCopyCount++;
       else if (copies === 2) twoCopiesCount++;
       else if (copies === 3) threeCopiesCount++;
-      else fourPlusCopiesCount++;
+      else if (copies >= 4) fourPlusCopiesCount++;
 
       // Type breakdown
       if (row.type === 'photo_strip') {

@@ -2,15 +2,61 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { publicationApi } from './api';
 import type { Publication, PublicationStatus } from './types';
+import { generateFlipbookPdf, generatePhotoStripPdf, printPdfBlobUrl } from '../../services/flipbook-pdf';
 
 const statuses: PublicationStatus[] = ['queued', 'in_progress', 'uploaded', 'failed'];
 const PAGE_SIZE = 20;
 const PUBLIC_APP_URL = (import.meta.env.VITE_APP_URL ?? 'https://myphotobooth.com').replace(/\/$/, '');
+const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 function publicationState(status: PublicationStatus) {
   if (status === 'uploaded') return 'Uploaded';
   if (status === 'in_progress') return 'Uploading';
   return 'Not uploaded';
+}
+
+function printImageUrl(imageUrl: string): Promise<void> {
+  return new Promise((resolve) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      resolve();
+      return;
+    }
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            @page { size: 4in 6in; margin: 0; }
+            html, body { width: 4in; height: 6in; margin: 0; padding: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+            img { width: 4in; height: 6in; object-fit: contain; display: block; }
+          </style>
+        </head>
+        <body>
+          <img src="${imageUrl}" onload="window.focus(); window.print();" />
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      resolve();
+      setTimeout(() => {
+        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      }, 60000);
+    }, 500);
+  });
 }
 
 export function PublicationDashboard() {
@@ -19,6 +65,11 @@ export function PublicationDashboard() {
   const [retrying, setRetrying] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [printing, setPrinting] = useState<string | null>(null);
+  const [printProgress, setPrintProgress] = useState<string | null>(null);
+  const [recordModalPublication, setRecordModalPublication] = useState<Publication | null>(null);
+  const [recordCopies, setRecordCopies] = useState<number | ''>(1);
+  const [isRecordingCopies, setIsRecordingCopies] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState<Publication | null>(null);
   const [qrPublication, setQrPublication] = useState<Publication | null>(null);
@@ -54,6 +105,12 @@ export function PublicationDashboard() {
       color: { dark: '#0b3b32', light: '#ffffff' },
     }).then(setQrDataUrl);
   }, [qrPublication]);
+
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = window.setTimeout(() => setToastMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   const retry = async (publication: Publication) => {
     setRetrying(publication.id);
@@ -99,12 +156,98 @@ export function PublicationDashboard() {
   const print = async (publication: Publication) => {
     setPrinting(publication.id);
     setError('');
+    setPrintProgress('Checking 4R PDF print file...');
+
     try {
-      await publicationApi.print(publication.id);
+      // 1. Fast Path: Check if 4R 300 DPI PDF is already cached on backend storage
+      const cachedPdfBlob = await publicationApi.getPdfBlob(publication.id);
+      if (cachedPdfBlob) {
+        setPrintProgress('Opening print dialog...');
+        const cachedPdfUrl = URL.createObjectURL(cachedPdfBlob);
+        await printPdfBlobUrl(cachedPdfUrl);
+        setRecordModalPublication(publication);
+        setRecordCopies(1);
+        return;
+      }
+
+      // 2. Fallback Path: Dynamically generate 300 DPI 4R PDF and persist to storage
+      if (publication.mediaType === 'image/gif') {
+        setPrintProgress('Fetching Flipbook assets...');
+        const flipbookData = await publicationApi.getFlipbookData(publication.id);
+        const coverUrl = flipbookData.coverUrl
+          ? (flipbookData.coverUrl.startsWith('http') ? flipbookData.coverUrl : `${API_URL}${flipbookData.coverUrl}`)
+          : `${API_URL}/photos/${publication.publicId}?preview=true`;
+        const motionFrames = flipbookData.motionFrameUrls.map((u) =>
+          u.startsWith('http') ? u : `${API_URL}${u}`
+        );
+        // All 16 frames: Frame 01 (Cover Photo) + Frames 02..16 (15 Motion Frames)
+        const allMotionFrames = coverUrl ? [coverUrl, ...motionFrames] : motionFrames;
+        const motionSheetUrl = flipbookData.motionSheetUrl
+          ? (flipbookData.motionSheetUrl.startsWith('http') ? flipbookData.motionSheetUrl : `${API_URL}${flipbookData.motionSheetUrl}`)
+          : null;
+
+        const { blob, url } = await generateFlipbookPdf(
+          {
+            publicId: publication.publicId,
+            frame: flipbookData.frame,
+            coverUrl,
+            allMotionFrames,
+            motionSheetUrl,
+            scope: 'all',
+            activeSheet: 1,
+            copies: 1,
+          },
+          (curr, total) => {
+            setPrintProgress(`Rendering 300 DPI PNGs (${curr}/${total})...`);
+          }
+        );
+
+        void publicationApi.savePdf(publication.id, blob);
+        setPrintProgress('Opening print dialog...');
+        await printPdfBlobUrl(url);
+      } else {
+        setPrintProgress('Preparing 300 DPI Photo Strip PDF...');
+        const stripUrl = `${API_URL}/photos/${publication.publicId}`;
+        try {
+          const { blob, url } = await generatePhotoStripPdf(stripUrl, publication.publicId, 1);
+          void publicationApi.savePdf(publication.id, blob);
+          setPrintProgress('Opening print dialog...');
+          await printPdfBlobUrl(url);
+        } catch {
+          // Fallback to strict 4R print iframe if canvas/webgl pdf creation fails
+          await printImageUrl(stripUrl);
+        }
+      }
+
+      setRecordModalPublication(publication);
+      setRecordCopies(1);
     } catch (cause) {
+      console.error('Print failed:', cause);
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setPrinting(null);
+      setPrintProgress(null);
+    }
+  };
+
+  const handleRecordCopies = async () => {
+    if (!recordModalPublication || recordCopies === '') return;
+    setIsRecordingCopies(true);
+    const copiesNum = Number(recordCopies);
+    try {
+      await publicationApi.print(recordModalPublication.id, {
+        copies: copiesNum,
+        recordOnly: true,
+      });
+      setToastMessage(`${copiesNum} ${copiesNum === 1 ? 'copy' : 'copies'} recorded.`);
+      setRecordModalPublication(null);
+    } catch (cause) {
+      console.error('Failed to record copies:', cause);
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setToastMessage(`${copiesNum} ${copiesNum === 1 ? 'copy' : 'copies'} recorded.`);
+      setRecordModalPublication(null);
+    } finally {
+      setIsRecordingCopies(false);
     }
   };
 
@@ -191,7 +334,7 @@ export function PublicationDashboard() {
               </div>
               <div className="publication-actions">
                 <button className="publication-link" disabled={printing === publication.id} onClick={() => print(publication)} type="button">
-                  {printing === publication.id ? 'Printing...' : 'Print'}
+                  {printing === publication.id ? (printProgress || 'Printing...') : 'Print'}
                 </button>
                 <button className="publication-link" onClick={() => setQrPublication(publication)} type="button">View QR</button>
                 <details className="publication-more-actions">
@@ -268,6 +411,72 @@ export function PublicationDashboard() {
             <strong>{qrPublication.publicId}</strong>
             <span>{PUBLIC_APP_URL}/{qrPublication.publicId}</span>
           </section>
+        </div>
+      )}
+      {recordModalPublication && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Record printed copies"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+        >
+          <div className="flex w-full max-w-lg flex-col gap-6 rounded-2xl border border-[#7bc6a5] bg-[#f0faf5] p-6 text-left shadow-2xl sm:p-8 text-[#146a56] font-['Nunito',sans-serif]">
+            <div className="flex items-start justify-between gap-5">
+              <div>
+                <p className="text-base font-bold sm:text-lg">
+                  After printing, record the printed copy count if needed.
+                </p>
+                <p className="text-sm font-semibold opacity-80 mt-1 text-[#2d6a54]">
+                  {recordModalPublication.eventName} · {recordModalPublication.publicId} ({recordModalPublication.mediaType === 'image/gif' ? 'Flipbook' : 'Photo Strip'})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecordModalPublication(null)}
+                className="shrink-0 rounded-lg px-2 py-1 text-sm font-bold underline hover:opacity-80 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 border-t border-current/15 pt-4 sm:gap-4">
+              <label htmlFor="pub-printed-copy-count" className="text-base font-bold sm:text-lg">
+                Copies printed
+              </label>
+              <select
+                id="pub-printed-copy-count"
+                aria-label="Printed copy count"
+                value={recordCopies}
+                onChange={(e) =>
+                  setRecordCopies(e.target.value === '' ? '' : Number(e.target.value))
+                }
+                className="h-12 w-24 rounded-lg border border-[#7bc6a5] bg-white px-3 text-lg font-bold text-[#1f2937]"
+              >
+                <option value="">-</option>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <option key={index + 1} value={index + 1}>
+                    {index + 1}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleRecordCopies}
+                disabled={isRecordingCopies || recordCopies === ''}
+                className="ml-auto min-h-12 cursor-pointer rounded-lg bg-[#146a56] px-5 py-2 text-base font-bold text-white hover:bg-[#0f5444] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRecordingCopies ? 'Recording...' : 'Record copies'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl bg-[#146a56] px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl"
+        >
+          {toastMessage}
         </div>
       )}
     </div>

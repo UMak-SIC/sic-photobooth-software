@@ -285,6 +285,80 @@ export async function generateFlipbookPdf(
 }
 
 /**
+ * Generates a 300 DPI 4R (4" x 6" / 6" x 4") PDF for Photo Strips with zero margins.
+ */
+export async function generatePhotoStripPdf(
+  imageUrl: string,
+  publicId: string,
+  copies: number = 1
+): Promise<{ blob: Blob; url: string; filename: string }> {
+  const response = await fetch(imageUrl);
+  const imageBytes = await response.arrayBuffer();
+
+  const pdfDoc = await PDFDocument.create();
+
+  // Load image to detect natural orientation
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = (e) => reject(e);
+    img.src = imageUrl;
+  });
+
+  const isLandscape = (img.naturalWidth || img.width) > (img.naturalHeight || img.height);
+  const PAGE_WIDTH_PT = isLandscape ? 432 : 288; // 6" or 4" * 72 pt
+  const PAGE_HEIGHT_PT = isLandscape ? 288 : 432; // 4" or 6" * 72 pt
+
+  let embeddedImg;
+  try {
+    embeddedImg = await pdfDoc.embedPng(imageBytes);
+  } catch {
+    embeddedImg = await pdfDoc.embedJpg(imageBytes);
+  }
+
+  const copiesCount = Math.max(1, copies || 1);
+  for (let c = 0; c < copiesCount; c++) {
+    const page = pdfDoc.addPage([PAGE_WIDTH_PT, PAGE_HEIGHT_PT]);
+    page.drawImage(embeddedImg, {
+      x: 0,
+      y: 0,
+      width: PAGE_WIDTH_PT,
+      height: PAGE_HEIGHT_PT,
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([new Uint8Array(pdfBytes).buffer as ArrayBuffer], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const filename = `photostrip_${publicId}_4R_${copiesCount}copies.pdf`;
+
+  return { blob, url, filename };
+}
+
+/**
+ * Uploads a generated PDF blob to the backend storage endpoint.
+ */
+export async function uploadPdfBlob(
+  uploadUrl: string,
+  pdfBlob: Blob,
+  filename: string = 'output.pdf'
+): Promise<boolean> {
+  try {
+    const formData = new FormData();
+    formData.append('file', pdfBlob, filename);
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+    });
+    return response.ok;
+  } catch (err) {
+    console.warn('Failed to upload PDF blob to storage:', err);
+    return false;
+  }
+}
+
+/**
  * Triggers native PDF printing using an invisible iframe.
  */
 export function printPdfBlobUrl(pdfUrl: string): Promise<void> {

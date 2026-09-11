@@ -144,9 +144,34 @@ export class StorageService {
   }
 
   /**
+   * Saves a 4R 300 DPI PDF output by session and public ID.
+   */
+  public async savePdf(
+    sessionId: string,
+    publicId: string,
+    buffer: Buffer,
+  ): Promise<{ sessionFilePath: string; publicFilePath: string }> {
+    const cleanPublicId = this.sanitizeId(publicId);
+    const sessionDir = this.getSessionDir(sessionId, 'outputs');
+    const filename = `${cleanPublicId}.pdf`;
+
+    const sessionFilePath = path.join(sessionDir, filename);
+    await fs.promises.writeFile(sessionFilePath, buffer);
+
+    const globalOutputsDir = path.join(this.baseDir, 'outputs');
+    if (!fs.existsSync(globalOutputsDir)) {
+      fs.mkdirSync(globalOutputsDir, { recursive: true });
+    }
+    const publicFilePath = path.join(globalOutputsDir, filename);
+    await fs.promises.copyFile(sessionFilePath, publicFilePath);
+
+    return { sessionFilePath, publicFilePath };
+  }
+
+  /**
    * Returns the file path of a generated public output by public ID if it exists.
    */
-  public getOutputPath(publicId: string, ext: 'png' | 'gif' = 'png'): string | null {
+  public getOutputPath(publicId: string, ext: 'png' | 'gif' | 'pdf' = 'png'): string | null {
     const cleanPublicId = this.sanitizeId(publicId);
     const candidatePath = path.join(this.baseDir, 'outputs', `${cleanPublicId}.${ext}`);
     if (fs.existsSync(candidatePath)) {
@@ -155,10 +180,22 @@ export class StorageService {
     return null;
   }
 
+  /**
+   * Returns the file path of a generated public PDF output if it exists.
+   */
+  public getPdfPath(publicId: string): string | null {
+    return this.getOutputPath(publicId, 'pdf');
+  }
+
   public async removeOutput(publicId: string, filePath: string, mediaType: string): Promise<void> {
     await fs.promises.rm(filePath, { force: true });
     const extension = mediaType === 'image/gif' ? 'gif' : 'png';
-    await fs.promises.rm(path.join(this.baseDir, 'outputs', `${this.sanitizeId(publicId)}.${extension}`), {
+    const sanitized = this.sanitizeId(publicId);
+    await fs.promises.rm(path.join(this.baseDir, 'outputs', `${sanitized}.${extension}`), {
+      force: true,
+    });
+    // Also clean up any associated 4R PDF
+    await fs.promises.rm(path.join(this.baseDir, 'outputs', `${sanitized}.pdf`), {
       force: true,
     });
   }
