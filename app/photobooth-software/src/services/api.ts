@@ -1,4 +1,5 @@
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
+import type { PhotoFilterType } from '../config/filters';
 
 export const API_BASE_URL =
   import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -392,11 +393,12 @@ export class BoothApiClient {
 
   public async confirmPhotoStrip(
     sessionId: string,
+    filter?: PhotoFilterType,
   ): Promise<{ outputId: string; publicId: string; qrUrl: string; filePath: string }> {
     const res = await fetch(`${API_BASE_URL}/api/sessions/${sessionId}/photo-strip/confirm`, {
       method: 'POST',
       headers: this.getHeaders('application/json'),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ filter }),
     });
     const body: ApiResponse<{
       outputId: string;

@@ -44,6 +44,10 @@ const printSessionSchema = z.object({
   recordOnly: z.boolean().optional(),
 });
 
+const confirmPhotoStripSchema = z.object({
+  filter: z.enum(['normal', 'bw', 'sepia', 'warm']).optional(),
+});
+
 function isSessionAuthorized(
   sessionTokenHeader: string | string[] | undefined,
   sessionToken: string,
@@ -1216,11 +1220,13 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 10b. Confirm Photo Strip Output (generates 300 DPI 4R PNG, public ID, QR, and queues publication)
-  fastify.post<{ Params: { id: string } }>(
+  fastify.post<{ Params: { id: string }; Body?: { filter?: 'normal' | 'bw' | 'sepia' | 'warm' } }>(
     '/api/sessions/:id/photo-strip/confirm',
     async (request, reply) => {
       const { id } = request.params;
       const sessionToken = request.headers['x-session-token'];
+      const parsedBody = confirmPhotoStripSchema.safeParse(request.body || {});
+      const filter = parsedBody.success ? parsedBody.data.filter : undefined;
 
       try {
         const session = await dbRepository.getSessionById(id);
@@ -1263,16 +1269,6 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
 
-        if (session.state !== 'review' && session.state !== 'capturing') {
-          return reply.status(400).send({
-            success: false,
-            error: {
-              code: 'INVALID_STATE',
-              message: 'This step is not available yet. Continue the current workflow.',
-            },
-          });
-        }
-
         const templateSnapshot = session.templateSnapshot as Record<string, unknown> | null;
         if (!templateSnapshot) {
           return reply.status(400).send({
@@ -1293,6 +1289,16 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             error: {
               code: 'INCOMPLETE_CAPTURES',
               message: `Photo strip requires ${requiredCount} photos (received ${captures.length}).`,
+            },
+          });
+        }
+
+        if (session.state !== 'review' && session.state !== 'capturing') {
+          return reply.status(400).send({
+            success: false,
+            error: {
+              code: 'INVALID_STATE',
+              message: 'This step is not available yet. Continue the current workflow.',
             },
           });
         }
@@ -1325,6 +1331,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           eventDate,
           eventName,
           templateName: (templateSnapshot.name as string) || undefined,
+          filter,
         });
 
         // Save output to session directory

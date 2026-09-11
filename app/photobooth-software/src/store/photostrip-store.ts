@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { ReviewTemplate } from '../components/photostrip/PhotoStripReview';
 import { PHOTO_STRIP_CONFIG } from '../config/photostrip';
+import type { PhotoFilterType } from '../config/filters';
 
 export type PhotoStripStep =
   | 'setup'
@@ -61,11 +62,13 @@ export interface PhotoStripState {
   errorMessage: string | null;
   isPrinted: boolean;
   copiesPrinted: number;
+  selectedFilter: PhotoFilterType;
 
   setSession: (sessionId: string, token: string) => void;
   setSelectedEvent: (event: PhotoStripEvent | null) => void;
   setStep: (step: PhotoStripStep) => void;
   setTemplate: (template: ReviewTemplate) => void;
+  setSelectedFilter: (filter: PhotoFilterType) => void;
   startCountdown: () => void;
   stopCountdown: () => void;
   addCapture: (blob: Blob, slotIndex?: number) => void;
@@ -101,6 +104,7 @@ const initialState = {
   errorMessage: null,
   isPrinted: false,
   copiesPrinted: 0,
+  selectedFilter: 'normal' as PhotoFilterType,
 };
 
 const RETAKE_LETTERS = ['A', 'B', 'C', 'D'];
@@ -118,6 +122,8 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
 
   setSession: (sessionId, sessionToken) => set({ sessionId, sessionToken }),
 
+  setSelectedFilter: (selectedFilter: PhotoFilterType) => set({ selectedFilter }),
+
   setStep: (currentStep) => set({ currentStep, errorMessage: null }),
 
   setTemplate: (selectedTemplate) =>
@@ -130,6 +136,7 @@ export const usePhotoStripStore = create<PhotoStripState>((set, get) => ({
       activeSlotIndex: 1,
       isRetaking: false,
       countdownSeconds: PHOTO_STRIP_CONFIG.photoCountdownSeconds,
+      selectedFilter: 'normal',
       currentStep: 'instructions',
     }),
 

@@ -24,7 +24,7 @@ These instructions begin after the event and operator have been selected. Choose
 4. Pose for each photo. The booth takes photos automatically, one at a time, until all layout slots are filled.
 5. On the review screen, tap a photo frame to select it.
 6. To replace a photo, tap **Retake photo #** for the selected frame. You can take up to four retakes in total.
-7. Retakes appear in the Take A-D bank. Select a frame, then tap a retake in the bank to swap it into that frame. Replacing one frame does not change the other photos.
+7. Retaking replaces the selected photo directly without affecting the other photos. Tap any of the 4 filter presets (Original, Classic B&W, Vintage Sepia, Warm Golden) to style your photos before finishing.
 8. Tap **I'm finished** when the strip looks right. The current strip is confirmed automatically after 60 seconds if no action is taken.
 9. Scan the QR code on the completion screen to view your digital photo strip. The displayed code can also be used to identify the output.
 10. Tap **Print** to open the system print dialog. After printing, record additional copies if required.

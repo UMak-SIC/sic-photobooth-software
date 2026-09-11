@@ -692,6 +692,68 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
      expect(dupBody.data.publicId).toBe(confirmBody.data.publicId);
    });
 
+  it('supports confirming photo strip with photo filters (bw, sepia, warm)', async () => {
+    for (const filter of ['bw', 'sepia', 'warm'] as const) {
+      const createRes = await app.inject({
+        method: 'POST',
+        url: '/api/sessions',
+        payload: {
+          eventName: `Filter ${filter} Test`,
+          eventDate: '2026-09-11',
+          operatorName: 'Joey Dev',
+          type: 'photo_strip',
+        },
+      });
+      const { sessionId, token } = JSON.parse(createRes.body).data;
+
+      const templatesRes = await app.inject({ method: 'GET', url: '/api/templates' });
+      const template = JSON.parse(templatesRes.body).data[0];
+
+      await app.inject({
+        method: 'POST',
+        url: `/api/sessions/${sessionId}/template`,
+        headers: { 'x-session-token': token },
+        payload: { templateId: template.id },
+      });
+
+      const requiredPhotos = template.requiredCaptureCount || template.placements?.length || 3;
+      const samplePng = Buffer.from(
+        '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
+        'hex',
+      );
+      for (let i = 1; i <= requiredPhotos; i++) {
+        const boundary = '----WebKitFormBoundaryFilterTest';
+        const payload = Buffer.concat([
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="captureIndex"\r\n\r\n${i}\r\n`),
+          Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="photo-${i}.png"\r\nContent-Type: image/png\r\n\r\n`),
+          samplePng,
+          Buffer.from(`\r\n--${boundary}--\r\n`),
+        ]);
+        await app.inject({
+          method: 'POST',
+          url: `/api/sessions/${sessionId}/captures/photo?captureIndex=${i}`,
+          headers: {
+            'x-session-token': token,
+            'content-type': `multipart/form-data; boundary=${boundary}`,
+          },
+          payload,
+        });
+      }
+
+      const confirmRes = await app.inject({
+        method: 'POST',
+        url: `/api/sessions/${sessionId}/photo-strip/confirm`,
+        headers: { 'x-session-token': token },
+        payload: { filter },
+      });
+      expect(confirmRes.statusCode).toBe(200);
+      const confirmBody = JSON.parse(confirmRes.body);
+      expect(confirmBody.success).toBe(true);
+      expect(confirmBody.data.state).toBe('booth_confirmed');
+      expect(confirmBody.data.publicId).toBeDefined();
+    }
+  });
+
   it('correctly formats dates as yyyy. mm. dd for the Date Pill badge', () => {
     expect(formatDateToPill('2026-09-10')).toBe('2026. 09. 10');
     expect(formatDateToPill('2025-01-05T12:00:00.000Z')).toBe('2025. 01. 05');

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   cloudinaryUpload: vi.fn(),
@@ -21,6 +21,12 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ from: mocks.supabaseFrom })),
 }));
 
+vi.mock('../src/db/pool.js', () => ({
+  pool: {
+    query: vi.fn().mockRejectedValue(new Error('Database offline in test')),
+  },
+}));
+
 describe('Publishing worker', () => {
   let cloudinaryV2: {
     uploader: { upload: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> };
@@ -35,6 +41,7 @@ describe('Publishing worker', () => {
     process.env.SUPABASE_URL = 'https://test.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
     process.env.PUBLIC_APP_URL = '';
+      vi.resetModules();
     mocks.supabaseEq.mockReturnValue({ maybeSingle: mocks.supabaseMaybeSingle });
     mocks.supabaseSelect.mockReturnValue({ eq: mocks.supabaseEq });
     mocks.supabaseFrom.mockReturnValue({
@@ -44,6 +51,15 @@ describe('Publishing worker', () => {
     cloudinaryV2 = (await import('cloudinary')).v2;
     worker = await import('../src/services/publishing-worker.js');
     repo = await import('../src/db/repository.js');
+  });
+
+  beforeEach(() => {
+    cloudinaryV2.uploader.upload.mockClear();
+    cloudinaryV2.uploader.destroy.mockClear();
+    mocks.supabaseUpsert.mockClear();
+    mocks.supabaseSelect.mockClear();
+    mocks.supabaseEq.mockClear();
+    mocks.supabaseMaybeSingle.mockClear();
   });
 
   it('uploads a queued publication and marks it uploaded', async () => {
@@ -253,3 +269,4 @@ describe('Publishing worker', () => {
     }
   });
 });
+

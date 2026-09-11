@@ -29,6 +29,8 @@ export const PhotoStripWorkflow: React.FC = () => {
     errorMessage,
     isPrinted,
     copiesPrinted,
+    selectedFilter,
+    setSelectedFilter,
     setSession,
     setSelectedEvent,
     setStep,
@@ -153,7 +155,7 @@ export const PhotoStripWorkflow: React.FC = () => {
     setError(null);
     try {
       if (sessionId && !sessionId.startsWith('mock-')) {
-        const result = await boothApi.confirmPhotoStrip(sessionId);
+        const result = await boothApi.confirmPhotoStrip(sessionId, selectedFilter);
         const imageUrl = `${API_BASE_URL}/photos/${result.publicId}`;
         setConfirmedOutput(result.publicId, result.qrUrl, imageUrl);
       } else {
@@ -257,6 +259,8 @@ export const PhotoStripWorkflow: React.FC = () => {
           retakeCount={retakeCount}
           isConfirming={isConfirming}
           errorMessage={errorMessage}
+          selectedFilter={selectedFilter}
+          onSelectFilter={setSelectedFilter}
           onRetake={handleRetake}
           onAssignPhoto={assignPhotoToSlot}
           onToggleVersion={toggleCaptureVersion}

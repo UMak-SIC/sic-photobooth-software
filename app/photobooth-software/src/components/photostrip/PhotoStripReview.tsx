@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { resolveAssetUrl } from '../../services/api';
 import { useCountdown } from '../../hooks/useCountdown';
 import { PHOTO_STRIP_CONFIG } from '../../config/photostrip';
+import { PHOTO_FILTERS, getFilterCss, type PhotoFilterType } from '../../config/filters';
 
 export interface ReviewPlacement {
   id?: string;
@@ -68,29 +69,40 @@ export interface PhotoStripReviewProps {
   errorMessage?: string | null;
   preview?: boolean;
   eventDate?: string;
+  selectedFilter?: PhotoFilterType;
+  onSelectFilter?: (filter: PhotoFilterType) => void;
   onRetake?: (captureIndex: number) => void;
   onAssignPhoto?: (slotIndex: number, photoId: string) => void;
   onToggleVersion?: (captureIndex: number) => void;
   onConfirm?: () => void;
 }
 
-const RETAKE_SLOT_LETTERS = ['A', 'B', 'C', 'D'];
-
 export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
   template,
   captures = [],
-  photoPool,
-  slotAssignments = {},
+  photoPool: _photoPool,
+  slotAssignments: _slotAssignments,
   retakeCount = 0,
   isConfirming = false,
   errorMessage,
   preview = false,
+  selectedFilter,
+  onSelectFilter,
   onRetake,
-  onAssignPhoto,
-  onToggleVersion,
+  onAssignPhoto: _onAssignPhoto,
+  onToggleVersion: _onToggleVersion,
   onConfirm,
 }) => {
   const [selectedSlot, setSelectedSlot] = useState<number | null>(1);
+  const [internalFilter, setInternalFilter] = useState<PhotoFilterType>('normal');
+  const currentFilter = selectedFilter !== undefined ? selectedFilter : internalFilter;
+
+  const handleSelectFilter = (filter: PhotoFilterType) => {
+    setInternalFilter(filter);
+    onSelectFilter?.(filter);
+  };
+
+  const filterCss = getFilterCss(currentFilter);
 
   // Auto continue timer with safe single-dispatch
   const { timeLeft: secondsRemaining } = useCountdown({
@@ -130,33 +142,8 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
           },
         ];
 
-  // Exactly 4 retake bank slots: Take A, Take B, Take C, Take D
-  const reviewSlots = [0, 1, 2, 3];
-
-  // Extract retaken photos from photoPool or captures
-  const retakePhotos: PoolPhoto[] = photoPool
-    ? photoPool.filter((p) => p.isRetake)
-    : captures
-        .filter((c) => !!c.retakeDataUrl)
-        .map((c, idx) => ({
-          id: c.photoId || `retake-${c.captureIndex}`,
-          dataUrl: c.retakeDataUrl || c.dataUrl,
-          label: `Take ${RETAKE_SLOT_LETTERS[idx] || idx + 1}`,
-          letter: RETAKE_SLOT_LETTERS[idx] || String(idx + 1),
-          isRetake: true,
-        }));
-
   const handleSlotClick = (slotIndex: number) => {
     setSelectedSlot(slotIndex);
-  };
-
-  const handleBankSlotClick = (photo: PoolPhoto) => {
-    if (!selectedSlot) return;
-    if (onAssignPhoto) {
-      onAssignPhoto(selectedSlot, photo.id);
-    } else if (onToggleVersion) {
-      onToggleVersion(selectedSlot);
-    }
   };
 
   const handleRetakeClick = () => {
@@ -290,7 +277,8 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
                       <img
                         src={cap.dataUrl}
                         alt={`Photo ${p.captureIndex}`}
-                        className="size-full object-cover"
+                        className="size-full object-cover transition-all duration-200"
+                        style={{ filter: filterCss }}
                       />
                     ) : (
                       <div className="flex size-full flex-col items-center justify-center bg-[#e2f0eb] text-[#1b6b55] font-bold text-sm p-1">
@@ -320,108 +308,69 @@ export const PhotoStripReview: React.FC<PhotoStripReviewProps> = ({
               {remainingRetakes} {remainingRetakes === 1 ? 'Retake' : 'Retakes'} Left
             </h1>
             <p className="mt-2 text-base sm:text-lg font-bold text-[#008037]">
-              Tap a frame to retake it, or tap a slot below to swap.
+              Select a photo filter below, or tap a photo to retake.
             </p>
           </div>
 
-          {/* 2x2 Retake Bank Grid */}
+          {/* 2x2 Photo Filters Grid */}
           <div className="grid grid-cols-2 gap-4 sm:gap-5 w-full my-6">
-            {reviewSlots.map((slotIndex) => {
-              const letter = RETAKE_SLOT_LETTERS[slotIndex];
-              const retakePhoto = retakePhotos[slotIndex];
-              const isOccupied = !!retakePhoto;
-
-              // Check which frame on the photostrip currently owns this photo
-              let assignedFrame: number | undefined;
-              if (isOccupied) {
-                const entry = Object.entries(slotAssignments).find(([, id]) => id === retakePhoto.id);
-                if (entry) {
-                  assignedFrame = Number(entry[0]);
-                } else {
-                  const matchedCapture = captures.find(
-                    (c) => c.dataUrl === retakePhoto.dataUrl || c.photoId === retakePhoto.id,
-                  );
-                  assignedFrame = matchedCapture?.captureIndex;
-                }
-              }
-
-              const isAssignedToSelected = isOccupied && selectedSlot !== null && assignedFrame === selectedSlot;
+            {PHOTO_FILTERS.map((filter) => {
+              const isSelected = currentFilter === filter.id;
+              const samplePhoto = captures[0]?.dataUrl;
 
               return (
                 <button
-                  key={slotIndex}
+                  key={filter.id}
                   type="button"
-                  onClick={() => {
-                    if (isOccupied) {
-                      handleBankSlotClick(retakePhoto);
-                    }
-                  }}
-                  aria-label={
-                    isOccupied
-                      ? `Retake bank slot Take ${letter}: ${assignedFrame ? `In Frame ${assignedFrame}` : 'Unused'}`
-                      : `Empty retake slot Take ${letter}`
-                  }
-                  className={`relative flex items-center justify-center h-28 sm:h-32 rounded-2xl transition-all duration-200 overflow-hidden ${
-                    isAssignedToSelected
-                      ? 'ring-4 ring-[#16a34a] ring-offset-2 scale-[1.03] shadow-lg cursor-pointer'
-                      : isOccupied
-                      ? 'hover:scale-[1.02] ring-2 ring-slate-300 cursor-pointer shadow-sm'
-                      : 'opacity-85 border-2 border-dashed border-slate-300 bg-slate-100 text-slate-400 cursor-default'
-                  } ${isOccupied ? 'bg-[#737373]' : ''}`}
+                  onClick={() => handleSelectFilter(filter.id)}
+                  aria-label={`Select ${filter.label} filter`}
+                  className={`relative flex flex-col justify-between p-3.5 h-40 sm:h-48 rounded-2xl transition-all duration-200 overflow-hidden cursor-pointer text-left ${
+                    isSelected
+                      ? 'ring-4 ring-[#16a34a] ring-offset-2 scale-[1.03] shadow-lg bg-[#f0fdf4] border-2 border-[#16a34a]'
+                      : 'hover:scale-[1.02] ring-1 ring-slate-200 hover:ring-slate-300 bg-white shadow-xs border border-slate-200'
+                  }`}
                 >
-                  {isOccupied ? (
-                    <>
+                  {/* Thumbnail / Swatch Preview */}
+                  <div className="relative w-full flex-1 min-h-[105px] sm:min-h-[135px] rounded-xl overflow-hidden flex items-center justify-center bg-slate-100">
+                    {samplePhoto ? (
                       <img
-                        src={retakePhoto.dataUrl}
-                        alt={`Take ${letter}`}
-                        className="size-full object-cover"
+                        src={samplePhoto}
+                        alt=""
+                        className="size-full object-cover transition-all"
+                        style={{ filter: filter.cssFilter }}
                       />
-                      {/* Top-left slot label badge */}
-                      <div className="absolute top-2 left-2 z-10">
-                        <span className="bg-black/75 backdrop-blur-xs text-white font-bold text-xs px-2 py-0.5 rounded-md shadow">
-                          Take {letter}
-                        </span>
+                    ) : (
+                      <div
+                        className="size-full"
+                        style={{ background: filter.previewBg }}
+                      />
+                    )}
+                    {isSelected && (
+                      <div className="absolute top-1.5 right-1.5 z-10 flex size-5 items-center justify-center rounded-full bg-[#16a34a] text-white shadow-md">
+                        <svg className="size-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path
+                            fillRule="evenodd"
+                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
                       </div>
-                      {/* Bottom Status / Frame ownership badge */}
-                      <div className="absolute bottom-2 inset-x-2 z-10 flex justify-center">
-                        {assignedFrame !== undefined ? (
-                          <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow bg-[#16a34a] text-white">
-                            In Frame {assignedFrame}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shadow bg-[#475569] text-slate-100">
-                            Unused (Tap to Swap)
-                          </span>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    /* Empty Retake Slot with Camera Icon and Take Letter */
-                    <div className="flex flex-col items-center justify-center gap-1.5 text-slate-400 select-none">
-                      <svg
-                        className="w-7 h-7 sm:w-8 sm:h-8"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.75"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"
-                        />
-                      </svg>
-                      <span className="text-xs sm:text-sm font-bold tracking-wider uppercase">
-                        Take {letter}
-                      </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
+
+                  {/* Filter Details */}
+                  <div className="w-full flex items-baseline justify-between pt-2 px-0.5">
+                    <span
+                      className={`text-xs sm:text-sm font-bold truncate ${
+                        isSelected ? 'text-[#16a34a]' : 'text-[#1f2937]'
+                      }`}
+                    >
+                      {filter.label}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] font-semibold text-[#6b7280] truncate ml-1">
+                      {filter.sublabel}
+                    </span>
+                  </div>
                 </button>
               );
             })}

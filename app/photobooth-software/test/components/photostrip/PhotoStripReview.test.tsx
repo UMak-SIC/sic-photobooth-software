@@ -24,14 +24,6 @@ const initialCaptures = [
   { captureIndex: 3, photoId: 'photo-3', dataUrl: 'blob:photo-3', originalDataUrl: 'blob:photo-3' },
 ];
 
-const mockPhotoPoolWithRetakes = [
-  { id: 'photo-1', dataUrl: 'blob:photo-1', label: 'Frame 1', isRetake: false },
-  { id: 'photo-2', dataUrl: 'blob:photo-2', label: 'Frame 2', isRetake: false },
-  { id: 'photo-3', dataUrl: 'blob:photo-3', label: 'Frame 3', isRetake: false },
-  { id: 'retake-A', dataUrl: 'blob:photo-retake-A', label: 'Take A', letter: 'A', isRetake: true },
-  { id: 'retake-B', dataUrl: 'blob:photo-retake-B', label: 'Take B', letter: 'B', isRetake: true },
-];
-
 describe('PhotoStripReview Retake Bank workflow', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -42,7 +34,7 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     vi.useRealTimers();
   });
 
-  it('renders countdown timer, updated instruction copy, 4 Take A/B/C/D slots, and finished button', () => {
+  it('renders countdown timer, updated instruction copy, 4 photo filter options, and finished button', () => {
     render(
       <PhotoStripReview
         template={mockTemplate}
@@ -57,13 +49,13 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     // Instruction copy
     expect(screen.getByText('Replacing 1 photo won’t touch the rest.')).toBeDefined();
     expect(screen.getByText('4 Retakes Left')).toBeDefined();
-    expect(screen.getByText('Tap a frame to retake it, or tap a slot below to swap.')).toBeDefined();
+    expect(screen.getByText('Select a photo filter below, or tap a photo to retake.')).toBeDefined();
 
-    // The 4 slots in 2x2 grid are labeled Take A, Take B, Take C, Take D (never 1–4)
-    expect(screen.getByText('Take A')).toBeDefined();
-    expect(screen.getByText('Take B')).toBeDefined();
-    expect(screen.getByText('Take C')).toBeDefined();
-    expect(screen.getByText('Take D')).toBeDefined();
+    // The 4 filter cards in 2x2 grid are labeled Original, Classic B&W, Vintage Sepia, Warm Golden
+    expect(screen.getByText('Original')).toBeDefined();
+    expect(screen.getByText('Classic B&W')).toBeDefined();
+    expect(screen.getByText('Vintage Sepia')).toBeDefined();
+    expect(screen.getByText('Warm Golden')).toBeDefined();
 
     // Buttons
     expect(screen.getByRole('button', { name: /Retake photo #1/i })).toBeDefined();
@@ -86,29 +78,22 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     expect(screen.getByRole('button', { name: /Retake photo #2/i })).toBeDefined();
   });
 
-  it('displays frame ownership badges and triggers onAssignPhoto when tapping an occupied Take slot', () => {
-    const onAssignPhotoMock = vi.fn();
+  it('triggers onSelectFilter when tapping a filter card', () => {
+    const onSelectFilterMock = vi.fn();
     render(
       <PhotoStripReview
         template={mockTemplate}
         captures={initialCaptures}
-        photoPool={mockPhotoPoolWithRetakes}
-        slotAssignments={{ 1: 'retake-A', 2: 'photo-2', 3: 'photo-3' }}
-        retakeCount={2}
-        onAssignPhoto={onAssignPhotoMock}
+        retakeCount={0}
+        onSelectFilter={onSelectFilterMock}
       />
     );
 
-    // Take A is in Frame 1
-    expect(screen.getByText('In Frame 1')).toBeDefined();
-    // Take B is unused
-    expect(screen.getByText('Unused (Tap to Swap)')).toBeDefined();
+    // Click Classic B&W filter card
+    const bwBtn = screen.getByRole('button', { name: /Select Classic B&W filter/i });
+    fireEvent.click(bwBtn);
 
-    // Click Take B to assign it to currently selected Frame 1
-    const takeBSlot = screen.getByRole('button', { name: /Retake bank slot Take B/i });
-    fireEvent.click(takeBSlot);
-
-    expect(onAssignPhotoMock).toHaveBeenCalledWith(1, 'retake-B');
+    expect(onSelectFilterMock).toHaveBeenCalledWith('bw');
   });
 
   it('triggers onRetake when clicking Retake photo #X button', () => {
@@ -178,6 +163,70 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     fireEvent.click(finishedBtn);
 
     expect(onConfirmMock).toHaveBeenCalled();
+  });
+
+  it('cycles through all 4 filters (Original, B&W, Sepia, Warm) and applies correct style', () => {
+    const onSelectFilterMock = vi.fn();
+    const { rerender } = render(
+      <PhotoStripReview
+        template={mockTemplate}
+        captures={initialCaptures}
+        retakeCount={0}
+        selectedFilter="normal"
+        onSelectFilter={onSelectFilterMock}
+      />
+    );
+
+    const photoImg = screen.getByAltText('Photo 1');
+    expect(photoImg.getAttribute('style')).toBe('filter: none;');
+
+    // Switch to Sepia
+    const sepiaBtn = screen.getByRole('button', { name: /Select Vintage Sepia filter/i });
+    fireEvent.click(sepiaBtn);
+    expect(onSelectFilterMock).toHaveBeenCalledWith('sepia');
+
+    rerender(
+      <PhotoStripReview
+        template={mockTemplate}
+        captures={initialCaptures}
+        retakeCount={0}
+        selectedFilter="sepia"
+        onSelectFilter={onSelectFilterMock}
+      />
+    );
+    expect(photoImg.getAttribute('style')).toContain('sepia(65%)');
+
+    // Switch to Warm
+    const warmBtn = screen.getByRole('button', { name: /Select Warm Golden filter/i });
+    fireEvent.click(warmBtn);
+    expect(onSelectFilterMock).toHaveBeenCalledWith('warm');
+
+    rerender(
+      <PhotoStripReview
+        template={mockTemplate}
+        captures={initialCaptures}
+        retakeCount={0}
+        selectedFilter="warm"
+        onSelectFilter={onSelectFilterMock}
+      />
+    );
+    expect(photoImg.getAttribute('style')).toContain('sepia(15%)');
+
+    // Switch to B&W
+    const bwBtn = screen.getByRole('button', { name: /Select Classic B&W filter/i });
+    fireEvent.click(bwBtn);
+    expect(onSelectFilterMock).toHaveBeenCalledWith('bw');
+
+    rerender(
+      <PhotoStripReview
+        template={mockTemplate}
+        captures={initialCaptures}
+        retakeCount={0}
+        selectedFilter="bw"
+        onSelectFilter={onSelectFilterMock}
+      />
+    );
+    expect(photoImg.getAttribute('style')).toContain('grayscale(100%)');
   });
 });
 

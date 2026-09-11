@@ -6,6 +6,7 @@ import { config } from '../config.js';
 import type { TemplatePlacement, TemplateOverlay } from '../db/repository.js';
 
 export type CutLayoutType = 'single' | 'cut_2_vertical' | 'cut_2_horizontal' | 'cut_4';
+export type PhotoFilterType = 'normal' | 'bw' | 'sepia' | 'warm';
 
 export interface RenderStripOptions {
   width: number;
@@ -22,6 +23,7 @@ export interface RenderStripOptions {
   cutInHalf?: boolean;
   cutLayout?: CutLayoutType;
   templateName?: string;
+  filter?: PhotoFilterType;
 }
 
 /**
@@ -285,6 +287,7 @@ export class PhotoStripRenderer {
       cutInHalf,
       cutLayout,
       templateName,
+      filter,
     } = options;
 
     const canvasWidth = Math.max(1, Math.round(width));
@@ -351,6 +354,15 @@ export class PhotoStripRenderer {
             fit: 'cover',
             position: 'center',
           });
+
+          // Apply selected photo filter (affecting actual photos only, excluding frame/overlays)
+          if (filter === 'bw') {
+            img = img.grayscale().linear(1.1, -(128 * 0.1));
+          } else if (filter === 'sepia') {
+            img = img.grayscale().tint({ r: 235, g: 210, b: 175 });
+          } else if (filter === 'warm') {
+            img = img.modulate({ saturation: 1.3, brightness: 1.05 }).tint({ r: 255, g: 245, b: 230 });
+          }
 
           if (pRadius > 0) {
             const maskSvg = Buffer.from(`
