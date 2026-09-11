@@ -176,4 +176,16 @@ describe('FlipbookCompletionScreen layout and session lifecycle', () => {
     expect(sessionState.activeSession).toBeNull();
     expect(sessionState.stage).toBe('choose_experience');
   });
+
+  it('renders flipbook booklet preview strips and inner photo slots with rounded-none', () => {
+    const { container } = render(<FlipbookCompletionScreen />);
+
+    const aspectStrips = container.querySelectorAll('.aspect-\\[8\\/3\\]');
+    expect(aspectStrips.length).toBe(4); // 4 instances: Front Cover, Cover Photo, Motion Pages, Back Cover
+    aspectStrips.forEach((el) => {
+      expect(el.className).toContain('rounded-none');
+      expect(el.className).not.toContain('rounded-lg');
+      expect(el.className).not.toContain('rounded-xl');
+    });
+  });
 });

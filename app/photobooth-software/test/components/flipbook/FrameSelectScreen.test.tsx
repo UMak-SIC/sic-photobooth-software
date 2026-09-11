@@ -112,4 +112,24 @@ describe('FrameSelectScreen layout and selection', () => {
 
     expect(selectFrameSpy).toHaveBeenCalledWith('session-flip-101', 'frame-a');
   });
+
+  it('renders all preview strips and frame options with rounded-none sharp corners', async () => {
+    const mockFrames: FrameItem[] = [
+      { id: 'frame-a', name: 'Alpha Frame', type: 'flipbook', isActive: true },
+    ];
+    vi.spyOn(boothApi, 'listFrames').mockResolvedValue(mockFrames);
+
+    const { container } = render(<FrameSelectScreen />);
+
+    await screen.findByText('Alpha Frame');
+
+    // Verify 8:3 aspect ratio preview containers use rounded-none
+    const aspectContainers = container.querySelectorAll('.aspect-\\[8\\/3\\]');
+    expect(aspectContainers.length).toBeGreaterThan(0);
+    aspectContainers.forEach((el) => {
+      expect(el.className).toContain('rounded-none');
+      expect(el.className).not.toContain('rounded-lg');
+      expect(el.className).not.toContain('rounded-xl');
+    });
+  });
 });
