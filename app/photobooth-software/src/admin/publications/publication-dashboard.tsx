@@ -2,11 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { publicationApi } from './api';
 import type { Publication, PublicationStatus } from './types';
-import { generateFlipbookPdf, generatePhotoStripPdf, printPdfBlobUrl } from '../../services/flipbook-pdf';
+import {
+  generateFlipbookPdf,
+  generatePhotoStripPdf,
+  printPdfBlobUrl,
+} from '../../services/flipbook-pdf';
 
 const statuses: PublicationStatus[] = ['queued', 'in_progress', 'uploaded', 'failed'];
 const PAGE_SIZE = 20;
-const PUBLIC_APP_URL = (import.meta.env.VITE_APP_URL ?? 'https://myphotobooth.com').replace(/\/$/, '');
+const PUBLIC_APP_URL = (
+  import.meta.env.VITE_APP_URL ?? 'https://umak-sic-photobooth.vercel.app'
+).replace(/\/$/, '');
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
 function publicationState(status: PublicationStatus) {
@@ -63,6 +69,7 @@ export function PublicationDashboard() {
   const [publications, setPublications] = useState<Publication[]>([]);
   const [error, setError] = useState('');
   const [retrying, setRetrying] = useState<string | null>(null);
+  const [retryingAll, setRetryingAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [printing, setPrinting] = useState<string | null>(null);
   const [printProgress, setPrintProgress] = useState<string | null>(null);
@@ -125,8 +132,39 @@ export function PublicationDashboard() {
     }
   };
 
+  const retryAllFailed = async () => {
+    const failedPublications = publications.filter(
+      (publication) => publication.status === 'failed',
+    );
+    if (failedPublications.length === 0) return;
+
+    setRetryingAll(true);
+    setError('');
+    try {
+      const results = await Promise.allSettled(
+        failedPublications.map((publication) => publicationApi.retry(publication.id)),
+      );
+      const retried = new Map(
+        results.flatMap((result) =>
+          result.status === 'fulfilled' ? [[result.value.id, result.value] as const] : [],
+        ),
+      );
+      setPublications((items) => items.map((item) => retried.get(item.id) ?? item));
+
+      const failures = results.filter((result) => result.status === 'rejected');
+      if (failures.length > 0) {
+        setError(
+          `Could not retry ${failures.length} failed ${failures.length === 1 ? 'upload' : 'uploads'}.`,
+        );
+      }
+    } finally {
+      setRetryingAll(false);
+    }
+  };
+
   const removeLocal = async (publication: Publication) => {
-    if (!window.confirm(`Delete the local copy of ${publication.publicId}? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete the local copy of ${publication.publicId}? This cannot be undone.`))
+      return;
     setDeleting(`local:${publication.id}`);
     setError('');
     try {
@@ -140,7 +178,10 @@ export function PublicationDashboard() {
   };
 
   const removeCloud = async (publication: Publication) => {
-    if (!window.confirm(`Delete ${publication.publicId} from the cloud? The local copy will remain.`)) return;
+    if (
+      !window.confirm(`Delete ${publication.publicId} from the cloud? The local copy will remain.`)
+    )
+      return;
     setDeleting(`cloud:${publication.id}`);
     setError('');
     try {
@@ -175,15 +216,19 @@ export function PublicationDashboard() {
         setPrintProgress('Fetching Flipbook assets...');
         const flipbookData = await publicationApi.getFlipbookData(publication.id);
         const coverUrl = flipbookData.coverUrl
-          ? (flipbookData.coverUrl.startsWith('http') ? flipbookData.coverUrl : `${API_URL}${flipbookData.coverUrl}`)
+          ? flipbookData.coverUrl.startsWith('http')
+            ? flipbookData.coverUrl
+            : `${API_URL}${flipbookData.coverUrl}`
           : `${API_URL}/photos/${publication.publicId}?preview=true`;
         const motionFrames = flipbookData.motionFrameUrls.map((u) =>
-          u.startsWith('http') ? u : `${API_URL}${u}`
+          u.startsWith('http') ? u : `${API_URL}${u}`,
         );
         // All 16 frames: Frame 01 (Cover Photo) + Frames 02..16 (15 Motion Frames)
         const allMotionFrames = coverUrl ? [coverUrl, ...motionFrames] : motionFrames;
         const motionSheetUrl = flipbookData.motionSheetUrl
-          ? (flipbookData.motionSheetUrl.startsWith('http') ? flipbookData.motionSheetUrl : `${API_URL}${flipbookData.motionSheetUrl}`)
+          ? flipbookData.motionSheetUrl.startsWith('http')
+            ? flipbookData.motionSheetUrl
+            : `${API_URL}${flipbookData.motionSheetUrl}`
           : null;
 
         const { blob, url } = await generateFlipbookPdf(
@@ -199,7 +244,7 @@ export function PublicationDashboard() {
           },
           (curr, total) => {
             setPrintProgress(`Rendering 300 DPI PNGs (${curr}/${total})...`);
-          }
+          },
         );
 
         void publicationApi.savePdf(publication.id, blob);
@@ -253,7 +298,11 @@ export function PublicationDashboard() {
 
   const pageCount = Math.max(1, Math.ceil(publications.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
-  const visiblePublications = publications.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const visiblePublications = publications.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+  const failedCount = publications.filter((publication) => publication.status === 'failed').length;
   const imageUrl = (publication: Publication, preview = false) =>
     `${import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000'}/photos/${publication.publicId}${preview ? '?preview=true' : ''}`;
   const closePreview = () => {
@@ -272,6 +321,16 @@ export function PublicationDashboard() {
             Local captures and their cloud delivery status, in one place.
           </p>
         </div>
+        {failedCount > 0 && (
+          <button
+            className="secondary-button"
+            disabled={retryingAll || retrying !== null}
+            onClick={retryAllFailed}
+            type="button"
+          >
+            {retryingAll ? 'Retrying failed uploads...' : `Retry all failed (${failedCount})`}
+          </button>
+        )}
       </header>
       {error && (
         <p className="admin-error" role="alert">
@@ -295,90 +354,150 @@ export function PublicationDashboard() {
         <>
           <div className="publication-grid">
             {visiblePublications.map((publication) => (
-            <article className="publication-card" key={publication.id}>
-              <button className="publication-thumbnail" onClick={() => setPreview(publication)} type="button">
-                <img
-                  alt={`${publication.eventName} ${publication.mediaType === 'image/gif' ? 'flipbook' : 'photo strip'}`}
-                  loading="lazy"
-                  onMouseEnter={(event) => {
-                    if (publication.mediaType === 'image/gif') event.currentTarget.src = imageUrl(publication);
-                  }}
-                  onMouseLeave={(event) => {
-                    if (publication.mediaType === 'image/gif') event.currentTarget.src = imageUrl(publication, true);
-                  }}
-                  src={imageUrl(publication, publication.mediaType === 'image/gif')}
-                />
-              </button>
-              <div className="publication-card-body">
-                <div>
-                  <p className="publication-id">{publication.publicId}</p>
-                  <h2>{publication.eventName}</h2>
-                  <p className="publication-detail">
-                    {publication.mediaType === 'image/gif' ? 'Flipbook' : 'Photo Strip'} · {publication.eventDate}
-                  </p>
-                  <p className="publication-retries">
-                    {publication.retryCount} upload {publication.retryCount === 1 ? 'retry' : 'retries'}
-                  </p>
-                </div>
-                {publication.status === 'failed' && publication.lastError && (
-                  <p className="publication-error">{publication.lastError}</p>
-                )}
-                {publication.status === 'queued' && publication.nextAttemptAt && (
-                  <p className="publication-detail">Next retry scheduled</p>
-                )}
-              </div>
-              <div className="publication-card-meta">
-                <span className={`status ${publication.status === 'uploaded' ? 'active' : publication.status === 'failed' ? 'failed' : ''}`}>
-                  {publicationState(publication.status)}
-                </span>
-              </div>
-              <div className="publication-actions">
-                <button className="publication-link" disabled={printing === publication.id} onClick={() => print(publication)} type="button">
-                  {printing === publication.id ? (printProgress || 'Printing...') : 'Print'}
+              <article className="publication-card" key={publication.id}>
+                <button
+                  className="publication-thumbnail"
+                  onClick={() => setPreview(publication)}
+                  type="button"
+                >
+                  <img
+                    alt={`${publication.eventName} ${publication.mediaType === 'image/gif' ? 'flipbook' : 'photo strip'}`}
+                    loading="lazy"
+                    onMouseEnter={(event) => {
+                      if (publication.mediaType === 'image/gif')
+                        event.currentTarget.src = imageUrl(publication);
+                    }}
+                    onMouseLeave={(event) => {
+                      if (publication.mediaType === 'image/gif')
+                        event.currentTarget.src = imageUrl(publication, true);
+                    }}
+                    src={imageUrl(publication, publication.mediaType === 'image/gif')}
+                  />
                 </button>
-                <button className="publication-link" onClick={() => setQrPublication(publication)} type="button">View QR</button>
-                <details className="publication-more-actions">
-                  <summary aria-label={`More actions for ${publication.publicId}`}>•••</summary>
+                <div className="publication-card-body">
                   <div>
-                    {publication.status === 'failed' && (
-                      <button disabled={retrying === publication.id} onClick={() => retry(publication)} type="button">
-                        {retrying === publication.id ? 'Retrying...' : 'Retry upload'}
-                      </button>
-                    )}
-                    {publication.cloudinaryUrl && (
-                      <a href={publication.cloudinaryUrl} target="_blank" rel="noreferrer">Open cloud</a>
-                    )}
-                    <button className="publication-delete" disabled={publication.status === 'in_progress' || deleting === `local:${publication.id}`} onClick={() => removeLocal(publication)} type="button">
-                      {deleting === `local:${publication.id}` ? 'Deleting...' : 'Delete local'}
-                    </button>
-                    {publication.status === 'uploaded' && (
-                      <button className="publication-delete" disabled={deleting === `cloud:${publication.id}`} onClick={() => removeCloud(publication)} type="button">
-                        {deleting === `cloud:${publication.id}` ? 'Deleting...' : 'Delete cloud'}
-                      </button>
-                    )}
+                    <p className="publication-id">{publication.publicId}</p>
+                    <h2>{publication.eventName}</h2>
+                    <p className="publication-detail">
+                      {publication.mediaType === 'image/gif' ? 'Flipbook' : 'Photo Strip'} ·{' '}
+                      {publication.eventDate}
+                    </p>
+                    <p className="publication-retries">
+                      {publication.retryCount} upload{' '}
+                      {publication.retryCount === 1 ? 'retry' : 'retries'}
+                    </p>
                   </div>
-                </details>
-              </div>
-            </article>
+                  {publication.status === 'failed' && publication.lastError && (
+                    <p className="publication-error">{publication.lastError}</p>
+                  )}
+                  {publication.status === 'queued' && publication.nextAttemptAt && (
+                    <p className="publication-detail">Next retry scheduled</p>
+                  )}
+                </div>
+                <div className="publication-card-meta">
+                  <span
+                    className={`status ${publication.status === 'uploaded' ? 'active' : publication.status === 'failed' ? 'failed' : ''}`}
+                  >
+                    {publicationState(publication.status)}
+                  </span>
+                </div>
+                <div className="publication-actions">
+                  <button
+                    className="publication-link"
+                    disabled={printing === publication.id}
+                    onClick={() => print(publication)}
+                    type="button"
+                  >
+                    {printing === publication.id ? printProgress || 'Printing...' : 'Print'}
+                  </button>
+                  <button
+                    className="publication-link"
+                    onClick={() => setQrPublication(publication)}
+                    type="button"
+                  >
+                    View QR
+                  </button>
+                  <details className="publication-more-actions">
+                    <summary aria-label={`More actions for ${publication.publicId}`}>•••</summary>
+                    <div>
+                      {publication.status === 'failed' && (
+                        <button
+                          disabled={retryingAll || retrying === publication.id}
+                          onClick={() => retry(publication)}
+                          type="button"
+                        >
+                          {retrying === publication.id ? 'Retrying...' : 'Retry upload'}
+                        </button>
+                      )}
+                      {publication.cloudinaryUrl && (
+                        <a href={publication.cloudinaryUrl} target="_blank" rel="noreferrer">
+                          Open cloud
+                        </a>
+                      )}
+                      <button
+                        className="publication-delete"
+                        disabled={
+                          publication.status === 'in_progress' ||
+                          deleting === `local:${publication.id}`
+                        }
+                        onClick={() => removeLocal(publication)}
+                        type="button"
+                      >
+                        {deleting === `local:${publication.id}` ? 'Deleting...' : 'Delete local'}
+                      </button>
+                      {publication.status === 'uploaded' && (
+                        <button
+                          className="publication-delete"
+                          disabled={deleting === `cloud:${publication.id}`}
+                          onClick={() => removeCloud(publication)}
+                          type="button"
+                        >
+                          {deleting === `cloud:${publication.id}` ? 'Deleting...' : 'Delete cloud'}
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              </article>
             ))}
           </div>
           <nav className="publication-pagination" aria-label="Publication pages">
             <span>
-              {publications.length} output{publications.length === 1 ? '' : 's'} · Page {currentPage} of {pageCount}
+              {publications.length} output{publications.length === 1 ? '' : 's'} · Page{' '}
+              {currentPage} of {pageCount}
             </span>
             <div>
-              <button className="secondary-button compact" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} type="button">Previous</button>
-              <button className="secondary-button compact" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)} type="button">Next</button>
+              <button
+                className="secondary-button compact"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+                type="button"
+              >
+                Previous
+              </button>
+              <button
+                className="secondary-button compact"
+                disabled={currentPage === pageCount}
+                onClick={() => setPage(currentPage + 1)}
+                type="button"
+              >
+                Next
+              </button>
             </div>
           </nav>
         </>
       )}
       {preview && (
         <div className="publication-lightbox" role="presentation" onClick={closePreview}>
-          <div className="publication-lightbox-toolbar" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="publication-lightbox-toolbar"
+            onClick={(event) => event.stopPropagation()}
+          >
             <strong>{preview.publicId}</strong>
             <span>Scroll to zoom · Drag to pan</span>
-            <button onClick={closePreview} type="button">Close</button>
+            <button onClick={closePreview} type="button">
+              Close
+            </button>
           </div>
           <img
             alt={`${preview.eventName} full size`}
@@ -390,9 +509,15 @@ export function PublicationDashboard() {
               event.currentTarget.setPointerCapture(event.pointerId);
             }}
             onPointerMove={(event) => {
-              if (drag.current) setPosition({ x: event.clientX - drag.current.x, y: event.clientY - drag.current.y });
+              if (drag.current)
+                setPosition({
+                  x: event.clientX - drag.current.x,
+                  y: event.clientY - drag.current.y,
+                });
             }}
-            onPointerUp={() => { drag.current = null; }}
+            onPointerUp={() => {
+              drag.current = null;
+            }}
             onWheel={(event) => {
               event.preventDefault();
               setZoom((value) => Math.min(4, Math.max(1, value - event.deltaY * 0.002)));
@@ -404,12 +529,24 @@ export function PublicationDashboard() {
       )}
       {qrPublication && (
         <div className="modal-backdrop" role="presentation" onClick={() => setQrPublication(null)}>
-          <section aria-label="Photo QR code" className="publication-qr-modal" onClick={(event) => event.stopPropagation()}>
-            <button className="publication-modal-close" onClick={() => setQrPublication(null)} type="button">Close</button>
+          <section
+            aria-label="Photo QR code"
+            className="publication-qr-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              className="publication-modal-close"
+              onClick={() => setQrPublication(null)}
+              type="button"
+            >
+              Close
+            </button>
             <p className="admin-eyebrow">SCAN TO DOWNLOAD</p>
             <img alt={`QR code for ${qrPublication.publicId}`} src={qrDataUrl} />
             <strong>{qrPublication.publicId}</strong>
-            <span>{PUBLIC_APP_URL}/{qrPublication.publicId}</span>
+            <span>
+              {PUBLIC_APP_URL}/{qrPublication.publicId}
+            </span>
           </section>
         </div>
       )}
@@ -427,7 +564,8 @@ export function PublicationDashboard() {
                   After printing, record the printed copy count if needed.
                 </p>
                 <p className="text-sm font-semibold opacity-80 mt-1 text-[#2d6a54]">
-                  {recordModalPublication.eventName} · {recordModalPublication.publicId} ({recordModalPublication.mediaType === 'image/gif' ? 'Flipbook' : 'Photo Strip'})
+                  {recordModalPublication.eventName} · {recordModalPublication.publicId} (
+                  {recordModalPublication.mediaType === 'image/gif' ? 'Flipbook' : 'Photo Strip'})
                 </p>
               </div>
               <button

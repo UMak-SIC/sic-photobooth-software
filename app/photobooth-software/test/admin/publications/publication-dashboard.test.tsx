@@ -4,8 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PublicationDashboard } from '../../../src/admin/publications/publication-dashboard';
 
 vi.mock('../../../src/services/flipbook-pdf', () => ({
-  generateFlipbookPdf: vi.fn().mockResolvedValue({ blob: new Blob([]), url: 'blob:mock-pdf', filename: 'flipbook-mock.pdf' }),
-  generatePhotoStripPdf: vi.fn().mockResolvedValue({ blob: new Blob([]), url: 'blob:mock-pdf', filename: 'photostrip-mock.pdf' }),
+  generateFlipbookPdf: vi
+    .fn()
+    .mockResolvedValue({ blob: new Blob([]), url: 'blob:mock-pdf', filename: 'flipbook-mock.pdf' }),
+  generatePhotoStripPdf: vi.fn().mockResolvedValue({
+    blob: new Blob([]),
+    url: 'blob:mock-pdf',
+    filename: 'photostrip-mock.pdf',
+  }),
   uploadPdfBlob: vi.fn().mockResolvedValue(true),
   printPdfBlobUrl: vi.fn().mockResolvedValue(undefined),
 }));
@@ -59,12 +65,68 @@ describe('PublicationDashboard', () => {
     expect(screen.getAllByText('Not uploaded')).toHaveLength(1);
   });
 
+  it('retries every failed job and keeps successful requeues', async () => {
+    const secondFailedPublication = {
+      ...failedPublication,
+      id: 'e0b692d8-ef13-4b79-922d-c5bb31056d67',
+      publicId: 'DeF5678',
+    };
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ data: [failedPublication, secondFailedPublication] }), {
+          status: 200,
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ data: { ...failedPublication, status: 'queued', lastError: null } }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: { ...secondFailedPublication, status: 'queued', lastError: null },
+          }),
+          { status: 200 },
+        ),
+      );
+    vi.stubGlobal('fetch', fetch);
+
+    render(<PublicationDashboard />);
+    expect(await screen.findByText('DeF5678', { exact: false })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry all failed (2)' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /Retry all failed/ })).toBeNull(),
+    );
+    expect(screen.getAllByText('Not uploaded')).toHaveLength(2);
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/publications/d0b692d8-ef13-4b79-922d-c5bb31056d67/retry',
+      { method: 'POST' },
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/publications/e0b692d8-ef13-4b79-922d-c5bb31056d67/retry',
+      { method: 'POST' },
+    );
+  });
+
   it('does not show a prior error for a queued retry', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
         new Response(
-          JSON.stringify({ data: [{ ...failedPublication, status: 'queued', retryCount: 1, nextAttemptAt: '2026-09-05T00:00:00.000Z' }] }),
+          JSON.stringify({
+            data: [
+              {
+                ...failedPublication,
+                status: 'queued',
+                retryCount: 1,
+                nextAttemptAt: '2026-09-05T00:00:00.000Z',
+              },
+            ],
+          }),
           { status: 200 },
         ),
       ),
@@ -83,13 +145,22 @@ describe('PublicationDashboard', () => {
       publicId: `Photo${String(index).padStart(2, '0')}`,
       eventName: `Event ${index}`,
     }));
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: publications }), { status: 200 })));
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValue(new Response(JSON.stringify({ data: publications }), { status: 200 })),
+    );
 
     render(<PublicationDashboard />);
 
     expect(await screen.findByText('Page 1 of 2', { exact: false })).toBeTruthy();
     expect(screen.queryByText('Photo20')).toBeNull();
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Publication pages' })).getByRole('button', { name: 'Next' }));
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Publication pages' })).getByRole('button', {
+        name: 'Next',
+      }),
+    );
     expect(screen.getByText('Photo20')).toBeTruthy();
   });
 
@@ -144,9 +215,7 @@ describe('PublicationDashboard', () => {
 
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: [flipbookPub] }), { status: 200 }),
-      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: [flipbookPub] }), { status: 200 }))
       // GET /pdf -> 404
       .mockResolvedValueOnce(new Response(null, { status: 404 }))
       // GET /flipbook-data -> 200
@@ -201,7 +270,12 @@ describe('PublicationDashboard', () => {
         new Response(JSON.stringify({ data: [failedPublication] }), { status: 200 }),
       )
       // GET /pdf -> 200 (PDF blob)
-      .mockResolvedValueOnce(new Response(new Blob(['%PDF-1.4']), { status: 200, headers: { 'Content-Type': 'application/pdf' } }))
+      .mockResolvedValueOnce(
+        new Response(new Blob(['%PDF-1.4']), {
+          status: 200,
+          headers: { 'Content-Type': 'application/pdf' },
+        }),
+      )
       // POST /print -> 200
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: { jobId: 'job-cached', copiesPrinted: 1 } }), {
