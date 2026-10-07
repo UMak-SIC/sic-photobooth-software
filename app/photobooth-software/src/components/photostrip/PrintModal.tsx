@@ -23,7 +23,7 @@ export interface PrintModalProps {
 export const PrintModal: React.FC<PrintModalProps> = ({
   sessionId,
   publicId = 'M7p4XaV',
-  qrUrl = 'https://myphotobooth.com/M7p4XaV',
+  qrUrl = 'https://umak-sic-photobooth.vercel.app/M7p4XaV',
   outputImageUrl = '',
   preview = false,
   isPrinted: externalIsPrinted = false,

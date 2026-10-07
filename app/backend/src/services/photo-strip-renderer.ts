@@ -6,7 +6,7 @@ import { config } from '../config.js';
 import type { TemplatePlacement, TemplateOverlay } from '../db/repository.js';
 
 export type CutLayoutType = 'single' | 'cut_2_vertical' | 'cut_2_horizontal' | 'cut_4';
-export type PhotoFilterType = 'normal' | 'bw' | 'sepia' | 'warm';
+export type PhotoFilterType = 'normal' | 'bw' | 'sepia';
 
 export interface RenderStripOptions {
   width: number;
@@ -282,7 +282,7 @@ export class PhotoStripRenderer {
       overlays = [],
       captures,
       publicId,
-      qrUrl = `https://myphotobooth.com/${publicId}`,
+      qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`,
       eventDate,
       cutInHalf,
       cutLayout,
@@ -359,9 +359,11 @@ export class PhotoStripRenderer {
           if (filter === 'bw') {
             img = img.grayscale().linear(1.1, -(128 * 0.1));
           } else if (filter === 'sepia') {
-            img = img.grayscale().tint({ r: 235, g: 210, b: 175 });
-          } else if (filter === 'warm') {
-            img = img.modulate({ saturation: 1.3, brightness: 1.05 }).tint({ r: 255, g: 245, b: 230 });
+            img = img.recomb([
+              [0.393, 0.769, 0.189],
+              [0.349, 0.686, 0.168],
+              [0.272, 0.534, 0.131],
+            ]);
           }
 
           if (pRadius > 0) {
@@ -450,7 +452,7 @@ export class PhotoStripRenderer {
 
     if (layout === 'cut_4') {
       // 4-Cut Quadrants (2x2 grid)
-      const qrSize = 75;
+      const qrSize = 100;
       const pillHeight = 24;
       const pillWidth = 105;
       const spacing = 3;
@@ -479,7 +481,7 @@ export class PhotoStripRenderer {
       }
     } else if (layout === 'cut_2_horizontal') {
       // 2-Cut Horizontal (Top/Bottom split)
-      const qrSize = 100;
+      const qrSize = 110;
       const pillHeight = 30;
       const pillWidth = 140;
       const spacing = 4;
@@ -563,4 +565,3 @@ export class PhotoStripRenderer {
 }
 
 export const photoStripRenderer = new PhotoStripRenderer();
- 

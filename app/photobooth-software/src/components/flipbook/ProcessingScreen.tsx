@@ -40,7 +40,7 @@ export function ProcessingScreen() {
             setProgress(100);
             const mockId = 'aB3x9Z1';
             const mockGifUrl = `${API_BASE_URL}/photos/${mockId}`;
-            setConfirmedOutput(mockId, `https://myphotobooth.com/${mockId}`, mockGifUrl);
+            setConfirmedOutput(mockId, `https://umak-sic-photobooth.vercel.app/${mockId}`, mockGifUrl);
           }, 2000);
           return;
         }

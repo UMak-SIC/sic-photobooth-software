@@ -140,4 +140,3 @@ export const printerConfig: PrinterConfig = {
   fitToPage: true,
   enableHardwarePrint: process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
 };
-

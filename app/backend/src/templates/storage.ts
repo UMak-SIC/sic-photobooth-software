@@ -41,12 +41,25 @@ export class TemplateStorage {
 
   public async removeAsset(filePath: string | null | undefined): Promise<void> {
     if (!filePath) return;
-    await fs.promises.rm(this.assetPath(filePath), { force: true });
+    try {
+      await fs.promises.rm(this.assetPath(filePath), { force: true });
+    } catch (error) {
+      // Asset paths persisted before the storage reorganization are no longer safe to delete.
+      if ((error as Error).message === 'Invalid template asset path') return;
+      throw error;
+    }
   }
 
   public async readAsset(templateId: string, filePath: string, type: 'photo_strip' | 'flipbook' = 'photo_strip'): Promise<Buffer> {
-    const resolved = this.assetPath(filePath);
     const templateDir = this.templateDir(templateId, type);
+    let resolved: string;
+    try {
+      resolved = this.assetPath(filePath);
+    } catch (error) {
+      if (!path.isAbsolute(filePath)) throw error;
+      // Preserve access to assets whose database path predates the storage move.
+      resolved = path.join(templateDir, path.basename(filePath));
+    }
     if (!resolved.startsWith(`${templateDir}${path.sep}`))
       throw new Error('Invalid template asset path');
     return fs.promises.readFile(resolved);

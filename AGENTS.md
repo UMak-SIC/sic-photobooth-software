@@ -28,5 +28,5 @@
 
 - Preserve local-first behavior: booth capture, confirmation, printing, and local retrieval work without internet; cloud publishing is asynchronous.
 - Treat clients as untrusted. The backend enforces state transitions, session isolation, retake/media limits, file validation, and generated storage paths.
-- Printed QR codes always contain `https://myphotobooth.com/:id`; there is no split DNS. Local retrieval extracts the ID rather than navigating to the public URL.
+- Printed QR codes always contain `https://umak-sic-photobooth.vercel.app/:id`; there is no split DNS. Local retrieval extracts the ID rather than navigating to the public URL.
 - Public output IDs are seven-character, cryptographically random base-62 values. Never expose sequential database IDs or local filesystem paths.

@@ -32,7 +32,7 @@ This document provides a single source of truth for tracking project tasks again
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TSK-0201** | Implement cryptographically random 7-character base-62 (`[A-Za-z0-9]`) ID generator | `packages/public-output` | US-12, US-125, US-132, US-138, Contract § Assisted Booth | Generator produces 7-char alphanumeric strings; zero sequential predictability. | `[x] Completed` |
-| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://myphotobooth.com/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[x] Completed` |
+| **TSK-0202** | Implement URL parser extracting public ID from full public QR string (`https://umak-sic-photobooth.vercel.app/:id`) or manual input | `packages/public-output` | US-107, US-118, Contract § Delivery Scope | Correctly parses ID from full URL, plain ID, and trailing slashes; rejects malformed inputs. | `[x] Completed` |
 | **TSK-0203** | Define shared TypeScript types and schemas for public output metadata and API responses | `packages/public-output` | US-108, US-119, Contract § Publishing and Retrieval | Shared types imported in backend, captive website, and public website. | `[x] Completed` |
 
 ---
@@ -74,7 +74,7 @@ This document provides a single source of truth for tracking project tasks again
 | **TSK-0505** | Implement Photo Strip review interface with template preview placement | `app/photobooth-software` | US-27, US-28 | Shows captured images positioned within template slots in real time. | `[x] Completed` |
 | **TSK-0506** | Implement single-image retake system with strict backend enforcement of the 4-retake maximum | `app/backend`, `app/photobooth-software` | US-29..33, Contract § Photo Strip | Retake replaces targeted capture; 5th retake attempt is rejected with 400 error. | `[x] Completed` |
 | **TSK-0507** | Implement 300 DPI 4R PNG compositor (`1800x1200` landscape / `1200x1800` portrait) with centered cover cropping | `app/backend` | US-34, US-35, US-36, US-68, Contract § Photo Strip | Produces high-resolution PNG matching placement coordinates and background asset. | `[x] Completed` |
-| **TSK-0508** | Implement confirmation handler generating 7-char public ID, QR code, and queued publication record | `app/backend` | US-38, US-132, Contract § Photo Strip | Generated PNG contains embedded QR with `https://myphotobooth.com/:id`. | `[x] Completed` |
+| **TSK-0508** | Implement confirmation handler generating 7-char public ID, QR code, and queued publication record | `app/backend` | US-38, US-132, Contract § Photo Strip | Generated PNG contains embedded QR with `https://umak-sic-photobooth.vercel.app/:id`. | `[x] Completed` |
 | **TSK-0509** | Implement printing record tracking (`is_printed`, `copies_printed`) for administrator Firefox/CUPS handoff | `app/backend`, `app/photobooth-software` | US-37, US-39, US-40, Contract § Photo Strip | Prevents printing before confirmation; records print status without auto-retry. | `[x] Completed` |
 
 ---

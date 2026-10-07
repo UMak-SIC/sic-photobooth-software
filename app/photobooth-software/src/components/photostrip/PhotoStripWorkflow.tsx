@@ -162,7 +162,7 @@ export const PhotoStripWorkflow: React.FC = () => {
         const demoId = 'M7p4XaV';
         setConfirmedOutput(
           demoId,
-          `https://myphotobooth.com/${demoId}`,
+          `https://umak-sic-photobooth.vercel.app/${demoId}`,
           captures[0]?.dataUrl || '',
         );
       }
@@ -276,7 +276,7 @@ export const PhotoStripWorkflow: React.FC = () => {
         <PrintModal
           sessionId={sessionId ?? undefined}
           publicId={publicId || 'M7p4XaV'}
-          qrUrl={qrUrl || 'https://myphotobooth.com/M7p4XaV'}
+          qrUrl={qrUrl || 'https://umak-sic-photobooth.vercel.app/M7p4XaV'}
           outputImageUrl={outputImageUrl || captures[0]?.dataUrl || ''}
           templateName={selectedTemplate?.name}
           orientation={selectedTemplate?.orientation}

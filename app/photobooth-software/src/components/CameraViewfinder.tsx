@@ -318,13 +318,13 @@ export const CameraViewfinder: React.FC<CameraViewfinderProps> = ({
             : `min(calc(100dvh - 48px), calc((100vw - 48px) / ${slotRatio}))`,
         }}
       >
-        {/* Live Video Feed (Mirrored for photobooth selfie view) */}
+        {/* Live Video Feed */}
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="size-full object-cover -scale-x-100"
+          className="size-full object-cover"
         />
 
         {/* Low-opacity screen that says Get Ready! before taking photo / while camera initializes */}

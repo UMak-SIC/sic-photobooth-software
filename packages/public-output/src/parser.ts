@@ -3,11 +3,11 @@ import { isValidPublicId, PUBLIC_ID_REGEX } from './id.js';
 /**
  * Canonical default public web base URL.
  */
-export const DEFAULT_PUBLIC_BASE_URL = 'https://myphotobooth.com';
+export const DEFAULT_PUBLIC_BASE_URL = 'https://umak-sic-photobooth.vercel.app';
 
 export interface ParsePublicIdOptions {
   /**
-   * Expected base URL (origin) to match against. Defaults to 'https://myphotobooth.com'.
+     * Expected base URL (origin) to match against. Defaults to the public Vercel URL.
    */
   baseUrl?: string;
 }
@@ -15,7 +15,7 @@ export interface ParsePublicIdOptions {
 /**
  * Parses and extracts a valid 7-character base-62 public ID from:
  * 1. A raw 7-character ID string (with whitespace trimmed).
- * 2. A full public QR URL (e.g. 'https://myphotobooth.com/:id' or 'https://myphotobooth.com/:id/').
+ * 2. A full public QR URL (e.g. 'https://umak-sic-photobooth.vercel.app/:id').
  * 3. A URL with query parameters or fragments.
  *
  * Returns the extracted 7-character public ID or null if the input is invalid.

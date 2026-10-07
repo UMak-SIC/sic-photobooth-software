@@ -45,7 +45,7 @@ const printSessionSchema = z.object({
 });
 
 const confirmPhotoStripSchema = z.object({
-  filter: z.enum(['normal', 'bw', 'sepia', 'warm']).optional(),
+  filter: z.enum(['normal', 'bw', 'sepia']).optional(),
 });
 
 function isSessionAuthorized(
@@ -1097,7 +1097,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           flipbookConfig.gifOutputHeight,
         );
 
-        const qrUrl = `https://myphotobooth.com/${publicId}`;
+        const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
         return reply.send({
           success: true,
@@ -1220,7 +1220,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // 10b. Confirm Photo Strip Output (generates 300 DPI 4R PNG, public ID, QR, and queues publication)
-  fastify.post<{ Params: { id: string }; Body?: { filter?: 'normal' | 'bw' | 'sepia' | 'warm' } }>(
+  fastify.post<{ Params: { id: string }; Body?: { filter?: 'normal' | 'bw' | 'sepia' } }>(
     '/api/sessions/:id/photo-strip/confirm',
     async (request, reply) => {
       const { id } = request.params;
@@ -1262,7 +1262,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               data: {
                 outputId: latestOutput.id,
                 publicId: latestOutput.publicId,
-                qrUrl: `https://myphotobooth.com/${latestOutput.publicId}`,
+                qrUrl: `https://umak-sic-photobooth.vercel.app/${latestOutput.publicId}`,
                 state: 'booth_confirmed',
               },
             });
@@ -1305,7 +1305,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
 
         // Generate 7-character base-62 public ID
         const publicId = generatePublicId();
-        const qrUrl = `https://myphotobooth.com/${publicId}`;
+        const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
         const width = (templateSnapshot.outputWidth as number) || 1200;
         const height = (templateSnapshot.outputHeight as number) || 1800;

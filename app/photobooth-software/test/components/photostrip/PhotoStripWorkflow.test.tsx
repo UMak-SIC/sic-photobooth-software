@@ -182,4 +182,35 @@ describe('PhotoStripWorkflow flow: layout confirmation and instructions screen',
     expect(sessionState.activeSession).toBeNull();
     expect(sessionState.stage).toBe('choose_experience');
   });
+
+it('sends the selected Vintage Sepia filter when confirming the review', async () => {
+    const confirmSpy = vi.spyOn(boothApi, 'confirmPhotoStrip').mockResolvedValue({
+      outputId: 'output-123',
+      publicId: 'Ab1Cd2E',
+      qrUrl: 'https://myphotobooth.com/Ab1Cd2E',
+      filePath: '/outputs/Ab1Cd2E.png',
+    });
+
+    usePhotoStripStore.setState({
+      currentStep: 'review',
+      sessionId: 'session-photo-123',
+      selectedFilter: 'sepia',
+      selectedTemplate: {
+        id: 'test-template-1',
+        name: 'Retro Strip',
+        orientation: 'portrait',
+        outputWidth: 1200,
+        outputHeight: 1800,
+        countdownSeconds: 5,
+        placements: [],
+      },
+    });
+
+    render(<PhotoStripWorkflow />);
+    fireEvent.click(screen.getByRole('button', { name: /I'm finished/i }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith('session-photo-123', 'sepia');
+    });
+  });
 });

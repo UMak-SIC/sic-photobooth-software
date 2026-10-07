@@ -10,8 +10,8 @@ export interface PhotoStripUiConfig {
 }
 
 export const PHOTO_STRIP_CONFIG: PhotoStripUiConfig = {
-  templateSelectionSeconds: 45,
-  instructionsCountdownSeconds: 10,
-  photoCountdownSeconds: 10,
-  reviewCountdownSeconds: 45,
+  templateSelectionSeconds: 30,
+  instructionsCountdownSeconds: 8,
+  photoCountdownSeconds: 7,
+  reviewCountdownSeconds: 30,
 };

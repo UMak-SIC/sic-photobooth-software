@@ -51,11 +51,11 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     expect(screen.getByText('4 Retakes Left')).toBeDefined();
     expect(screen.getByText('Select a photo filter below, or tap a photo to retake.')).toBeDefined();
 
-    // The 4 filter cards in 2x2 grid are labeled Original, Classic B&W, Vintage Sepia, Warm Golden
+    // The 3 filter cards are labeled Original, Classic B&W, Vintage Sepia
     expect(screen.getByText('Original')).toBeDefined();
     expect(screen.getByText('Classic B&W')).toBeDefined();
     expect(screen.getByText('Vintage Sepia')).toBeDefined();
-    expect(screen.getByText('Warm Golden')).toBeDefined();
+    expect(screen.queryByText('Warm Golden')).toBeNull();
 
     // Buttons
     expect(screen.getByRole('button', { name: /Retake photo #1/i })).toBeDefined();
@@ -165,7 +165,7 @@ describe('PhotoStripReview Retake Bank workflow', () => {
     expect(onConfirmMock).toHaveBeenCalled();
   });
 
-  it('cycles through all 4 filters (Original, B&W, Sepia, Warm) and applies correct style', () => {
+  it('cycles through all 3 filters (Original, B&W, Sepia) and applies correct style', () => {
     const onSelectFilterMock = vi.fn();
     const { rerender } = render(
       <PhotoStripReview
@@ -195,22 +195,6 @@ describe('PhotoStripReview Retake Bank workflow', () => {
       />
     );
     expect(photoImg.getAttribute('style')).toContain('sepia(65%)');
-
-    // Switch to Warm
-    const warmBtn = screen.getByRole('button', { name: /Select Warm Golden filter/i });
-    fireEvent.click(warmBtn);
-    expect(onSelectFilterMock).toHaveBeenCalledWith('warm');
-
-    rerender(
-      <PhotoStripReview
-        template={mockTemplate}
-        captures={initialCaptures}
-        retakeCount={0}
-        selectedFilter="warm"
-        onSelectFilter={onSelectFilterMock}
-      />
-    );
-    expect(photoImg.getAttribute('style')).toContain('sepia(15%)');
 
     // Switch to B&W
     const bwBtn = screen.getByRole('button', { name: /Select Classic B&W filter/i });

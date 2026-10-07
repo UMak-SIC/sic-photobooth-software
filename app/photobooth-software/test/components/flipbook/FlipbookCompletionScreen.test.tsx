@@ -31,7 +31,7 @@ describe('FlipbookCompletionScreen layout and session lifecycle', () => {
       sessionId: 'old-session-123',
       sessionToken: 'old-token-abc',
       publicId: 'k9X2bQ1',
-      qrUrl: 'https://myphotobooth.com/k9X2bQ1',
+      qrUrl: 'https://umak-sic-photobooth.vercel.app/k9X2bQ1',
       outputGifUrl: 'http://localhost:3000/photos/k9X2bQ1',
       coverUrls: ['blob:http://localhost/cover1'],
       videoUrls: ['blob:http://localhost/video1'],

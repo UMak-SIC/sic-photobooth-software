@@ -7,7 +7,7 @@ The photobooth system supports both **offline local retrieval** and **online ret
 The QR printed on the photocard always contains the full public URL:
 
 ```text
-https://myphotobooth.com/:id
+https://umak-sic-photobooth.vercel.app/:id
 ```
 
 The offline system extracts the photo ID from this URL, while the online web application uses the URL normally.
@@ -90,13 +90,13 @@ The public web application is deployed through Vercel.
 Photo URLs use:
 
 ```text
-https://myphotobooth.com/:id
+https://umak-sic-photobooth.vercel.app/:id
 ```
 
 Example:
 
 ```text
-https://myphotobooth.com/7fK92pQx
+https://umak-sic-photobooth.vercel.app/7fK92pQx
 ```
 
 When accessed normally through the internet:
@@ -104,7 +104,7 @@ When accessed normally through the internet:
 ```text
 User
 ↓
-myphotobooth.com/:id
+umak-sic-photobooth.vercel.app/:id
 ↓
 Vercel
 ↓
@@ -122,7 +122,7 @@ The QR printed on every photocard contains the complete permanent URL.
 Example:
 
 ```text
-https://myphotobooth.com/7fK92pQx
+https://umak-sic-photobooth.vercel.app/7fK92pQx
 ```
 
 The QR does **not** contain only:
@@ -148,7 +148,7 @@ They then scan the QR printed on their photocard.
 The scanned value is:
 
 ```text
-https://myphotobooth.com/7fK92pQx
+https://umak-sic-photobooth.vercel.app/7fK92pQx
 ```
 
 The local system does not navigate to this URL.
@@ -156,7 +156,7 @@ The local system does not navigate to this URL.
 Instead, it parses the URL:
 
 ```text
-https://myphotobooth.com/7fK92pQx
+https://umak-sic-photobooth.vercel.app/7fK92pQx
                          ↓
                      7fK92pQx
 ```
@@ -188,7 +188,7 @@ When the user wants to access the photo later:
 ```text
 Scan printed QR
 ↓
-https://myphotobooth.com/7fK92pQx
+https://umak-sic-photobooth.vercel.app/7fK92pQx
 ↓
 Vercel
 ↓
@@ -240,7 +240,7 @@ Local:
 192.168.4.1/photos/7fK92pQx
 
 Online:
-myphotobooth.com/7fK92pQx
+umak-sic-photobooth.vercel.app/7fK92pQx
 ```
 
 Local photos should not be deleted until the cloud upload has been successfully confirmed.
@@ -261,7 +261,7 @@ Local photos should not be deleted until the cloud upload has been successfully 
                        ↓
              Scan Photocard QR
                        ↓
-      https://myphotobooth.com/:id
+      https://umak-sic-photobooth.vercel.app/:id
                        ↓
                   Extract ID
                        ↓
@@ -274,7 +274,7 @@ Local photos should not be deleted until the cloud upload has been successfully 
 
               Scan Photocard QR
                        ↓
-      https://myphotobooth.com/:id
+      https://umak-sic-photobooth.vercel.app/:id
                        ↓
                      Vercel
                        ↓

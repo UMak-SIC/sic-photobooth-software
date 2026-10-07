@@ -32,6 +32,20 @@ describe('template persistence boundaries', () => {
     );
   });
 
+  it('reads a moved asset referenced by its legacy absolute path', async () => {
+    const storage = new TemplateStorage();
+    const templateId = '44444444-4444-4444-8444-444444444444';
+    const assetPath = await storage.saveAsset(templateId, 'background', 'png', Buffer.from('asset'));
+
+    try {
+      const legacyPath = `/previous/location/templates/${templateId}/${assetPath.split('/').pop()}`;
+      await expect(storage.readAsset(templateId, legacyPath)).resolves.toEqual(Buffer.from('asset'));
+      await expect(storage.removeAsset(legacyPath)).resolves.toBeUndefined();
+    } finally {
+      await storage.removeTemplate(templateId);
+    }
+  });
+
   it('generates the next available duplicate name', () => {
     expect(duplicateName('Party', ['Party', 'Party_(1)', 'Party_(2)'])).toBe('Party_(3)');
   });

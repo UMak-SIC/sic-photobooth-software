@@ -11,15 +11,15 @@ describe('parsePublicId', () => {
   });
 
   it('should parse standard full public QR URL', () => {
-    expect(parsePublicId('https://myphotobooth.com/7fK92pQ')).toBe('7fK92pQ');
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/7fK92pQ')).toBe('7fK92pQ');
   });
 
   it('should parse full public URL with trailing slash', () => {
-    expect(parsePublicId('https://myphotobooth.com/7fK92pQ/')).toBe('7fK92pQ');
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/7fK92pQ/')).toBe('7fK92pQ');
   });
 
   it('should parse full public URL with query parameters and hash', () => {
-    expect(parsePublicId('https://myphotobooth.com/7fK92pQ?src=qr#preview')).toBe('7fK92pQ');
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/7fK92pQ?src=qr#preview')).toBe('7fK92pQ');
   });
 
   it('should parse URL with custom baseUrl option when provided', () => {
@@ -35,21 +35,21 @@ describe('parsePublicId', () => {
   });
 
   it('should reject malformed or non-base62 path values in URL', () => {
-    expect(parsePublicId('https://myphotobooth.com/invalid-length-id')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/12345')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/12345678')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/7fK9-pQ')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/invalid-length-id')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/12345')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/12345678')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/7fK9-pQ')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/')).toBeNull();
   });
 
   it('should reject nested path URLs', () => {
-    expect(parsePublicId('https://myphotobooth.com/foo/7fK92pQ')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/photos/7fK92pQ')).toBeNull();
-    expect(parsePublicId('https://myphotobooth.com/a/b/c/7fK92pQ')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/foo/7fK92pQ')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/photos/7fK92pQ')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/a/b/c/7fK92pQ')).toBeNull();
   });
 
   it('should reject path traversal and malicious payloads', () => {
-    expect(parsePublicId('https://myphotobooth.com/../../etc/passwd')).toBeNull();
+    expect(parsePublicId('https://umak-sic-photobooth.vercel.app/../../etc/passwd')).toBeNull();
     expect(parsePublicId('../../../secret')).toBeNull();
     expect(parsePublicId("' OR '1'='1")).toBeNull();
     expect(parsePublicId('<script>alert(1)</script>')).toBeNull();
@@ -67,7 +67,7 @@ describe('parsePublicId', () => {
 
 describe('buildPublicUrl', () => {
   it('should construct the canonical public URL with default domain', () => {
-    expect(buildPublicUrl('7fK92pQ')).toBe('https://myphotobooth.com/7fK92pQ');
+    expect(buildPublicUrl('7fK92pQ')).toBe('https://umak-sic-photobooth.vercel.app/7fK92pQ');
   });
 
   it('should construct URL with custom baseUrl and remove trailing slashes from baseUrl', () => {

@@ -9,7 +9,7 @@ describe('OutputCard', () => {
     publicId: '7fK92pQ',
     sessionType: 'photo_strip',
     mediaType: 'image/png',
-    mediaUrl: 'https://myphotobooth.com/photos/7fK92pQ.png',
+    mediaUrl: 'https://umak-sic-photobooth.vercel.app/photos/7fK92pQ.png',
     eventName: 'Graduation 2026',
     eventDate: '2026-09-04',
     createdAt: '2026-09-04T12:00:00Z',

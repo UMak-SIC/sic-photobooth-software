@@ -42,7 +42,7 @@ export function FlipbookCompletionScreen() {
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
   const publicCode = publicId || 'M7p4XaV';
   const formattedPublicId = publicCode;
-  const qrDisplayUrl = qrUrl || `https://myphotobooth.com/${publicCode}`;
+  const qrDisplayUrl = qrUrl || `https://umak-sic-photobooth.vercel.app/${publicCode}`;
   const motionGifUrl = outputGifUrl
     ? `${outputGifUrl}?variant=motion`
     : publicId

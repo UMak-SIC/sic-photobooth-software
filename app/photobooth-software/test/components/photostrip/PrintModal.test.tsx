@@ -23,7 +23,7 @@ describe('PrintModal completion & print screen', () => {
     render(
       <PrintModal
         publicId="M7P4XAV"
-        qrUrl="https://myphotobooth.com/M7P4XAV"
+        qrUrl="https://umak-sic-photobooth.vercel.app/M7P4XAV"
         outputImageUrl="blob:output-image"
       />
     );
@@ -53,7 +53,7 @@ describe('PrintModal completion & print screen', () => {
     render(
       <PrintModal
         publicId="M7P4XAV"
-        qrUrl="https://myphotobooth.com/M7P4XAV"
+        qrUrl="https://umak-sic-photobooth.vercel.app/M7P4XAV"
         outputImageUrl="blob:output-image"
         onPrintConfirmed={onPrintConfirmedMock}
       />
@@ -77,7 +77,7 @@ describe('PrintModal completion & print screen', () => {
     render(
       <PrintModal
         publicId="M7P4XAV"
-        qrUrl="https://myphotobooth.com/M7P4XAV"
+        qrUrl="https://umak-sic-photobooth.vercel.app/M7P4XAV"
         outputImageUrl="blob:output-image"
         isPrinted={true}
         onFinishSession={onFinishSessionMock}
@@ -97,7 +97,7 @@ describe('PrintModal completion & print screen', () => {
     render(
       <PrintModal
         publicId="M7P4XAV"
-        qrUrl="https://myphotobooth.com/M7P4XAV"
+        qrUrl="https://umak-sic-photobooth.vercel.app/M7P4XAV"
         outputImageUrl="blob:output-image"
         isPrinted={false}
         onFinishSession={onFinishSessionMock}
@@ -126,7 +126,7 @@ describe('PrintModal completion & print screen', () => {
     render(
       <PrintModal
         publicId="M7P4XAV"
-        qrUrl="https://myphotobooth.com/M7P4XAV"
+        qrUrl="https://umak-sic-photobooth.vercel.app/M7P4XAV"
         outputImageUrl="blob:output-image"
         onPrintConfirmed={onPrintConfirmedMock}
       />
@@ -147,4 +147,3 @@ describe('PrintModal completion & print screen', () => {
     });
   });
 });
-

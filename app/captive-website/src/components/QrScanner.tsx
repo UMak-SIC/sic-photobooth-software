@@ -34,7 +34,7 @@ function extractIdFromQrData(raw: string): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
 
-  // 1. Direct parser check (handles https://myphotobooth.com/:id, raw 7-char base62 IDs, etc.)
+  // 1. Direct parser check (handles the public Vercel URL, raw 7-char base62 IDs, etc.)
   const parsed = parsePublicId(trimmed);
   if (parsed) return parsed;
 

@@ -1,4 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { buildApp } from '../src/app.js';
@@ -238,14 +241,14 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     const confirmBody = JSON.parse(confirmRes.body);
     expect(confirmBody.success).toBe(true);
     expect(confirmBody.data.publicId).toBeDefined();
-    expect(confirmBody.data.qrUrl).toContain('https://myphotobooth.com/');
+    expect(confirmBody.data.qrUrl).toContain('https://umak-sic-photobooth.vercel.app/');
 
     // 11. Record first print (1 copy) -> transitions to printed
     const print1Res = await app.inject({
       method: 'POST',
       url: `/api/sessions/${sessionId}/print`,
       headers: { 'x-session-token': token },
-      payload: { copies: 1 },
+      payload: { copies: 1, recordOnly: true },
     });
     expect(print1Res.statusCode).toBe(200);
     const print1Body = JSON.parse(print1Res.body);
@@ -253,7 +256,6 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(print1Body.data.state).toBe('printed');
     expect(print1Body.data.isPrinted).toBe(true);
     expect(print1Body.data.copiesPrinted).toBe(1);
-    expect(print1Body.data.jobId).toBeDefined();
 
     // 12. Record subsequent print (2 additional copies) -> stays printed and increments count to 3
     const print2Res = await app.inject({
@@ -272,7 +274,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
   it('renders high-resolution 300 DPI 4R PNG buffer', async () => {
     const publicId = '7fK92pQ';
-    const qrUrl = `https://myphotobooth.com/${publicId}`;
+    const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
     const pngBuffer = await photoStripRenderer.renderStrip({
       width: 1200,
@@ -353,7 +355,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       ],
       captures: [],
       publicId: 'overlayTest',
-      qrUrl: 'https://myphotobooth.com/overlayTest',
+      qrUrl: 'https://umak-sic-photobooth.vercel.app/overlayTest',
     });
 
     expect(Buffer.isBuffer(pngBuffer)).toBe(true);
@@ -380,7 +382,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       overlays: [],
       captures: [],
       publicId: '8kL99zX',
-      qrUrl: 'https://myphotobooth.com/8kL99zX',
+      qrUrl: 'https://umak-sic-photobooth.vercel.app/8kL99zX',
     });
 
     expect(Buffer.isBuffer(pngBuffer)).toBe(true);
@@ -463,7 +465,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       ],
       captures: [],
       publicId: 'Safe001',
-      qrUrl: 'https://myphotobooth.com/Safe001',
+      qrUrl: 'https://umak-sic-photobooth.vercel.app/Safe001',
     });
 
     expect(Buffer.isBuffer(pngBuffer)).toBe(true);
@@ -692,8 +694,8 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
      expect(dupBody.data.publicId).toBe(confirmBody.data.publicId);
    });
 
-  it('supports confirming photo strip with photo filters (bw, sepia, warm)', async () => {
-    for (const filter of ['bw', 'sepia', 'warm'] as const) {
+  it('supports confirming photo strip with photo filters (bw, sepia)', async () => {
+    for (const filter of ['bw', 'sepia'] as const) {
       const createRes = await app.inject({
         method: 'POST',
         url: '/api/sessions',
@@ -717,10 +719,16 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       });
 
       const requiredPhotos = template.requiredCaptureCount || template.placements?.length || 3;
-      const samplePng = Buffer.from(
-        '89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c63000100000500010d0a2db40000000049454e44ae426082',
-        'hex',
-      );
+      const samplePng = await sharp({
+        create: {
+          width: 20,
+          height: 20,
+          channels: 3,
+          background: { r: 30, g: 130, b: 230 },
+        },
+      })
+        .png()
+        .toBuffer();
       for (let i = 1; i <= requiredPhotos; i++) {
         const boundary = '----WebKitFormBoundaryFilterTest';
         const payload = Buffer.concat([
@@ -751,6 +759,70 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       expect(confirmBody.success).toBe(true);
       expect(confirmBody.data.state).toBe('booth_confirmed');
       expect(confirmBody.data.publicId).toBeDefined();
+
+      const outputRes = await app.inject({
+        method: 'GET',
+        url: `/photos/${confirmBody.data.publicId}`,
+      });
+      expect(outputRes.statusCode).toBe(200);
+      const { data, info } = await sharp(outputRes.rawPayload)
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      const placement = template.placements[0];
+      const sampleX = Math.round(placement.x + placement.width / 2);
+      const sampleY = Math.round(placement.y + placement.height / 2);
+      const offset = (sampleY * info.width + sampleX) * info.channels;
+      const pixel = [data[offset], data[offset + 1], data[offset + 2]];
+
+      if (filter === 'sepia') {
+        expect(new Set(pixel).size).toBeGreaterThan(1);
+      } else {
+        expect(pixel[0]).toBe(pixel[1]);
+        expect(pixel[1]).toBe(pixel[2]);
+      }
+    }
+  });
+
+  it('keeps Sepia filter renders colored while B&W is grayscale', async () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'photobooth-filter-test-'));
+    const capturePath = path.join(tempDir, 'blue-capture.png');
+
+    try {
+      await sharp({
+        create: {
+          width: 20,
+          height: 20,
+          channels: 3,
+          background: { r: 30, g: 130, b: 230 },
+        },
+      })
+        .png()
+        .toFile(capturePath);
+
+      const renderPixel = async (filter: 'normal' | 'bw' | 'sepia') => {
+        const output = await photoStripRenderer.renderStrip({
+          width: 500,
+          height: 500,
+          placements: [{ captureIndex: 1, x: 0, y: 0, width: 500, height: 500 }],
+          captures: [{ captureIndex: 1, filePath: capturePath }],
+          publicId: 'Ab1Cd2E',
+          filter,
+        });
+        const { data, info } = await sharp(output).raw().toBuffer({ resolveWithObject: true });
+        const offset = (10 * info.width + 10) * info.channels;
+        return [data[offset], data[offset + 1], data[offset + 2]];
+      };
+
+      const normal = await renderPixel('normal');
+      const bw = await renderPixel('bw');
+      const sepia = await renderPixel('sepia');
+
+      expect(normal).toEqual([30, 130, 230]);
+      expect(bw[0]).toBe(bw[1]);
+      expect(bw[1]).toBe(bw[2]);
+      expect(new Set(sepia).size).toBeGreaterThan(1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
@@ -833,7 +905,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
   it('renders dual-strip (cut in half) photo strips with 2x stacked QR and Date Pills', async () => {
     const publicId = 'M7p4XaV';
-    const qrUrl = `https://myphotobooth.com/${publicId}`;
+    const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
     const pngBuffer = await photoStripRenderer.renderStrip({
       width: 1200,
@@ -860,7 +932,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
   it('renders 4-cut quad photo strips with 4x stacked QR and Date Pills across all quadrants', async () => {
     const publicId = 'K9p4XaV';
-    const qrUrl = `https://myphotobooth.com/${publicId}`;
+    const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
     const pngBuffer = await photoStripRenderer.renderStrip({
       width: 1200,
@@ -888,7 +960,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
   it('renders horizontal 2-cut photo strips with 2x stacked QR and Date Pills (top and bottom)', async () => {
     const publicId = 'H2p4XaV';
-    const qrUrl = `https://myphotobooth.com/${publicId}`;
+    const qrUrl = `https://umak-sic-photobooth.vercel.app/${publicId}`;
 
     const pngBuffer = await photoStripRenderer.renderStrip({
       width: 1200,
@@ -975,4 +1047,3 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(diffSingle).toBeLessThanOrEqual(1);
   });
 });
-

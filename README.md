@@ -44,7 +44,7 @@ STORAGE_DIR=/absolute/path/to/photobooth-storage
 NODE_ENV=development
 
 # Required in production. The worker resolves this host before attempting uploads.
-PUBLIC_APP_URL=https://myphotobooth.com
+PUBLIC_APP_URL=https://umak-sic-photobooth.vercel.app
 
 # Server-only Cloudinary credentials. Use a signed Upload API account, not an unsigned preset.
 CLOUDINARY_CLOUD_NAME=your-cloud-name
@@ -136,7 +136,7 @@ Create a Vercel project from this repository with `app/public-website` as the Ro
 
 Never use `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`. Any variable prefixed `NEXT_PUBLIC_` is included in browser JavaScript.
 
-Set `myphotobooth.com` as the Vercel production domain. The public route is `https://myphotobooth.com/:id`; it validates the seven-character base-62 ID, consumes a shared rate-limit token, then looks up the finalized Supabase record. Unpublished, expired, deleted, malformed, or rate-limited IDs return the standard unavailable page.
+The Vercel public route is `https://umak-sic-photobooth.vercel.app/:id`; it validates the seven-character base-62 ID, consumes a shared rate-limit token, then looks up the finalized Supabase record. Unpublished, expired, deleted, malformed, or rate-limited IDs return the standard unavailable page.
 
 ## Deployment Order
 
@@ -144,8 +144,8 @@ Set `myphotobooth.com` as the Vercel production domain. The public route is `htt
 2. Provision Supabase, apply the migration, configure Vault and Edge Function secrets, and deploy `expire-public-outputs`.
 3. Configure the local booth backend environment and run its local PostgreSQL migration.
 4. Deploy the public Next.js app to Vercel with its two public variables and server-only service-role variable.
-5. Point `myphotobooth.com` to Vercel and set `PUBLIC_APP_URL=https://myphotobooth.com` on the booth.
-6. Confirm a new output appears as `uploaded` in the booth dashboard and resolves at `https://myphotobooth.com/:id`.
+5. Set `PUBLIC_APP_URL=https://umak-sic-photobooth.vercel.app` on the booth.
+6. Confirm a new output appears as `uploaded` in the booth dashboard and resolves at `https://umak-sic-photobooth.vercel.app/:id`.
 
 ## Verification
 

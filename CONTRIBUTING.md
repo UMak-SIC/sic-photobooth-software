@@ -18,7 +18,7 @@
 - Put shared public-ID parsing, validation, and public-output types in `packages/public-output/`.
 - Put a component in `packages/ui/` only when both retrieval websites use it unchanged.
 - Public output IDs are seven-character, cryptographically random base-62 values. Never expose sequential IDs or local filesystem paths.
-- Printed QR codes always contain `https://myphotobooth.com/:id`. Do not introduce split DNS.
+- Printed QR codes always contain `https://umak-sic-photobooth.vercel.app/:id`. Do not introduce split DNS.
 - Keep cloud publishing asynchronous; it must not block booth confirmation.
 
 ## Make Changes

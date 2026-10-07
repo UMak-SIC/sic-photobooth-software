@@ -386,7 +386,7 @@ This section resolves implementation details established after the original user
 * Interactive sessions do not expire automatically. The administrator can explicitly cancel an abandoned session and start a new one.
 * A new session may begin once the prior session has been marked printed. Publishing may remain queued or in progress and must not block the booth.
 * Browser navigation should warn that progress may be lost. The system does not promise recovery after a page reload; the administrator manages the current session.
-* Every generated local output receives a seven-character, cryptographically random base-62 public ID (`A-Z`, `a-z`, `0-9`) before publication. The printed QR contains the full URL `https://myphotobooth.com/:id`.
+* Every generated local output receives a seven-character, cryptographically random base-62 public ID (`A-Z`, `a-z`, `0-9`) before publication. The printed QR contains the full URL `https://umak-sic-photobooth.vercel.app/:id`.
 * Booth confirmation locks the selected captures and generates a local output. It is deliberately separate from cloud finalization so printing and local QR retrieval continue while offline.
 * Cloud finalization occurs only after the asset has uploaded to Cloudinary and Supabase has recorded its public delivery metadata.
 

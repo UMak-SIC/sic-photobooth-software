@@ -1,4 +1,4 @@
-export type PhotoFilterType = 'normal' | 'bw' | 'sepia' | 'warm';
+export type PhotoFilterType = 'normal' | 'bw' | 'sepia';
 
 export interface PhotoFilterPreset {
   id: PhotoFilterType;
@@ -33,14 +33,6 @@ export const PHOTO_FILTERS: PhotoFilterPreset[] = [
     cssFilter: 'sepia(65%) contrast(105%) brightness(95%)',
     previewBg: 'linear-gradient(135deg, #d97706 0%, #78350f 100%)',
     accentColor: '#b45309',
-  },
-  {
-    id: 'warm',
-    label: 'Warm Golden',
-    sublabel: 'Sunlit Glow',
-    cssFilter: 'saturate(130%) brightness(105%) sepia(15%)',
-    previewBg: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)',
-    accentColor: '#d97706',
   },
 ];
 
