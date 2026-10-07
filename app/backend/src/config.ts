@@ -128,15 +128,19 @@ export const flipbookConfig: FlipbookConfig = {
 };
 
 export interface PrinterConfig {
+  cupsServer: string;
   printerName: string;
   mediaSize: string;
   fitToPage: boolean;
   enableHardwarePrint: boolean;
+  pollIntervalMs: number;
 }
 
 export const printerConfig: PrinterConfig = {
+  cupsServer: process.env.CUPS_SERVER || 'localhost:631',
   printerName: process.env.PRINTER_NAME || 'Epson_L3250',
   mediaSize: process.env.PRINTER_MEDIA_SIZE || 'Custom.4x6in',
   fitToPage: true,
   enableHardwarePrint: process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
+  pollIntervalMs: Number(process.env.PRINT_POLL_INTERVAL_MS || 5000),
 };

@@ -21,6 +21,7 @@
     "@supabase/supabase-js": "^2.115.0",
     "cloudinary": "^2.11.0",
     "dotenv": "^16.4.7",
+    "fast-xml-parser": "^5.11.2",
     "fastify": "5.2.1",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.3",

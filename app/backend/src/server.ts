@@ -1,8 +1,9 @@
 import { buildApp } from './app.js';
-import { config } from './config.js';
+import { config, printerConfig } from './config.js';
 import { runMigrations } from './db/migrations.js';
 import { checkDatabaseHealth, closePool } from './db/pool.js';
 import { startPublishingWorker, stopPublishingWorker } from './services/publishing-worker.js';
+import { startPrintWorker, stopPrintWorker } from './services/print-worker.js';
 
 async function startServer() {
   const app = await buildApp();
@@ -26,6 +27,7 @@ async function startServer() {
     process.on(signal, async () => {
       app.log.info(`Received ${signal}. Shutting down gracefully...`);
       stopPublishingWorker();
+      stopPrintWorker();
       await app.close();
       await closePool();
       process.exit(0);
@@ -35,6 +37,7 @@ async function startServer() {
   try {
     await app.listen({ port: config.port, host: config.host });
     startPublishingWorker();
+    if (dbHealth.ok) startPrintWorker(printerConfig.pollIntervalMs);
     app.log.info(`Photobooth Backend server running at http://${config.host}:${config.port}`);
   } catch (err) {
     app.log.error(err);

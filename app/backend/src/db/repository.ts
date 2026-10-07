@@ -131,6 +131,15 @@ export interface LocalPublicationOutput {
   sessionId?: string;
 }
 
+export type PrintJobStatus = 'queued' | 'submitting' | 'pending' | 'processing' | 'stopped' | 'completed' | 'failed' | 'canceled' | 'needs_attention';
+export interface PrintJob {
+  id: string; sessionId: string; outputId: string | null; requestKey: string; artifactPath: string;
+  artifactType: 'image/png' | 'application/pdf'; publicId: string; outputType: 'photo_strip' | 'flipbook';
+  printerName: string; mediaSize: string; copiesRequested: number; copiesCompleted: number;
+  submissionMode: 'cups' | 'simulation'; status: PrintJobStatus; lastError: string | null;
+  lastReconciledAt: Date | null; reprintOfId: string | null; createdAt: Date; updatedAt: Date;
+}
+
 export class DatabaseRepository {
   public async listEvents(): Promise<EventData[]> {
     try {
@@ -237,6 +246,7 @@ export class DatabaseRepository {
 
   // In-memory fallback stores when PostgreSQL is offline
   private inMemoryEvents: Map<string, EventData> = new Map();
+  private inMemoryPrintJobs: Map<string, PrintJob> = new Map();
   private inMemorySessions: Map<string, SessionData> = new Map();
   private inMemoryFrames: Map<string, FrameItem> = new Map([
     [
@@ -2035,6 +2045,48 @@ export class DatabaseRepository {
     return null;
   }
 
+  public async createPrintJob(job: Omit<PrintJob, 'id' | 'copiesCompleted' | 'status' | 'lastError' | 'lastReconciledAt' | 'createdAt' | 'updatedAt'>): Promise<PrintJob> {
+    const columns = ['output_id', 'session_id', 'request_key', 'artifact_path', 'artifact_type', 'public_id', 'output_type', 'printer_name', 'media_size', 'copies_requested', 'submission_mode', 'reprint_of_id'];
+    const values = [job.outputId, job.sessionId, job.requestKey, job.artifactPath, job.artifactType, job.publicId, job.outputType, job.printerName, job.mediaSize, job.copiesRequested, job.submissionMode, job.reprintOfId];
+    try {
+      const result = await pool.query(`INSERT INTO print_jobs (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')}) ON CONFLICT (request_key) DO UPDATE SET request_key = EXCLUDED.request_key RETURNING id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt"`, values);
+      return result.rows[0];
+    } catch {
+      const existing = Array.from(this.inMemoryPrintJobs.values()).find((item) => item.requestKey === job.requestKey);
+      if (existing) return existing;
+      const created: PrintJob = { ...job, id: crypto.randomUUID(), copiesCompleted: 0, status: 'queued', lastError: null, lastReconciledAt: null, createdAt: new Date(), updatedAt: new Date() };
+      this.inMemoryPrintJobs.set(created.id, created);
+      return created;
+    }
+  }
+
+  public async getPrintJob(id: string): Promise<PrintJob | null> {
+    try {
+      const result = await pool.query(`SELECT id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE id = $1`, [id]);
+      return result.rows[0] || null;
+    } catch { return this.inMemoryPrintJobs.get(id) || null; }
+  }
+
+  public async listPrintJobs(limit = 50): Promise<PrintJob[]> {
+    try {
+      const result = await pool.query(`SELECT id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs ORDER BY (status IN ('queued','submitting','pending','processing','stopped')) DESC, created_at DESC LIMIT $1`, [limit]);
+      return result.rows;
+    } catch { return Array.from(this.inMemoryPrintJobs.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit); }
+  }
+
+  public async updatePrintJob(id: string, status: PrintJobStatus, error: string | null = null): Promise<PrintJob | null> {
+    try {
+      const result = await pool.query(`UPDATE print_jobs SET status = $2, last_error = $3, copies_completed = CASE WHEN $2 = 'completed' THEN copies_requested ELSE copies_completed END, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt"`, [id, status, error]);
+      const job = result.rows[0];
+      if (job?.status === 'completed') await this.recordPrintStatus(job.sessionId, job.copiesRequested);
+      return job || null;
+    } catch {
+      const job = this.inMemoryPrintJobs.get(id); if (!job) return null;
+      const wasCompleted = job.status === 'completed'; job.status = status; job.lastError = error; job.lastReconciledAt = new Date(); job.updatedAt = new Date(); if (status === 'completed') job.copiesCompleted = job.copiesRequested;
+      if (status === 'completed' && !wasCompleted) await this.recordPrintStatus(job.sessionId, job.copiesRequested); return job;
+    }
+  }
+
   /**
    * Aggregates and calculates full KPI & analytics metrics across sessions.
    */
@@ -2426,4 +2478,3 @@ export interface AnalyticsData {
 }
 
 export const dbRepository = new DatabaseRepository();
-
