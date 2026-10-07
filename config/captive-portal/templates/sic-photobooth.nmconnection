@@ -7,15 +7,22 @@ autoconnect=false
 
 [wifi]
 mode=ap
+band={{WIFI_BAND}}
+channel={{WIFI_CHANNEL}}
 ssid={{SSID}}
 
 [wifi-security]
 key-mgmt=wpa-psk
+proto=rsn
+pairwise=ccmp
+group=ccmp
+pmf=1
 psk={{HOTSPOT_PASSWORD}}
 
 [ipv4]
 method=manual
 address1={{GATEWAY_IP}}/{{SUBNET_PREFIX}}
+never-default=true
 
 [ipv6]
 method=disabled

@@ -12,13 +12,16 @@ const subnetMaskByPrefix: Record<number, string> = {
 };
 
 const hotspotPassword = process.env.HOTSPOT_PASSWORD;
+const hotspotPasswordLength = hotspotPassword ? Buffer.byteLength(hotspotPassword, 'utf8') : 0;
 if (
   !hotspotPassword ||
-  hotspotPassword.length < 8 ||
-  hotspotPassword.length > 63 ||
-  /[\r\n]/.test(hotspotPassword)
+  hotspotPasswordLength < 8 ||
+  hotspotPasswordLength > 63 ||
+  /[^\x20-\x7e]/.test(hotspotPassword)
 ) {
-  throw new Error('Set HOTSPOT_PASSWORD to an 8-63 character WPA2 passphrase before rendering.');
+  throw new Error(
+    'Set HOTSPOT_PASSWORD to an 8-63 byte printable ASCII Wi-Fi passphrase before rendering.',
+  );
 }
 
 const subnetMask = subnetMaskByPrefix[captivePortalConfig.subnetPrefix];
@@ -32,6 +35,11 @@ if (gatewayOctets.length !== 4 || gatewayOctets.some((octet) => !/^\d+$/.test(oc
 }
 
 const hotspotSubnet = `${gatewayOctets.slice(0, 3).join('.')}.0/${captivePortalConfig.subnetPrefix}`;
+const hostapdHwModeByBand = {
+  bg: 'g',
+  a: 'a',
+} as const;
+const wifiHwMode = hostapdHwModeByBand[captivePortalConfig.wifiBand];
 
 const replacements: Record<string, string> = {
   GATEWAY_IP: captivePortalConfig.gatewayIp,
@@ -39,6 +47,9 @@ const replacements: Record<string, string> = {
   SUBNET_MASK: subnetMask,
   HOTSPOT_SUBNET: hotspotSubnet,
   WIFI_INTERFACE: captivePortalConfig.wifiInterface,
+  WIFI_HW_MODE: wifiHwMode,
+  WIFI_CHANNEL: String(captivePortalConfig.wifiChannel),
+  WIFI_COUNTRY_CODE: captivePortalConfig.wifiCountryCode,
   SSID: captivePortalConfig.ssid,
   DHCP_RANGE_START: captivePortalConfig.dhcpRangeStart,
   DHCP_RANGE_END: captivePortalConfig.dhcpRangeEnd,
@@ -52,7 +63,10 @@ await mkdir(outputDir, { recursive: true });
 for (const filename of [
   'Caddyfile',
   'dnsmasq.conf',
-  'sic-photobooth.nmconnection',
+  'hostapd.conf',
+  'prepare-hotspot.sh',
+  'restore-network.sh',
+  'sic-photobooth-hotspot.service',
   'configure-firewall.fish',
   'captive-portal.env',
 ]) {

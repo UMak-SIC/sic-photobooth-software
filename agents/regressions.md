@@ -17,6 +17,19 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 
 ## Entries
 
+### 2026-09-11: Warm Golden Render Was Monochrome
+
+- Symptom: Selecting the Warm Golden photo filter produced a black-and-white output instead of a colored warm adjustment.
+- Root cause: Sharp's `tint()` first converted the image to grayscale before applying the tint color.
+- Resolution: The Warm Golden option was removed on 2026-09-11; the booth offers Original, Classic B&W, and Vintage Sepia.
+- Prevention: `app/backend/test/photo-strip-workflow.test.ts` verifies confirmed Sepia output retains distinct RGB channels while B&W stays grayscale, and `app/photobooth-software/test/components/photostrip/PhotoStripWorkflow.test.tsx` verifies the review action submits the selected filter.
+
+### 2026-09-11: Current iPad Rejects NetworkManager WPA2 Hotspot Password
+
+- Symptom: An iPad (A16) on iPadOS 26.5.2 reported `Incorrect Password` for the WPA2 hotspot even after forgetting the network and using a verified plain-ASCII test password.
+- Root cause: NetworkManager's wpa_supplicant WPA2 AP was incompatible with this iPad and advertised `WPA-PSK-SHA256`; the iPad repeatedly failed the four-way handshake with `AP-STA-POSSIBLE-PSK-MISMATCH` but completed the same hardware's WPA3-SAE handshake.
+- Prevention: `config/captive-portal/templates/hostapd.conf` uses WPA2/WPA3 transition mode with classic `WPA-PSK` plus `SAE`. Verify an iPad connects using WPA3, an older WPA2 client connects, and both receive dnsmasq leases.
+
 ### 2026-09-11: Android Captive Check Shows Photo-Not-Found Screen
 
 - Symptom: Opening Android's captive-network sign-in URL (`connectivitycheck.gstatic.com/generate_204`) showed the portal's invalid-photo screen.

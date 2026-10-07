@@ -1,0 +1,14 @@
+[Unit]
+Description=SIC Photobooth WPA2/WPA3 hotspot
+After=NetworkManager.service
+Requires=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/local/libexec/sic-photobooth/prepare-hotspot
+ExecStart=/usr/bin/env hostapd /etc/sic-photobooth/captive-portal/hostapd.conf
+ExecStopPost=/usr/local/libexec/sic-photobooth/restore-network
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
