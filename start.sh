@@ -94,13 +94,13 @@ run_services() {
   cd "$ROOT_DIR"
   trap 'kill "$api_pid" "$captive_pid" 2>/dev/null || true' EXIT INT TERM
 
-  pnpm --filter @photobooth/backend dev &
+  npm --prefix "$ROOT_DIR/app/backend" run dev &
   api_pid=$!
 
   # The captive portal runs in production mode because Caddy exposes it to guests.
   (
-    pnpm --filter captive-website build
-    pnpm --filter captive-website start
+    npm --prefix "$ROOT_DIR/app/captive-website" run build
+    npm --prefix "$ROOT_DIR/app/captive-website" run start
   ) &
   captive_pid=$!
 
@@ -109,7 +109,7 @@ run_services() {
 
 run_booth() {
   cd "$ROOT_DIR"
-  exec pnpm --filter photobooth-software dev
+  exec npm --prefix "$ROOT_DIR/app/photobooth-software" run dev
 }
 
 print_summary() {
@@ -141,7 +141,7 @@ start() {
   local failed=0
 
   require_command kitty
-  require_command pnpm
+  require_command npm
   require_command curl
   require_command systemctl
 
