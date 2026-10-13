@@ -10,7 +10,6 @@ import { mediaValidator } from '../services/media-validator.js';
 import { gifRenderer } from '../services/gif-renderer.js';
 import { config, flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
-import { printerService } from '../services/printer.js';
 import type { SessionType } from '@photobooth/public-output';
 import { templateRepository } from '../templates/repository.js';
 import { toTemplateDto } from '../templates/routes.js';
@@ -39,10 +38,6 @@ const selectFlipbookSchema = z.object({
   videoIndex: z.number().int().min(1).max(3),
 });
 
-const printSessionSchema = z.object({
-  copies: z.number().int().min(1).default(1),
-  recordOnly: z.boolean().optional(),
-});
 
 const confirmPhotoStripSchema = z.object({
   filter: z.enum(['normal', 'bw', 'sepia']).optional(),
@@ -1190,6 +1185,12 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
       });
     }
+    if (!isSessionAuthorized(request.headers['x-session-token'], session.token)) {
+      return reply.status(403).send({ success: false, error: { code: 'FORBIDDEN', message: 'Invalid or missing session authorization token' } });
+    }
+    if (session.type !== 'flipbook' || !['booth_confirmed', 'printed'].includes(session.state)) {
+      return reply.status(409).send({ success: false, error: { code: 'PRINT_ARTIFACT_NOT_READY', message: 'A finalized flipbook output is required.' } });
+    }
 
     const latestOutput = await dbRepository.getLatestOutputForSession(id);
     if (!latestOutput) {
@@ -1208,6 +1209,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     const buffer = await file.toBuffer();
+    if (buffer.length > 30 * 1024 * 1024 || !buffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
+      return reply.status(400).send({ success: false, error: { code: 'INVALID_PDF', message: 'Upload a valid PDF no larger than 30 MB.' } });
+    }
     await storageService.savePdf(id, latestOutput.publicId, buffer);
 
     return reply.send({
@@ -1374,81 +1378,9 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  // 10c. Print Recording (Firefox/CUPS handoff)
-  // 10c. Print Recording (Direct CUPS printing / manual record)
+  // Retired direct-print endpoint. All new jobs are persisted through /print-jobs.
   fastify.post<{ Params: { id: string } }>('/api/sessions/:id/print', async (request, reply) => {
-    const { id } = request.params;
-    const sessionToken = request.headers['x-session-token'];
-
-    const parseResult = printSessionSchema.safeParse(request.body || {});
-    const copies = parseResult.success ? parseResult.data.copies : 1;
-    const recordOnly = parseResult.success ? !!parseResult.data.recordOnly : false;
-
-    try {
-      const session = await dbRepository.getSessionById(id);
-      if (!session) {
-        return reply.status(404).send({
-          success: false,
-          error: { code: 'SESSION_NOT_FOUND', message: 'Session does not exist' },
-        });
-      }
-
-      if (!isSessionAuthorized(sessionToken, session.token)) {
-        return reply.status(403).send({
-          success: false,
-          error: { code: 'FORBIDDEN', message: 'Invalid or missing session authorization token' },
-        });
-      }
-
-      if (session.state !== 'booth_confirmed' && session.state !== 'printed') {
-        return reply.status(400).send({
-          success: false,
-          error: {
-            code: 'INVALID_STATE',
-            message: 'Printing is only allowed after booth confirmation.',
-          },
-        });
-      }
-
-      sessionStateMachine.assertValidTransition(session.type, session.state, 'printed');
-
-      let printJobId: string | undefined;
-
-      if (!recordOnly && session.type !== 'flipbook') {
-        const output = await dbRepository.getLatestOutputForSession(id);
-        if (output && output.filePath) {
-          const printResult = await printerService.printImage(output.filePath, copies);
-          if (!printResult.success) {
-            return reply.status(502).send({
-              success: false,
-              error: {
-                code: 'PRINT_FAILED',
-                message:
-                  'Physical printing could not be completed by printer service. Please record copies manually.',
-                details: printResult.error,
-              },
-            });
-          }
-          printJobId = printResult.jobId;
-        }
-      }
-
-      const updated = await dbRepository.recordPrintStatus(id, copies);
-
-      return reply.send({
-        success: true,
-        data: {
-          ...stripToken(updated),
-          jobId: printJobId,
-        },
-      });
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(400).send({
-        success: false,
-        error: { code: 'PRINT_RECORD_ERROR', message },
-      });
-    }
+    return reply.status(410).send({ success: false, error: { code: 'PRINT_QUEUE_REQUIRED', message: 'Create a persistent print job instead.' } });
   });
 
   // 11. Cancel active session

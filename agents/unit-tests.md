@@ -14,6 +14,9 @@ Behavior-focused unit and integration coverage derived from the PRD. Follow the 
 - Media validation rejects unsupported, malformed, oversized, and path-traversal inputs.
 - Confirmed outputs receive a valid seven-character public ID and only approved local outputs are retrievable.
 - Publishing remains queued while offline, retries within its bound, and records terminal failure.
+- Print-job creation is idempotent by request key; only the first CUPS completion updates session copy accounting.
+- Active print jobs prevent local-output deletion; terminal job history remains after deletion.
+- Retry is limited to failed/canceled/attention-needed jobs and Reprint is limited to completed jobs.
 
 ## Clients
 
@@ -21,6 +24,7 @@ Behavior-focused unit and integration coverage derived from the PRD. Follow the 
 - Camera, composition, GIF-processing, print, publishing, and retrieval failures show the recovery action defined in the PRD.
 - Captive retrieval parses the printed full public URL without navigating to it.
 - Public retrieval returns an unavailable state before publication and after expiry/deletion.
+- The print dialog submits one request key across retries and reports CUPS completion without opening browser print UI.
 
 ## Template
 

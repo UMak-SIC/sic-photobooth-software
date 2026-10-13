@@ -3,7 +3,8 @@ import QRCode from 'qrcode';
 import { useFlipbookStore } from '../../store/flipbook-store';
 import { useSessionStore } from '../../store/session-store';
 import { boothApi } from '../../services/api';
-import { generateFlipbookPdf, printPdfBlobUrl } from '../../services/flipbook-pdf';
+import { generateFlipbookPdf } from '../../services/flipbook-pdf';
+import { PrintDialog } from '../printing/PrintDialog';
 import { LoopingMotionPreview } from './LoopingMotionPreview';
 import { fireCelebrationConfetti } from '../../utils/confetti';
 import { FLIPBOOK_CONFIG } from '../../config/flipbook';
@@ -37,6 +38,7 @@ export function FlipbookCompletionScreen() {
   const [showUnprintedWarning, setShowUnprintedWarning] = useState<boolean>(false);
   const [recordToast, setRecordToast] = useState<string | null>(null);
   const [isFinishing, setIsFinishing] = useState<boolean>(false);
+  const [showQueueDialog, setShowQueueDialog] = useState(false);
 
   const previewCoverUrl = coverUrls[selectedCoverIndex - 1] || coverUrls[0];
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
@@ -116,16 +118,13 @@ export function FlipbookCompletionScreen() {
         }
       );
 
-      // Persist generated 4R PDF in backend storage for instant admin reprint/retrieval
+      // The backend must have the single-copy booklet before CUPS receives a copy count.
       if (sessionId && !sessionId.startsWith('mock-')) {
-        void boothApi.uploadSessionPdf(sessionId, blob);
+        await boothApi.uploadSessionPdf(sessionId, blob);
       }
-
-      setPrintProgress('Opening print dialog...');
-      await printPdfBlobUrl(url);
-
-      setHasPrinted(true);
-      setShowPrintRecord(true);
+      URL.revokeObjectURL(url);
+      if (!sessionId || sessionId.startsWith('mock-')) throw new Error('A saved booth session is required to queue printing.');
+      setShowQueueDialog(true);
     } catch (err) {
       console.error('Direct PDF printing failed:', err);
       setPrintError('PDF generation or printing failed. Please try again.');
@@ -553,6 +552,10 @@ export function FlipbookCompletionScreen() {
           {recordToast}
         </div>
       )}
+      {showQueueDialog && sessionId && <PrintDialog sessionId={sessionId} previewUrl={previewCoverUrl} label="booklet set" onClose={() => setShowQueueDialog(false)} onCompleted={(job) => {
+        setHasPrinted(true);
+        recordPrintSuccess(job.copiesCompleted);
+      }} />}
     </>
   );
 }

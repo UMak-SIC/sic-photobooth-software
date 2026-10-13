@@ -125,6 +125,7 @@ async function processPublication(
     mediaType: string;
     eventName: string;
     eventDate: string;
+    copiesPrinted: number;
     retryCount: number;
   },
   now: Date,
@@ -150,6 +151,7 @@ async function processPublication(
         mediaType: publication.mediaType,
         eventName: publication.eventName,
         eventDate: publication.eventDate,
+        printCount: publication.copiesPrinted,
         cloudFinalizedAt,
         expiresAt,
       }),

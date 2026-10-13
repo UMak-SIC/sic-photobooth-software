@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { fireCelebrationConfetti } from '../../utils/confetti';
-import { generatePhotoStripPdf, uploadPdfBlob, printPdfBlobUrl } from '../../services/flipbook-pdf';
-import { boothApi, API_BASE_URL } from '../../services/api';
+import { PrintDialog } from '../printing/PrintDialog';
 
 export interface PrintModalProps {
   sessionId?: string;
@@ -30,14 +29,12 @@ export const PrintModal: React.FC<PrintModalProps> = ({
   onPrintConfirmed,
   onFinishSession,
 }) => {
-  const [isPrinting, setIsPrinting] = useState<boolean>(false);
+  const [isPrinting] = useState<boolean>(false);
+  const [showQueueDialog, setShowQueueDialog] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [hasPrinted, setHasPrinted] = useState<boolean>(externalIsPrinted);
   const [printError, setPrintError] = useState<string | null>(null);
-  const [showPrintRecord, setShowPrintRecord] = useState<boolean>(false);
-  const [recoveryCopies, setRecoveryCopies] = useState<number | ''>(1);
   const [showUnprintedWarning, setShowUnprintedWarning] = useState<boolean>(false);
-  const [recordToast, setRecordToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!preview) {
@@ -64,75 +61,13 @@ export const PrintModal: React.FC<PrintModalProps> = ({
     }
   }, [qrUrl, preview]);
 
-  useEffect(() => {
-    if (!recordToast) return;
-    const timeoutId = window.setTimeout(() => setRecordToast(null), 3000);
-    return () => window.clearTimeout(timeoutId);
-  }, [recordToast]);
-
-  const [printProgress, setPrintProgress] = useState<string | null>(null);
-
   const handleDirectPrint = async () => {
-    setPrintError(null);
+    if (!sessionId || sessionId.startsWith('mock-')) {
+      setPrintError('A saved booth session is required to queue printing.');
+      return;
+    }
     setShowUnprintedWarning(false);
-    setIsPrinting(true);
-    setPrintProgress('Preparing 300 DPI PDF...');
-
-    try {
-      const formattedPublicId = publicId || 'M7p4XaV';
-      if (outputImageUrl) {
-        const { blob, url } = await generatePhotoStripPdf(outputImageUrl, formattedPublicId, 1);
-        if (sessionId && !sessionId.startsWith('mock-')) {
-          void boothApi.uploadSessionPdf(sessionId, blob);
-        }
-        void uploadPdfBlob(`${API_BASE_URL}/api/publications/${formattedPublicId}/pdf`, blob);
-        setPrintProgress('Opening print dialog...');
-        await printPdfBlobUrl(url);
-      } else {
-        window.print();
-      }
-
-      setHasPrinted(true);
-      setShowPrintRecord(true);
-    } catch (err) {
-      console.error('Photo strip PDF printing failed, falling back to window.print():', err);
-      try {
-        window.print();
-        setHasPrinted(true);
-        setShowPrintRecord(true);
-      } catch {
-        setPrintError('Printing failed. Please try again.');
-      }
-    } finally {
-      setIsPrinting(false);
-      setPrintProgress(null);
-    }
-  };
-
-  const handleRecordManualCopies = async (copiesToRecord: number = 1) => {
-    setIsPrinting(true);
-    setRecordToast(null);
-    try {
-      if (onPrintConfirmed) {
-        await onPrintConfirmed(copiesToRecord, true);
-      }
-      setHasPrinted(true);
-      setPrintError(null);
-      setShowPrintRecord(false);
-      setRecordToast(
-        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`,
-      );
-    } catch (err) {
-      console.error('Failed to record print status:', err);
-      setHasPrinted(true);
-      setPrintError(null);
-      setShowPrintRecord(false);
-      setRecordToast(
-        `${copiesToRecord} ${copiesToRecord === 1 ? 'copy' : 'copies'} recorded.`,
-      );
-    } finally {
-      setIsPrinting(false);
-    }
+    setShowQueueDialog(true);
   };
 
   const handleFinishAttempt = () => {
@@ -156,14 +91,6 @@ export const PrintModal: React.FC<PrintModalProps> = ({
 
   return (
     <>
-      <div className="print-only-target" aria-hidden="true">
-        {outputImageUrl ? (
-          <div className="relative size-full">
-            <img src={outputImageUrl} alt={`Photo Strip ${formattedPublicId}`} />
-          </div>
-        ) : null}
-      </div>
-
       {/* 2. Main Screen Interface */}
       <div className="relative flex min-h-[100dvh] w-full flex-col items-center justify-center overflow-hidden bg-white px-6 sm:px-12 py-8 select-none font-['Nunito',sans-serif] text-[#1f2937]">
         {/* Main Content: 2-Column Split Layout */}
@@ -234,67 +161,30 @@ export const PrintModal: React.FC<PrintModalProps> = ({
             </p>
 
             {/* Warnings and Recovery */}
-            {(printError || showPrintRecord) && (
+            {printError && (
               <div
                 role="dialog"
                 aria-modal="true"
-                aria-label={printError ? 'Printing error' : 'Record printed copies'}
+                aria-label="Printing error"
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
               >
                 <div
                   className={`flex w-full max-w-lg flex-col gap-6 rounded-2xl border p-6 text-left shadow-2xl sm:p-8 ${
-                    printError
-                      ? 'border-red-300 bg-red-50 text-red-800'
-                      : 'border-[#7bc6a5] bg-[#f0faf5] text-[#146a56]'
+                    'border-red-300 bg-red-50 text-red-800'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-5">
                     <p className="text-base font-bold sm:text-lg">
-                      {printError ||
-                        'After printing, record the printed copy count if needed.'}
+                      {printError}
                     </p>
                     <button
                       type="button"
                       onClick={() => {
                         setPrintError(null);
-                        setShowPrintRecord(false);
                       }}
                       className="shrink-0 rounded-lg px-2 py-1 text-sm font-bold underline hover:opacity-80 cursor-pointer"
                     >
                       Dismiss
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3 border-t border-current/15 pt-4 sm:gap-4">
-                    <label htmlFor="printed-copy-count" className="text-base font-bold sm:text-lg">
-                      Copies printed
-                    </label>
-                    <select
-                      id="printed-copy-count"
-                      aria-label="Printed copy count"
-                      value={recoveryCopies}
-                      onChange={(e) =>
-                        setRecoveryCopies(e.target.value === '' ? '' : Number(e.target.value))
-                      }
-                      className="h-12 w-24 rounded-lg border border-current/30 bg-white px-3 text-lg font-bold"
-                    >
-                      <option value="">-</option>
-                      {Array.from({ length: 5 }, (_, index) => (
-                        <option key={index + 1} value={index + 1}>
-                          {index + 1}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (recoveryCopies !== '') {
-                          handleRecordManualCopies(recoveryCopies);
-                        }
-                      }}
-                      disabled={isPrinting || recoveryCopies === ''}
-                      className="ml-auto min-h-12 cursor-pointer rounded-lg bg-[#146a56] px-5 py-2 text-base font-bold text-white hover:bg-[#0f5444] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {isPrinting ? 'Recording...' : 'Record copies'}
                     </button>
                   </div>
                 </div>
@@ -322,7 +212,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
                 {isPrinting ? (
                   <>
                     <span className="inline-block size-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span className="text-lg">{printProgress || 'Printing...'}</span>
+                    <span className="text-lg">Queueing...</span>
                   </>
                 ) : (
                   'Print'
@@ -383,15 +273,7 @@ export const PrintModal: React.FC<PrintModalProps> = ({
         </div>
       )}
 
-      {recordToast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl bg-[#146a56] px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl"
-        >
-          {recordToast}
-        </div>
-      )}
+      {showQueueDialog && sessionId && <PrintDialog sessionId={sessionId} previewUrl={outputImageUrl} onClose={() => setShowQueueDialog(false)} onCompleted={(job) => { setHasPrinted(true); onPrintConfirmed?.(job.copiesCompleted); }} />}
     </>
   );
 };

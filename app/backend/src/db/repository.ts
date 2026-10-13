@@ -103,6 +103,7 @@ export interface QueuedPublication {
   mediaType: string;
   eventName: string;
   eventDate: string;
+  copiesPrinted: number;
   retryCount: number;
 }
 
@@ -131,13 +132,39 @@ export interface LocalPublicationOutput {
   sessionId?: string;
 }
 
-export type PrintJobStatus = 'queued' | 'submitting' | 'pending' | 'processing' | 'stopped' | 'completed' | 'failed' | 'canceled' | 'needs_attention';
+export type PrintJobStatus =
+  | 'queued' | 'submitting' | 'pending' | 'processing' | 'stopped'
+  | 'completed' | 'failed' | 'canceled' | 'needs_attention';
+
 export interface PrintJob {
-  id: string; sessionId: string; outputId: string | null; requestKey: string; artifactPath: string;
-  artifactType: 'image/png' | 'application/pdf'; publicId: string; outputType: 'photo_strip' | 'flipbook';
-  printerName: string; mediaSize: string; copiesRequested: number; copiesCompleted: number;
-  submissionMode: 'cups' | 'simulation'; status: PrintJobStatus; lastError: string | null;
-  lastReconciledAt: Date | null; reprintOfId: string | null; createdAt: Date; updatedAt: Date;
+  id: string;
+  sessionId: string;
+  outputId: string | null;
+  publicId: string;
+  outputType: 'photo_strip' | 'flipbook';
+  artifactType: 'image/png' | 'application/pdf';
+  copiesRequested: number;
+  copiesCompleted: number;
+  copiesWaiting: number;
+  printerName: string;
+  mediaSize: string;
+  mode: 'cups' | 'simulation';
+  status: PrintJobStatus;
+  lastError: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PrintJobAttempt {
+  id: string;
+  printJobId: string;
+  attemptNumber: number;
+  title: string;
+  cupsJobId: string | null;
+  state: PrintJobStatus;
+  error: string | null;
+  isCurrent: boolean;
+  supersededAt: Date | null;
 }
 
 export class DatabaseRepository {
@@ -246,7 +273,6 @@ export class DatabaseRepository {
 
   // In-memory fallback stores when PostgreSQL is offline
   private inMemoryEvents: Map<string, EventData> = new Map();
-  private inMemoryPrintJobs: Map<string, PrintJob> = new Map();
   private inMemorySessions: Map<string, SessionData> = new Map();
   private inMemoryFrames: Map<string, FrameItem> = new Map([
     [
@@ -1306,7 +1332,11 @@ export class DatabaseRepository {
       const result = await pool.query(
         `DELETE FROM generated_outputs o
          WHERE o.id = (
-           SELECT output_id FROM publication_records WHERE id = $1 AND status <> 'in_progress'
+            SELECT output_id FROM publication_records WHERE id = $1 AND status <> 'in_progress'
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM print_jobs j WHERE j.output_id = o.id
+             AND j.status IN ('queued', 'submitting', 'pending', 'processing', 'stopped')
          )
          RETURNING public_id AS "publicId", file_path AS "filePath", media_type AS "mediaType"`,
         [id],
@@ -1382,8 +1412,9 @@ export class DatabaseRepository {
       );
       if (claim.rows.length > 0) {
         const details = await pool.query(
-          `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
-             e.name AS "eventName", e.date::text AS "eventDate", p.retry_count AS "retryCount"
+           `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
+              e.name AS "eventName", e.date::text AS "eventDate", s.copies_printed AS "copiesPrinted",
+              p.retry_count AS "retryCount"
            FROM publication_records p
            JOIN generated_outputs o ON o.id = p.output_id
            JOIN sessions s ON s.id = o.session_id
@@ -1425,6 +1456,7 @@ export class DatabaseRepository {
           mediaType: output.mediaType,
           eventName: output.eventName,
           eventDate: output.eventDate,
+          copiesPrinted: this.inMemorySessions.get(output.sessionId)?.copiesPrinted ?? 0,
           retryCount: p.retryCount,
         };
       })
@@ -1566,6 +1598,284 @@ export class DatabaseRepository {
       }
     }
     return null;
+  }
+
+  public async getOutputByPublicId(publicId: string): Promise<OutputItem | null> {
+    const result = await pool.query(
+      `SELECT o.id, o.session_id AS "sessionId", o.public_id AS "publicId", o.media_type AS "mediaType", o.file_path AS "filePath",
+        o.width, o.height, o.created_at AS "createdAt", e.name AS "eventName", e.date::text AS "eventDate"
+       FROM generated_outputs o JOIN sessions s ON s.id = o.session_id JOIN events e ON e.id = s.event_id WHERE o.public_id = $1`, [publicId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  public async createPrintJob(input: {
+    output: OutputItem;
+    requestKey: string;
+    artifactPath: string;
+    artifactType: 'image/png' | 'application/pdf';
+    printerName: string;
+    mediaSize: string;
+    copies: number;
+    mode: 'cups' | 'simulation';
+    reprintOfId?: string;
+    rejectAfterInitialCompletion?: boolean;
+  }): Promise<PrintJob | null> {
+    if (input.rejectAfterInitialCompletion) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [input.output.sessionId]);
+        const existing = await client.query<PrintJob>(
+          `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+            output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+            copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+            printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+            created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE request_key = $1`,
+          [input.requestKey],
+        );
+        if (existing.rows[0]) {
+          await client.query('COMMIT');
+          return existing.rows[0];
+        }
+        const completed = await client.query(
+          `SELECT id FROM print_jobs
+           WHERE session_id = $1 AND reprint_of_id IS NULL AND status = 'completed' LIMIT 1`,
+          [input.output.sessionId],
+        );
+        if (completed.rows[0]) {
+          await client.query('COMMIT');
+          return null;
+        }
+        const created = await this.insertPrintJob(client, input);
+        await client.query('COMMIT');
+        return created;
+      } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+
+    return this.insertPrintJob(pool, input);
+  }
+
+  private async insertPrintJob(
+    client: Pick<typeof pool, 'query'>,
+    input: {
+      output: OutputItem;
+      requestKey: string;
+      artifactPath: string;
+      artifactType: 'image/png' | 'application/pdf';
+      printerName: string;
+      mediaSize: string;
+      copies: number;
+      mode: 'cups' | 'simulation';
+      reprintOfId?: string;
+    },
+  ): Promise<PrintJob> {
+    const result = await client.query(
+      `INSERT INTO print_jobs
+        (output_id, session_id, request_key, artifact_path, artifact_type, public_id, output_type,
+         printer_name, media_size, copies_requested, mode, reprint_of_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (request_key) DO UPDATE SET request_key = EXCLUDED.request_key
+       RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+         output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+         copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+         printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+         created_at AS "createdAt", updated_at AS "updatedAt"`,
+      [input.output.id, input.output.sessionId, input.requestKey, input.artifactPath, input.artifactType,
+        input.output.publicId, input.output.mediaType === 'image/png' ? 'photo_strip' : 'flipbook',
+        input.printerName, input.mediaSize, input.copies, input.mode, input.reprintOfId ?? null],
+    );
+    return result.rows[0];
+  }
+
+  public async getPrintJob(id: string): Promise<PrintJob | null> {
+    const result = await pool.query(
+      `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+        output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+        copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+        printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+        created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE id = $1`, [id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  public async getPrintJobArtifact(id: string): Promise<string | null> {
+    const result = await pool.query<{ artifactPath: string }>(
+      'SELECT artifact_path AS "artifactPath" FROM print_jobs WHERE id = $1',
+      [id],
+    );
+    return result.rows[0]?.artifactPath ?? null;
+  }
+
+  public async listPrintJobs(limit: number, before?: Date): Promise<PrintJob[]> {
+    const result = await pool.query(
+      `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+        output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+        copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+        printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+        created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs
+       WHERE ($2::timestamptz IS NULL OR created_at < $2)
+       ORDER BY CASE WHEN status IN ('queued','submitting','pending','processing','stopped','needs_attention') THEN 0 ELSE 1 END, created_at DESC
+       LIMIT $1`, [limit, before ?? null],
+    );
+    return result.rows;
+  }
+
+  public async claimQueuedPrintJobs(limit: number): Promise<PrintJob[]> {
+    const result = await pool.query(
+      `WITH claimed AS (
+        UPDATE print_jobs SET status = 'submitting', updated_at = CURRENT_TIMESTAMP
+        WHERE id IN (SELECT id FROM print_jobs WHERE status = 'queued' ORDER BY created_at LIMIT $1 FOR UPDATE SKIP LOCKED)
+        RETURNING *
+      ) SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+        output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+        copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+        printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+        created_at AS "createdAt", updated_at AS "updatedAt" FROM claimed`, [limit],
+    );
+    return result.rows;
+  }
+
+  public async listActivePrintAttempts(): Promise<Array<PrintJob & { cupsJobId: string | null; attemptId: string }>> {
+    const result = await pool.query(
+      `SELECT j.id, j.session_id AS "sessionId", j.output_id AS "outputId", j.public_id AS "publicId",
+        j.output_type AS "outputType", j.artifact_type AS "artifactType", j.copies_requested AS "copiesRequested",
+        j.copies_completed AS "copiesCompleted", GREATEST(j.copies_requested - j.copies_completed, 0) AS "copiesWaiting",
+        j.printer_name AS "printerName", j.media_size AS "mediaSize", j.mode, j.status, j.last_error AS "lastError",
+        j.created_at AS "createdAt", j.updated_at AS "updatedAt", a.id AS "attemptId", a.cups_job_id AS "cupsJobId"
+       FROM print_jobs j JOIN print_job_attempts a ON a.print_job_id = j.id AND a.is_current
+       WHERE j.status IN ('pending', 'processing', 'stopped')`,
+    );
+    return result.rows;
+  }
+
+  public async listSupersededPrintAttempts(): Promise<Array<{ jobId: string; attemptId: string; cupsJobId: string }>> {
+    const result = await pool.query(
+      `SELECT print_job_id AS "jobId", id AS "attemptId", cups_job_id AS "cupsJobId"
+       FROM print_job_attempts
+       WHERE is_current = false AND cups_job_id IS NOT NULL AND state <> 'completed'`,
+    );
+    return result.rows;
+  }
+
+  public async createPrintAttempt(jobId: string): Promise<PrintJobAttempt> {
+    const result = await pool.query(
+      `WITH next_attempt AS (
+        SELECT COALESCE(MAX(attempt_number), 0) + 1 AS number FROM print_job_attempts WHERE print_job_id = $1
+      ), superseded AS (
+        UPDATE print_job_attempts SET is_current = false, superseded_at = CURRENT_TIMESTAMP
+        WHERE print_job_id = $1 AND is_current
+      ) INSERT INTO print_job_attempts (print_job_id, attempt_number, title, is_current)
+      SELECT $1, number, 'sic-print:' || $1 || ':' || number FROM next_attempt
+      RETURNING id, print_job_id AS "printJobId", attempt_number AS "attemptNumber", title, cups_job_id AS "cupsJobId", state, error,
+        is_current AS "isCurrent", superseded_at AS "supersededAt"`, [jobId],
+    );
+    return result.rows[0];
+  }
+
+  public async updatePrintAttempt(attemptId: string, state: PrintJobStatus, cupsJobId?: string, error?: string): Promise<void> {
+    await pool.query(
+      `UPDATE print_job_attempts SET state = $2, cups_job_id = COALESCE($3, cups_job_id), error = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [attemptId, state, cupsJobId ?? null, error ?? null],
+    );
+  }
+
+  public async updatePrintJobStatus(id: string, status: PrintJobStatus, error?: string): Promise<PrintJob | null> {
+    const result = await pool.query(
+      `UPDATE print_jobs SET status = $2, last_error = $3, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+        output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+        copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+        printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`,
+      [id, status, error ?? null],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  public async retryPrintJob(id: string): Promise<PrintJob | null> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+      `UPDATE print_jobs SET status = 'queued', last_error = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status IN ('failed', 'canceled', 'needs_attention')
+       RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
+         artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
+         GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName", media_size AS "mediaSize",
+          mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`, [id],
+      );
+      if (result.rows[0]) {
+        await client.query(
+          `UPDATE print_job_attempts SET is_current = false, superseded_at = CURRENT_TIMESTAMP
+           WHERE print_job_id = $1 AND is_current`,
+          [id],
+        );
+      }
+      await client.query('COMMIT');
+      return result.rows[0] ?? null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public async reprintPrintJob(id: string, requestKey: string): Promise<PrintJob | null> {
+    const result = await pool.query(
+      `INSERT INTO print_jobs (output_id, session_id, request_key, artifact_path, artifact_type, public_id, output_type,
+         printer_name, media_size, copies_requested, mode, reprint_of_id)
+       SELECT output_id, session_id, $2, artifact_path, artifact_type, public_id, output_type,
+         printer_name, media_size, copies_requested, mode, id FROM print_jobs WHERE id = $1 AND status = 'completed'
+       RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
+         artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
+         GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName", media_size AS "mediaSize",
+         mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`, [id, requestKey],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /** Completion and session accounting share one transaction, so repeated reconciliation is harmless. */
+  public async completePrintJob(id: string, attemptId: string): Promise<PrintJob | null> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const completed = await client.query(
+        `UPDATE print_jobs SET status = 'completed', copies_completed = copies_requested,
+          last_error = NULL, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $1 AND status <> 'completed'
+            AND EXISTS (
+              SELECT 1 FROM print_job_attempts
+              WHERE id = $2 AND print_job_id = print_jobs.id AND is_current
+            )
+          RETURNING session_id, copies_requested`, [id, attemptId],
+      );
+      if (completed.rows[0]) {
+        await client.query(
+          `UPDATE sessions SET is_printed = true, copies_printed = copies_printed + $2,
+            state = 'printed', last_activity_at = CURRENT_TIMESTAMP
+           WHERE id = $1 AND state IN ('booth_confirmed', 'printed')`,
+          [completed.rows[0].session_id, completed.rows[0].copies_requested],
+        );
+      }
+      const job = await client.query(
+        `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
+          artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
+          GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName",
+          media_size AS "mediaSize", mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"
+         FROM print_jobs WHERE id = $1`, [id],
+      );
+      await client.query('COMMIT');
+      return job.rows[0] ?? null;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally { client.release(); }
   }
 
   private readonly templateSelectFields = `
@@ -2043,48 +2353,6 @@ export class DatabaseRepository {
       return session;
     }
     return null;
-  }
-
-  public async createPrintJob(job: Omit<PrintJob, 'id' | 'copiesCompleted' | 'status' | 'lastError' | 'lastReconciledAt' | 'createdAt' | 'updatedAt'>): Promise<PrintJob> {
-    const columns = ['output_id', 'session_id', 'request_key', 'artifact_path', 'artifact_type', 'public_id', 'output_type', 'printer_name', 'media_size', 'copies_requested', 'submission_mode', 'reprint_of_id'];
-    const values = [job.outputId, job.sessionId, job.requestKey, job.artifactPath, job.artifactType, job.publicId, job.outputType, job.printerName, job.mediaSize, job.copiesRequested, job.submissionMode, job.reprintOfId];
-    try {
-      const result = await pool.query(`INSERT INTO print_jobs (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')}) ON CONFLICT (request_key) DO UPDATE SET request_key = EXCLUDED.request_key RETURNING id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt"`, values);
-      return result.rows[0];
-    } catch {
-      const existing = Array.from(this.inMemoryPrintJobs.values()).find((item) => item.requestKey === job.requestKey);
-      if (existing) return existing;
-      const created: PrintJob = { ...job, id: crypto.randomUUID(), copiesCompleted: 0, status: 'queued', lastError: null, lastReconciledAt: null, createdAt: new Date(), updatedAt: new Date() };
-      this.inMemoryPrintJobs.set(created.id, created);
-      return created;
-    }
-  }
-
-  public async getPrintJob(id: string): Promise<PrintJob | null> {
-    try {
-      const result = await pool.query(`SELECT id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE id = $1`, [id]);
-      return result.rows[0] || null;
-    } catch { return this.inMemoryPrintJobs.get(id) || null; }
-  }
-
-  public async listPrintJobs(limit = 50): Promise<PrintJob[]> {
-    try {
-      const result = await pool.query(`SELECT id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs ORDER BY (status IN ('queued','submitting','pending','processing','stopped')) DESC, created_at DESC LIMIT $1`, [limit]);
-      return result.rows;
-    } catch { return Array.from(this.inMemoryPrintJobs.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, limit); }
-  }
-
-  public async updatePrintJob(id: string, status: PrintJobStatus, error: string | null = null): Promise<PrintJob | null> {
-    try {
-      const result = await pool.query(`UPDATE print_jobs SET status = $2, last_error = $3, copies_completed = CASE WHEN $2 = 'completed' THEN copies_requested ELSE copies_completed END, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING id, output_id AS "outputId", session_id AS "sessionId", request_key AS "requestKey", artifact_path AS "artifactPath", artifact_type AS "artifactType", public_id AS "publicId", output_type AS "outputType", printer_name AS "printerName", media_size AS "mediaSize", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted", submission_mode AS "submissionMode", status, last_error AS "lastError", last_reconciled_at AS "lastReconciledAt", reprint_of_id AS "reprintOfId", created_at AS "createdAt", updated_at AS "updatedAt"`, [id, status, error]);
-      const job = result.rows[0];
-      if (job?.status === 'completed') await this.recordPrintStatus(job.sessionId, job.copiesRequested);
-      return job || null;
-    } catch {
-      const job = this.inMemoryPrintJobs.get(id); if (!job) return null;
-      const wasCompleted = job.status === 'completed'; job.status = status; job.lastError = error; job.lastReconciledAt = new Date(); job.updatedAt = new Date(); if (status === 'completed') job.copiesCompleted = job.copiesRequested;
-      if (status === 'completed' && !wasCompleted) await this.recordPrintStatus(job.sessionId, job.copiesRequested); return job;
-    }
   }
 
   /**

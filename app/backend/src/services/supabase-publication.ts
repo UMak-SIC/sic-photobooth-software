@@ -10,6 +10,7 @@ export interface PublicOutputPublication {
   mediaType: string;
   eventName: string;
   eventDate: string;
+  printCount: number;
   cloudFinalizedAt: Date;
   expiresAt: Date;
 }
@@ -42,6 +43,7 @@ export async function registerPublicOutput(output: PublicOutputPublication): Pro
       media_type: output.mediaType,
       event_name: output.eventName,
       event_date: output.eventDate,
+      print_count: output.printCount,
       status: 'uploaded',
       cloud_finalized_at: output.cloudFinalizedAt.toISOString(),
       expires_at: output.expiresAt.toISOString(),
@@ -49,6 +51,19 @@ export async function registerPublicOutput(output: PublicOutputPublication): Pro
     { onConflict: 'public_id' },
   );
   if (error) throw new Error(`Supabase publication record failed: ${error.message}`);
+}
+
+/** Best-effort mirror of the locally authoritative print count for an uploaded output. */
+export async function updatePublicOutputPrintCount(
+  publicId: string,
+  printCount: number,
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc('set_public_output_print_count', {
+    output_public_id: publicId,
+    output_print_count: printCount,
+  });
+  if (error) throw new Error(`Supabase print count update failed: ${error.message}`);
 }
 
 /** Reconciles a timed-out upsert before deleting a Cloudinary asset from a dead-letter job. */

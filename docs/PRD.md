@@ -399,7 +399,7 @@ This section resolves implementation details established after the original user
 * The capture sequence automatically captures each required index and assigns them in index order. The administrator can set the countdown to 3, 5, or 10 seconds per template; retakes use that same countdown.
 * A retake replaces exactly one selected capture and may be repeated while the session is still in review, subject to the four-retake session limit.
 * Booth confirmation is irreversible. It generates the PNG, public ID, QR, and a queued publication record. Printing and publication are always attempted after booth confirmation.
-* Firefox handles browser printing through CUPS for the Epson L3250. The application does not retry printing. The administrator records `is_printed` and `copies_printed` manually.
+* Chromium hosts an in-app print dialog while the local backend owns CUPS submission and reconciliation for the Epson L3250. A persistent queue records every attempt. `is_printed` and `copies_printed` advance exactly once when CUPS reports completion; Retry and Reprint require explicit operator action.
 
 #### Template Editor Contract
 
@@ -441,7 +441,7 @@ This section resolves implementation details established after the original user
 * Camera failure: “Camera capture failed. Check the camera feed and retake this photo.” The current capture can be retried.
 * Composition failure: “Could not generate the photo strip. Your original photos are safe.” The administrator can retry generation.
 * GIF timeout: “GIF processing took too long. Please recapture this flipbook.” The system discards Flipbook assets and restarts cover capture.
-* Print failure: “Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.” The administrator enters `is_printed` and `copies_printed` after resolving CUPS.
+* Print failure: “Printing needs operator attention. It may have produced partial pages.” The operator uses the local print queue to Retry after confirmation, or Reprint only after a completed job. The application never records copies manually or automatically resubmits an ambiguous job.
 * Publishing failure: “Saved locally. Online delivery will retry automatically.” The job remains queued or can be retried from the dashboard.
 * Local retrieval failure: “Photo not found. Check the QR code or enter the full link/code again.”
 * Public retrieval failure returns a `404` page: “This photo has not been published or is no longer available.”

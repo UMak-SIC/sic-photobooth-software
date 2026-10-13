@@ -6,7 +6,7 @@ Complete workflows to verify once the applications and test runner exist. Test e
 
 ## Photo Strip
 
-1. Start a session, select an event and template, capture each required image, retake one image, confirm, record printing, and retrieve the generated output locally.
+1. Start a session, select an event and template, capture each required image, retake one image, confirm, queue printing in the booth dialog, wait for CUPS completion, and retrieve the generated output locally.
 2. Run the same flow offline and confirm printing and local retrieval remain available while publication stays queued.
 3. Attempt a fifth retake and confirm the backend rejects it without changing the final captures.
 
@@ -26,3 +26,8 @@ Complete workflows to verify once the applications and test runner exist. Test e
 
 1. Attempt cross-session access, invalid state transitions, unsupported media uploads, oversized uploads, and path traversal.
 2. Confirm each attempt fails without exposing another session's media or local filesystem paths.
+
+## Printing Recovery
+
+1. Restart the backend before and after CUPS accepts a job; confirm reconciliation does not duplicate the submission or copy count.
+2. Retry a failed/canceled/indeterminate job only after acknowledging possible partial output, then Reprint a completed job and confirm it creates a distinct queue record.

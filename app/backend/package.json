@@ -6,7 +6,7 @@
   "types": "./dist/server.d.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -b && node -e \"const fs=require('node:fs'), path=require('node:path'); const dest=path.resolve('dist/db/migrations'); fs.mkdirSync(dest, {recursive:true}); fs.cpSync(path.resolve('src/db/migrations'), dest, {recursive:true}); if (fs.existsSync('src/db/schema.sql')) fs.copyFileSync(path.resolve('src/db/schema.sql'), path.resolve('dist/db/schema.sql'));\"",
+    "build": "tsc -b && node -e \"const fs=require('node:fs'), path=require('node:path'); for (const source of ['src/db/migrations', 'src/services/ipp']) { const dest=path.resolve('dist', source.slice(4)); fs.mkdirSync(path.dirname(dest), {recursive:true}); fs.cpSync(path.resolve(source), dest, {recursive:true}); } if (fs.existsSync('src/db/schema.sql')) fs.copyFileSync(path.resolve('src/db/schema.sql'), path.resolve('dist/db/schema.sql'));\"",
     "typecheck": "tsc --noEmit",
     "test:integration": "vitest run test/supabase-publication.integration.test.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",

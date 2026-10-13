@@ -8,6 +8,7 @@ import { draftFromTemplate, emptyDraft, type Template } from './templates/types'
 import { PublicationDashboard } from './publications/publication-dashboard';
 import { AdminEventsPage } from '../pages/AdminEventsPage';
 import { AdminAnalyticsPage } from './analytics/AdminAnalyticsPage';
+import { PrintQueuePage } from './printing/print-queue-page';
 
 
 export function AdminRouter() {
@@ -158,6 +159,7 @@ export function AdminRouter() {
       </AdminFrame>
     );
   if (path === '/admin/publications') return <AdminFrame onNavigate={navigate}><PublicationDashboard /></AdminFrame>;
+  if (path === '/admin/print') return <AdminFrame onNavigate={navigate}><PrintQueuePage /></AdminFrame>;
 
   const isFlipbookRoute = path.startsWith('/admin/frames/');
   const id = (path.startsWith('/admin/templates/') || isFlipbookRoute) ? path.split('/').at(-1) : undefined;
@@ -196,6 +198,7 @@ function AdminFrame({ children, onNavigate }: { children: React.ReactNode; onNav
             ['/admin/templates', 'Templates'],
             ['/admin/frames', 'Flipbook frames'],
             ['/admin/publications', 'Publications'],
+            ['/admin/print', 'Print queue'],
           ].map(([path, label]) => (
             <a href={path} key={path} onClick={(event) => { event.preventDefault(); onNavigate(path); }}>{label}</a>
           ))}

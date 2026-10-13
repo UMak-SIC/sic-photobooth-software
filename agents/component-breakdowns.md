@@ -9,7 +9,7 @@ Component and module boundaries derived from the product contract. This is a tem
 - Session workflow: owns state transitions and session isolation.
 - Media validation: owns file type, actual format, size, dimensions, duration, and generated paths.
 - Rendering: owns photo-strip composition and Flipbook GIF generation.
-- Printing: owns print eligibility; the administrator records final print confirmation.
+- Printing: owns print eligibility, persistent CUPS submission attempts, reconciliation, and transactional session print accounting. The administrator recovers failed or indeterminate jobs through the queue.
 - Publishing worker: owns asynchronous Cloudinary/Supabase delivery and retry state.
 - Local output retrieval: exposes only approved outputs addressed by public ID.
 

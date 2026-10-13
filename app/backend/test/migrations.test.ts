@@ -71,6 +71,24 @@ describe('Versioned Database Migrations', () => {
     expect(schema006).toContain('ALTER COLUMN next_attempt_at DROP NOT NULL');
   });
 
+  it('defines persistent print jobs, immutable attempts, and active-output protection', () => {
+    const dir = findMigrationsDir();
+    const schema009 = fs.readFileSync(path.join(dir, '009_print_jobs.sql'), 'utf8');
+    expect(schema009).toContain('CREATE TABLE IF NOT EXISTS print_jobs');
+    expect(schema009).toContain('CREATE TABLE IF NOT EXISTS print_job_attempts');
+    expect(schema009).toContain('request_key UUID NOT NULL UNIQUE');
+    expect(schema009).toContain("ON DELETE SET NULL");
+    expect(schema009).toContain("'needs_attention'");
+  });
+
+  it('gives each logical print job one current attempt', () => {
+    const dir = findMigrationsDir();
+    const schema010 = fs.readFileSync(path.join(dir, '010_print_job_attempt_ownership.sql'), 'utf8');
+    expect(schema010).toContain('is_current BOOLEAN NOT NULL DEFAULT true');
+    expect(schema010).toContain('superseded_at TIMESTAMPTZ');
+    expect(schema010).toContain('idx_print_job_attempts_one_current');
+  });
+
   it('verifies all migration files have unique, monotonically incrementing 3-digit prefixes', () => {
     const dir = findMigrationsDir();
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();

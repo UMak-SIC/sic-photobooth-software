@@ -1,5 +1,5 @@
 import { buildApp } from './app.js';
-import { config, printerConfig } from './config.js';
+import { config } from './config.js';
 import { runMigrations } from './db/migrations.js';
 import { checkDatabaseHealth, closePool } from './db/pool.js';
 import { startPublishingWorker, stopPublishingWorker } from './services/publishing-worker.js';
@@ -37,7 +37,7 @@ async function startServer() {
   try {
     await app.listen({ port: config.port, host: config.host });
     startPublishingWorker();
-    if (dbHealth.ok) startPrintWorker(printerConfig.pollIntervalMs);
+    if (dbHealth.ok) startPrintWorker();
     app.log.info(`Photobooth Backend server running at http://${config.host}:${config.port}`);
   } catch (err) {
     app.log.error(err);

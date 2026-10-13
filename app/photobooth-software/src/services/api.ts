@@ -79,6 +79,10 @@ export class BoothApiClient {
     this.token = token;
   }
 
+  public getToken(): string | null {
+    return this.token;
+  }
+
   private getHeaders(contentType?: string): Record<string, string> {
     const headers: Record<string, string> = {};
     if (contentType) {

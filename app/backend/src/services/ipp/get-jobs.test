@@ -1,0 +1,11 @@
+{
+  NAME "Get all printer jobs"
+  OPERATION Get-Jobs
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language en
+  ATTR uri printer-uri $PRINTER_URI
+  ATTR keyword which-jobs all
+  ATTR boolean my-jobs false
+  STATUS successful-ok
+}

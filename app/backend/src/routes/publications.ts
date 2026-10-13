@@ -6,15 +6,10 @@ import { z } from 'zod';
 import { dbRepository } from '../db/repository.js';
 import { storageService } from '../services/storage.js';
 import { deleteCloudPublication } from '../services/publishing-worker.js';
-import { printerService } from '../services/printer.js';
 import { templateRepository } from '../templates/repository.js';
 import { resolveFlipbookTemplate } from './sessions.js';
 
 const publicationIdSchema = z.object({ id: z.string().uuid() });
-const printBodySchema = z.object({
-  copies: z.number().int().min(1).max(10).optional().default(1),
-  recordOnly: z.boolean().optional().default(false),
-});
 
 async function resolvePublicationOutput(id: string) {
   const parsed = publicationIdSchema.safeParse({ id });
@@ -372,46 +367,8 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
 
   fastify.post<{ Params: { id: string }; Body?: { copies?: number; recordOnly?: boolean } }>(
     '/api/publications/:id/print',
-    async (request, reply) => {
-      const output = await resolvePublicationOutput(request.params.id);
-      if (!output) {
-        return reply.status(404).send({
-          success: false,
-          error: { code: 'PUBLICATION_NOT_FOUND', message: 'Publication output was not found.' },
-        });
-      }
-
-      const bodyParsed = printBodySchema.safeParse(request.body || {});
-      const copies = bodyParsed.success ? bodyParsed.data.copies : 1;
-      const recordOnly = bodyParsed.success ? bodyParsed.data.recordOnly : false;
-
-      let printJobId: string | undefined;
-      if (!recordOnly && output.mediaType !== 'image/gif') {
-        const result = await printerService.printImage(output.filePath, copies);
-        if (!result.success) {
-          return reply.status(502).send({
-            success: false,
-            error: { code: 'PRINT_FAILED', message: result.error ?? 'Print failed.' },
-          });
-        }
-        printJobId = result.jobId;
-      }
-
-      let copiesPrinted = copies;
-      if (output.sessionId) {
-        const updated = await dbRepository.recordPrintStatus(output.sessionId, copies);
-        if (updated) {
-          copiesPrinted = updated.copiesPrinted;
-        }
-      }
-
-      return reply.send({
-        success: true,
-        data: {
-          jobId: printJobId,
-          copiesPrinted,
-        },
-      });
+    async (_request, reply) => {
+      return reply.status(410).send({ success: false, error: { code: 'PRINT_QUEUE_REQUIRED', message: 'Use /api/print-jobs to create a persistent queue record.' } });
     },
   );
 };

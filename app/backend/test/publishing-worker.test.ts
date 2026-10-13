@@ -88,6 +88,7 @@ describe('Publishing worker', () => {
       expect.objectContaining({
         public_id: 'WkrTst',
         cloudinary_public_id: 'photobooth/WkrTst',
+        print_count: 0,
         status: 'uploaded',
         cloud_finalized_at: expect.any(String),
       }),
@@ -269,4 +270,3 @@ describe('Publishing worker', () => {
     }
   });
 });
-
