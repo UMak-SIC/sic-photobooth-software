@@ -98,6 +98,8 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
     );
     let motionSheetUrl: string | null = null;
     let coverSheetUrl: string | null = null;
+    const templateAssetUrl = (templateId: string, kind: 'cover' | 'background') =>
+      `/templates/${templateId}/${kind}`;
 
     if (sessionId) {
       const session = await dbRepository.getSessionById(sessionId);
@@ -108,23 +110,17 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
           frame = {
             id: resolvedTemplate.id,
             name: resolvedTemplate.name,
-            coverPath: resolvedTemplate.coverPath
-              ? (resolvedTemplate.coverPath.startsWith('/') ? resolvedTemplate.coverPath : `/templates/${resolvedTemplate.id}/cover`)
-              : null,
+            coverPath: resolvedTemplate.coverPath ? templateAssetUrl(resolvedTemplate.id, 'cover') : null,
             backgroundPath: resolvedTemplate.backgroundPath
-              ? (resolvedTemplate.backgroundPath.startsWith('/') ? resolvedTemplate.backgroundPath : `/templates/${resolvedTemplate.id}/background`)
+              ? templateAssetUrl(resolvedTemplate.id, 'background')
               : null,
             placements: resolvedTemplate.placements,
           };
           if (resolvedTemplate.backgroundPath) {
-            motionSheetUrl = resolvedTemplate.backgroundPath.startsWith('/')
-              ? resolvedTemplate.backgroundPath
-              : `/templates/${resolvedTemplate.id}/background`;
+            motionSheetUrl = templateAssetUrl(resolvedTemplate.id, 'background');
           }
           if (resolvedTemplate.coverPath) {
-            coverSheetUrl = resolvedTemplate.coverPath.startsWith('/')
-              ? resolvedTemplate.coverPath
-              : `/templates/${resolvedTemplate.id}/cover`;
+            coverSheetUrl = templateAssetUrl(resolvedTemplate.id, 'cover');
           }
         }
       }
@@ -134,23 +130,15 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
         frame = {
           id: snap.id || 'custom',
           name: snap.name || 'Custom Frame',
-          coverPath: snap.coverPath
-            ? (snap.coverPath.startsWith('/') ? snap.coverPath : `/templates/${snap.id}/cover`)
-            : null,
-          backgroundPath: snap.backgroundPath
-            ? (snap.backgroundPath.startsWith('/') ? snap.backgroundPath : `/templates/${snap.id}/background`)
-            : null,
+          coverPath: snap.coverPath && snap.id ? templateAssetUrl(snap.id, 'cover') : null,
+          backgroundPath: snap.backgroundPath && snap.id ? templateAssetUrl(snap.id, 'background') : null,
           placements: snap.placements,
         };
-        if (snap.backgroundPath) {
-          motionSheetUrl = snap.backgroundPath.startsWith('/')
-            ? snap.backgroundPath
-            : `/templates/${snap.id}/background`;
+        if (snap.backgroundPath && snap.id) {
+          motionSheetUrl = templateAssetUrl(snap.id, 'background');
         }
-        if (snap.coverPath) {
-          coverSheetUrl = snap.coverPath.startsWith('/')
-            ? snap.coverPath
-            : `/templates/${snap.id}/cover`;
+        if (snap.coverPath && snap.id) {
+          coverSheetUrl = templateAssetUrl(snap.id, 'cover');
         }
       }
     }
@@ -163,23 +151,17 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
           frame = {
             id: defaultTemplate.id,
             name: defaultTemplate.name,
-            coverPath: defaultTemplate.coverPath
-              ? (defaultTemplate.coverPath.startsWith('/') ? defaultTemplate.coverPath : `/templates/${defaultTemplate.id}/cover`)
-              : null,
+            coverPath: defaultTemplate.coverPath ? templateAssetUrl(defaultTemplate.id, 'cover') : null,
             backgroundPath: defaultTemplate.backgroundPath
-              ? (defaultTemplate.backgroundPath.startsWith('/') ? defaultTemplate.backgroundPath : `/templates/${defaultTemplate.id}/background`)
+              ? templateAssetUrl(defaultTemplate.id, 'background')
               : null,
             placements: defaultTemplate.placements,
           };
           if (defaultTemplate.backgroundPath) {
-            motionSheetUrl = defaultTemplate.backgroundPath.startsWith('/')
-              ? defaultTemplate.backgroundPath
-              : `/templates/${defaultTemplate.id}/background`;
+            motionSheetUrl = templateAssetUrl(defaultTemplate.id, 'background');
           }
           if (defaultTemplate.coverPath) {
-            coverSheetUrl = defaultTemplate.coverPath.startsWith('/')
-              ? defaultTemplate.coverPath
-              : `/templates/${defaultTemplate.id}/cover`;
+            coverSheetUrl = templateAssetUrl(defaultTemplate.id, 'cover');
           }
         }
       } catch {}

@@ -133,8 +133,15 @@ export interface LocalPublicationOutput {
 }
 
 export type PrintJobStatus =
-  | 'queued' | 'submitting' | 'pending' | 'processing' | 'stopped'
-  | 'completed' | 'failed' | 'canceled' | 'needs_attention';
+  | 'queued'
+  | 'submitting'
+  | 'pending'
+  | 'processing'
+  | 'stopped'
+  | 'completed'
+  | 'failed'
+  | 'canceled'
+  | 'needs_attention';
 
 export interface PrintJob {
   id: string;
@@ -265,10 +272,46 @@ export class DatabaseRepository {
 
   // Default 4-strip placements for canonical flipbook templates/frames
   private defaultFlipbookPlacements: TemplatePlacement[] = [
-    { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
-    { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
-    { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
-    { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+    {
+      captureIndex: 1,
+      x: 290,
+      y: 150,
+      width: 620,
+      height: 348.75,
+      rotation: 0,
+      borderRadius: 0,
+      zIndex: 1,
+    },
+    {
+      captureIndex: 2,
+      x: 290,
+      y: 540,
+      width: 620,
+      height: 348.75,
+      rotation: 0,
+      borderRadius: 0,
+      zIndex: 2,
+    },
+    {
+      captureIndex: 3,
+      x: 290,
+      y: 930,
+      width: 620,
+      height: 348.75,
+      rotation: 0,
+      borderRadius: 0,
+      zIndex: 3,
+    },
+    {
+      captureIndex: 4,
+      x: 290,
+      y: 1320,
+      width: 620,
+      height: 348.75,
+      rotation: 0,
+      borderRadius: 0,
+      zIndex: 4,
+    },
   ];
 
   // In-memory fallback stores when PostgreSQL is offline
@@ -283,10 +326,46 @@ export class DatabaseRepository {
         overlayPath: 'frames/sic-seal.png',
         isActive: true,
         placements: [
-          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
-          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
-          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
-          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+          {
+            captureIndex: 1,
+            x: 290,
+            y: 150,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 290,
+            y: 540,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 2,
+          },
+          {
+            captureIndex: 3,
+            x: 290,
+            y: 930,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 3,
+          },
+          {
+            captureIndex: 4,
+            x: 290,
+            y: 1320,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 4,
+          },
         ],
       },
     ],
@@ -298,10 +377,46 @@ export class DatabaseRepository {
         overlayPath: 'frames/emerald-motion.png',
         isActive: true,
         placements: [
-          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
-          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
-          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
-          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+          {
+            captureIndex: 1,
+            x: 290,
+            y: 150,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 290,
+            y: 540,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 2,
+          },
+          {
+            captureIndex: 3,
+            x: 290,
+            y: 930,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 3,
+          },
+          {
+            captureIndex: 4,
+            x: 290,
+            y: 1320,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 4,
+          },
         ],
       },
     ],
@@ -313,10 +428,46 @@ export class DatabaseRepository {
         overlayPath: 'frames/pioneer-grid.png',
         isActive: true,
         placements: [
-          { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
-          { captureIndex: 2, x: 290, y: 540, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 2 },
-          { captureIndex: 3, x: 290, y: 930, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 3 },
-          { captureIndex: 4, x: 290, y: 1320, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 4 },
+          {
+            captureIndex: 1,
+            x: 290,
+            y: 150,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 1,
+          },
+          {
+            captureIndex: 2,
+            x: 290,
+            y: 540,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 2,
+          },
+          {
+            captureIndex: 3,
+            x: 290,
+            y: 930,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 3,
+          },
+          {
+            captureIndex: 4,
+            x: 290,
+            y: 1320,
+            width: 620,
+            height: 348.75,
+            rotation: 0,
+            borderRadius: 0,
+            zIndex: 4,
+          },
         ],
       },
     ],
@@ -606,7 +757,10 @@ export class DatabaseRepository {
       if (res.rows && res.rows.length > 0) {
         return res.rows.map((row: FrameItem) => ({
           ...row,
-          placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+          placements:
+            row.placements && row.placements.length > 0
+              ? row.placements
+              : this.defaultFlipbookPlacements,
         }));
       }
       return Array.from(this.inMemoryFrames.values()).filter((f) => f.isActive);
@@ -632,7 +786,10 @@ export class DatabaseRepository {
           const row = res.rows[0];
           return {
             ...row,
-            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+            placements:
+              row.placements && row.placements.length > 0
+                ? row.placements
+                : this.defaultFlipbookPlacements,
           };
         }
       } catch {
@@ -651,7 +808,10 @@ export class DatabaseRepository {
           const row = res.rows[0];
           return {
             ...row,
-            placements: row.placements && row.placements.length > 0 ? row.placements : this.defaultFlipbookPlacements,
+            placements:
+              row.placements && row.placements.length > 0
+                ? row.placements
+                : this.defaultFlipbookPlacements,
           };
         }
       } catch {
@@ -670,7 +830,11 @@ export class DatabaseRepository {
       return allFrames[idx];
     }
 
-    const matched = allFrames.find((f) => f.name.toLowerCase().includes(frameId.toLowerCase()) || frameId.toLowerCase().includes(f.name.toLowerCase()));
+    const matched = allFrames.find(
+      (f) =>
+        f.name.toLowerCase().includes(frameId.toLowerCase()) ||
+        frameId.toLowerCase().includes(f.name.toLowerCase()),
+    );
     if (matched) {
       return matched;
     }
@@ -1412,7 +1576,7 @@ export class DatabaseRepository {
       );
       if (claim.rows.length > 0) {
         const details = await pool.query(
-           `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
+          `SELECT p.id, p.public_id AS "publicId", o.file_path AS "filePath", o.media_type AS "mediaType",
               e.name AS "eventName", e.date::text AS "eventDate", s.copies_printed AS "copiesPrinted",
               p.retry_count AS "retryCount"
            FROM publication_records p
@@ -1604,7 +1768,8 @@ export class DatabaseRepository {
     const result = await pool.query(
       `SELECT o.id, o.session_id AS "sessionId", o.public_id AS "publicId", o.media_type AS "mediaType", o.file_path AS "filePath",
         o.width, o.height, o.created_at AS "createdAt", e.name AS "eventName", e.date::text AS "eventDate"
-       FROM generated_outputs o JOIN sessions s ON s.id = o.session_id JOIN events e ON e.id = s.event_id WHERE o.public_id = $1`, [publicId],
+       FROM generated_outputs o JOIN sessions s ON s.id = o.session_id JOIN events e ON e.id = s.event_id WHERE o.public_id = $1`,
+      [publicId],
     );
     return result.rows[0] ?? null;
   }
@@ -1625,7 +1790,9 @@ export class DatabaseRepository {
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        await client.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [input.output.sessionId]);
+        await client.query('SELECT id FROM sessions WHERE id = $1 FOR UPDATE', [
+          input.output.sessionId,
+        ]);
         const existing = await client.query<PrintJob>(
           `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
             output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
@@ -1686,9 +1853,20 @@ export class DatabaseRepository {
          copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
          printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
          created_at AS "createdAt", updated_at AS "updatedAt"`,
-      [input.output.id, input.output.sessionId, input.requestKey, input.artifactPath, input.artifactType,
-        input.output.publicId, input.output.mediaType === 'image/png' ? 'photo_strip' : 'flipbook',
-        input.printerName, input.mediaSize, input.copies, input.mode, input.reprintOfId ?? null],
+      [
+        input.output.id,
+        input.output.sessionId,
+        input.requestKey,
+        input.artifactPath,
+        input.artifactType,
+        input.output.publicId,
+        input.output.mediaType === 'image/png' ? 'photo_strip' : 'flipbook',
+        input.printerName,
+        input.mediaSize,
+        input.copies,
+        input.mode,
+        input.reprintOfId ?? null,
+      ],
     );
     return result.rows[0];
   }
@@ -1699,7 +1877,8 @@ export class DatabaseRepository {
         output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
         copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
         printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
-        created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE id = $1`, [id],
+        created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs WHERE id = $1`,
+      [id],
     );
     return result.rows[0] ?? null;
   }
@@ -1721,7 +1900,8 @@ export class DatabaseRepository {
         created_at AS "createdAt", updated_at AS "updatedAt" FROM print_jobs
        WHERE ($2::timestamptz IS NULL OR created_at < $2)
        ORDER BY CASE WHEN status IN ('queued','submitting','pending','processing','stopped','needs_attention') THEN 0 ELSE 1 END, created_at DESC
-       LIMIT $1`, [limit, before ?? null],
+       LIMIT $1`,
+      [limit, before ?? null],
     );
     return result.rows;
   }
@@ -1736,12 +1916,15 @@ export class DatabaseRepository {
         output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
         copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
         printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
-        created_at AS "createdAt", updated_at AS "updatedAt" FROM claimed`, [limit],
+        created_at AS "createdAt", updated_at AS "updatedAt" FROM claimed`,
+      [limit],
     );
     return result.rows;
   }
 
-  public async listActivePrintAttempts(): Promise<Array<PrintJob & { cupsJobId: string | null; attemptId: string }>> {
+  public async listActivePrintAttempts(): Promise<
+    Array<PrintJob & { cupsJobId: string | null; attemptId: string }>
+  > {
     const result = await pool.query(
       `SELECT j.id, j.session_id AS "sessionId", j.output_id AS "outputId", j.public_id AS "publicId",
         j.output_type AS "outputType", j.artifact_type AS "artifactType", j.copies_requested AS "copiesRequested",
@@ -1754,7 +1937,9 @@ export class DatabaseRepository {
     return result.rows;
   }
 
-  public async listSupersededPrintAttempts(): Promise<Array<{ jobId: string; attemptId: string; cupsJobId: string }>> {
+  public async listSupersededPrintAttempts(): Promise<
+    Array<{ jobId: string; attemptId: string; cupsJobId: string }>
+  > {
     const result = await pool.query(
       `SELECT print_job_id AS "jobId", id AS "attemptId", cups_job_id AS "cupsJobId"
        FROM print_job_attempts
@@ -1770,29 +1955,63 @@ export class DatabaseRepository {
       ), superseded AS (
         UPDATE print_job_attempts SET is_current = false, superseded_at = CURRENT_TIMESTAMP
         WHERE print_job_id = $1 AND is_current
-      ) INSERT INTO print_job_attempts (print_job_id, attempt_number, title, is_current)
+      ) INSERT INTO print_job_attempts (print_job_id, attempt_number, title)
       SELECT $1, number, 'sic-print:' || $1 || ':' || number FROM next_attempt
       RETURNING id, print_job_id AS "printJobId", attempt_number AS "attemptNumber", title, cups_job_id AS "cupsJobId", state, error,
-        is_current AS "isCurrent", superseded_at AS "supersededAt"`, [jobId],
+        is_current AS "isCurrent", superseded_at AS "supersededAt"`,
+      [jobId],
     );
     return result.rows[0];
   }
 
-  public async updatePrintAttempt(attemptId: string, state: PrintJobStatus, cupsJobId?: string, error?: string): Promise<void> {
+  public async updatePrintAttempt(
+    attemptId: string,
+    state: PrintJobStatus,
+    cupsJobId?: string,
+    error?: string,
+  ): Promise<void> {
     await pool.query(
       `UPDATE print_job_attempts SET state = $2, cups_job_id = COALESCE($3, cups_job_id), error = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
       [attemptId, state, cupsJobId ?? null, error ?? null],
     );
   }
 
-  public async updatePrintJobStatus(id: string, status: PrintJobStatus, error?: string): Promise<PrintJob | null> {
+  public async updatePrintJobStatus(
+    id: string,
+    status: PrintJobStatus,
+    error?: string,
+    expectedStatus?: PrintJobStatus,
+  ): Promise<PrintJob | null> {
     const result = await pool.query(
       `UPDATE print_jobs SET status = $2, last_error = $3, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+       WHERE id = $1 AND ($4::text IS NULL OR status = $4) RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
         output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
         copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
         printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`,
-      [id, status, error ?? null],
+      [id, status, error ?? null, expectedStatus ?? null],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  public async getCurrentCupsJobId(id: string): Promise<string | null> {
+    const result = await pool.query<{ cupsJobId: string | null }>(
+      `SELECT cups_job_id AS "cupsJobId" FROM print_job_attempts
+       WHERE print_job_id = $1 AND is_current`,
+      [id],
+    );
+    return result.rows[0]?.cupsJobId ?? null;
+  }
+
+  public async cancelPrintJob(id: string): Promise<PrintJob | null> {
+    const result = await pool.query(
+      `UPDATE print_jobs SET status = 'canceled', last_error = NULL, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND status IN ('queued', 'submitting', 'pending', 'processing', 'stopped')
+       RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId",
+         output_type AS "outputType", artifact_type AS "artifactType", copies_requested AS "copiesRequested",
+         copies_completed AS "copiesCompleted", GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting",
+         printer_name AS "printerName", media_size AS "mediaSize", mode, status, last_error AS "lastError",
+         created_at AS "createdAt", updated_at AS "updatedAt"`,
+      [id],
     );
     return result.rows[0] ?? null;
   }
@@ -1802,12 +2021,13 @@ export class DatabaseRepository {
     try {
       await client.query('BEGIN');
       const result = await client.query(
-      `UPDATE print_jobs SET status = 'queued', last_error = NULL, updated_at = CURRENT_TIMESTAMP
+        `UPDATE print_jobs SET status = 'queued', last_error = NULL, updated_at = CURRENT_TIMESTAMP
        WHERE id = $1 AND status IN ('failed', 'canceled', 'needs_attention')
        RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
          artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
          GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName", media_size AS "mediaSize",
-          mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`, [id],
+          mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`,
+        [id],
       );
       if (result.rows[0]) {
         await client.query(
@@ -1835,7 +2055,8 @@ export class DatabaseRepository {
        RETURNING id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
          artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
          GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName", media_size AS "mediaSize",
-         mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`, [id, requestKey],
+         mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"`,
+      [id, requestKey],
     );
     return result.rows[0] ?? null;
   }
@@ -1848,34 +2069,40 @@ export class DatabaseRepository {
       const completed = await client.query(
         `UPDATE print_jobs SET status = 'completed', copies_completed = copies_requested,
           last_error = NULL, last_reconciled_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $1 AND status <> 'completed'
+          WHERE id = $1 AND status IN ('submitting', 'pending', 'processing', 'stopped')
             AND EXISTS (
               SELECT 1 FROM print_job_attempts
               WHERE id = $2 AND print_job_id = print_jobs.id AND is_current
             )
-          RETURNING session_id, copies_requested`, [id, attemptId],
+          RETURNING session_id, copies_requested`,
+        [id, attemptId],
       );
-      if (completed.rows[0]) {
-        await client.query(
-          `UPDATE sessions SET is_printed = true, copies_printed = copies_printed + $2,
-            state = 'printed', last_activity_at = CURRENT_TIMESTAMP
-           WHERE id = $1 AND state IN ('booth_confirmed', 'printed')`,
-          [completed.rows[0].session_id, completed.rows[0].copies_requested],
-        );
+      if (!completed.rows[0]) {
+        await client.query('COMMIT');
+        return null;
       }
+      await client.query(
+        `UPDATE sessions SET is_printed = true, copies_printed = copies_printed + $2,
+          state = 'printed', last_activity_at = CURRENT_TIMESTAMP
+         WHERE id = $1 AND state IN ('booth_confirmed', 'printed')`,
+        [completed.rows[0].session_id, completed.rows[0].copies_requested],
+      );
       const job = await client.query(
         `SELECT id, session_id AS "sessionId", output_id AS "outputId", public_id AS "publicId", output_type AS "outputType",
           artifact_type AS "artifactType", copies_requested AS "copiesRequested", copies_completed AS "copiesCompleted",
           GREATEST(copies_requested - copies_completed, 0) AS "copiesWaiting", printer_name AS "printerName",
           media_size AS "mediaSize", mode, status, last_error AS "lastError", created_at AS "createdAt", updated_at AS "updatedAt"
-         FROM print_jobs WHERE id = $1`, [id],
+         FROM print_jobs WHERE id = $1`,
+        [id],
       );
       await client.query('COMMIT');
       return job.rows[0] ?? null;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
-    } finally { client.release(); }
+    } finally {
+      client.release();
+    }
   }
 
   private readonly templateSelectFields = `
@@ -2358,11 +2585,13 @@ export class DatabaseRepository {
   /**
    * Aggregates and calculates full KPI & analytics metrics across sessions.
    */
-  public async getAnalyticsData(filters: {
-    eventId?: string;
-    startDate?: string;
-    endDate?: string;
-  } = {}): Promise<AnalyticsData> {
+  public async getAnalyticsData(
+    filters: {
+      eventId?: string;
+      startDate?: string;
+      endDate?: string;
+    } = {},
+  ): Promise<AnalyticsData> {
     const { eventId, startDate, endDate } = filters;
     const startIso = startDate ? new Date(startDate).toISOString() : null;
     const endIso = endDate ? new Date(endDate).toISOString() : null;
@@ -2407,11 +2636,7 @@ export class DatabaseRepository {
           AND ($3::TIMESTAMPTZ IS NULL OR s.created_at <= $3::TIMESTAMPTZ)
         ORDER BY s.created_at ASC
       `;
-      const res = await pool.query(query, [
-        eventId || null,
-        startIso,
-        endIso,
-      ]);
+      const res = await pool.query(query, [eventId || null, startIso, endIso]);
       rows = res.rows;
     } catch {
       // In-memory fallback for test environments
@@ -2437,7 +2662,8 @@ export class DatabaseRepository {
           isPrinted: s.isPrinted,
           copiesPrinted: s.copiesPrinted || 0,
           createdAt: s.createdAt,
-          templateName: snap?.name || (s.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template'),
+          templateName:
+            snap?.name || (s.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template'),
           templateType: s.type,
         };
       });
@@ -2459,33 +2685,42 @@ export class DatabaseRepository {
     let threeCopiesCount = 0;
     let fourPlusCopiesCount = 0;
 
-    const templateMap = new Map<string, {
-      templateId: string;
-      name: string;
-      type: 'photo_strip' | 'flipbook';
-      layoutCategory: string;
-      layoutLabel: string;
-      totalSessions: number;
-      totalPrints: number;
-      reprintSessions: number;
-    }>();
+    const templateMap = new Map<
+      string,
+      {
+        templateId: string;
+        name: string;
+        type: 'photo_strip' | 'flipbook';
+        layoutCategory: string;
+        layoutLabel: string;
+        totalSessions: number;
+        totalPrints: number;
+        reprintSessions: number;
+      }
+    >();
 
-    const layoutMap = new Map<string, {
-      category: string;
-      label: string;
-      description: string;
-      totalSessions: number;
-      totalPrints: number;
-      reprintSessions: number;
-    }>();
+    const layoutMap = new Map<
+      string,
+      {
+        category: string;
+        label: string;
+        description: string;
+        totalSessions: number;
+        totalPrints: number;
+        reprintSessions: number;
+      }
+    >();
 
-    const timeseriesMap = new Map<string, {
-      date: string;
-      totalSessions: number;
-      totalPrints: number;
-      photoStripPrints: number;
-      flipbookPrints: number;
-    }>();
+    const timeseriesMap = new Map<
+      string,
+      {
+        date: string;
+        totalSessions: number;
+        totalPrints: number;
+        photoStripPrints: number;
+        flipbookPrints: number;
+      }
+    >();
 
     for (const row of rows) {
       totalSessions++;
@@ -2515,7 +2750,10 @@ export class DatabaseRepository {
 
       // Template & Layout resolution
       const snap = row.templateSnapshot || {};
-      const templateName = row.templateName || snap.name || (row.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template');
+      const templateName =
+        row.templateName ||
+        snap.name ||
+        (row.type === 'flipbook' ? 'Flipbook Frame' : 'Photo Strip Template');
       const templateId = row.templateId || row.frameId || snap.id || templateName;
       const placements = snap.placements || [];
 
@@ -2582,16 +2820,23 @@ export class DatabaseRepository {
       }
     }
 
-    const avgCopiesOverall = totalSessions > 0 ? Number((totalPrints / totalSessions).toFixed(2)) : 0;
-    const overallReprintRate = totalSessions > 0 ? Number(((totalReprintSessions / totalSessions) * 100).toFixed(1)) : 0;
+    const avgCopiesOverall =
+      totalSessions > 0 ? Number((totalPrints / totalSessions).toFixed(2)) : 0;
+    const overallReprintRate =
+      totalSessions > 0 ? Number(((totalReprintSessions / totalSessions) * 100).toFixed(1)) : 0;
 
     // Build Templates array sorted by total prints descending
     const templates: TemplateRanking[] = Array.from(templateMap.values())
       .map((t) => ({
         ...t,
-        averageCopies: t.totalSessions > 0 ? Number((t.totalPrints / t.totalSessions).toFixed(2)) : 0,
-        reprintRate: t.totalSessions > 0 ? Number(((t.reprintSessions / t.totalSessions) * 100).toFixed(1)) : 0,
-        shareOfPrintsPercent: totalPrints > 0 ? Number(((t.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies:
+          t.totalSessions > 0 ? Number((t.totalPrints / t.totalSessions).toFixed(2)) : 0,
+        reprintRate:
+          t.totalSessions > 0
+            ? Number(((t.reprintSessions / t.totalSessions) * 100).toFixed(1))
+            : 0,
+        shareOfPrintsPercent:
+          totalPrints > 0 ? Number(((t.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
       }))
       .sort((a, b) => b.totalPrints - a.totalPrints);
 
@@ -2599,9 +2844,14 @@ export class DatabaseRepository {
     const layoutBreakdown: LayoutCategoryBreakdown[] = Array.from(layoutMap.values())
       .map((l) => ({
         ...l,
-        averageCopies: l.totalSessions > 0 ? Number((l.totalPrints / l.totalSessions).toFixed(2)) : 0,
-        reprintRate: l.totalSessions > 0 ? Number(((l.reprintSessions / l.totalSessions) * 100).toFixed(1)) : 0,
-        sharePercent: totalPrints > 0 ? Number(((l.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies:
+          l.totalSessions > 0 ? Number((l.totalPrints / l.totalSessions).toFixed(2)) : 0,
+        reprintRate:
+          l.totalSessions > 0
+            ? Number(((l.reprintSessions / l.totalSessions) * 100).toFixed(1))
+            : 0,
+        sharePercent:
+          totalPrints > 0 ? Number(((l.totalPrints / totalPrints) * 100).toFixed(1)) : 0,
       }))
       .sort((a, b) => b.reprintRate - a.reprintRate || b.totalPrints - a.totalPrints);
 
@@ -2612,22 +2862,40 @@ export class DatabaseRepository {
         label: 'Photo Strips',
         sessions: photoStripSessions,
         totalPrints: photoStripPrints,
-        sharePercent: totalPrints > 0 ? Number(((photoStripPrints / totalPrints) * 100).toFixed(1)) : 0,
-        averageCopies: photoStripSessions > 0 ? Number((photoStripPrints / photoStripSessions).toFixed(2)) : 0,
-        reprintRate: photoStripSessions > 0
-          ? Number(((rows.filter((r) => r.type === 'photo_strip' && (r.copiesPrinted > 1)).length / photoStripSessions) * 100).toFixed(1))
-          : 0,
+        sharePercent:
+          totalPrints > 0 ? Number(((photoStripPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies:
+          photoStripSessions > 0 ? Number((photoStripPrints / photoStripSessions).toFixed(2)) : 0,
+        reprintRate:
+          photoStripSessions > 0
+            ? Number(
+                (
+                  (rows.filter((r) => r.type === 'photo_strip' && r.copiesPrinted > 1).length /
+                    photoStripSessions) *
+                  100
+                ).toFixed(1),
+              )
+            : 0,
       },
       {
         type: 'flipbook',
         label: 'Flipbooks',
         sessions: flipbookSessions,
         totalPrints: flipbookPrints,
-        sharePercent: totalPrints > 0 ? Number(((flipbookPrints / totalPrints) * 100).toFixed(1)) : 0,
-        averageCopies: flipbookSessions > 0 ? Number((flipbookPrints / flipbookSessions).toFixed(2)) : 0,
-        reprintRate: flipbookSessions > 0
-          ? Number(((rows.filter((r) => r.type === 'flipbook' && (r.copiesPrinted > 1)).length / flipbookSessions) * 100).toFixed(1))
-          : 0,
+        sharePercent:
+          totalPrints > 0 ? Number(((flipbookPrints / totalPrints) * 100).toFixed(1)) : 0,
+        averageCopies:
+          flipbookSessions > 0 ? Number((flipbookPrints / flipbookSessions).toFixed(2)) : 0,
+        reprintRate:
+          flipbookSessions > 0
+            ? Number(
+                (
+                  (rows.filter((r) => r.type === 'flipbook' && r.copiesPrinted > 1).length /
+                    flipbookSessions) *
+                  100
+                ).toFixed(1),
+              )
+            : 0,
       },
     ];
 
@@ -2637,14 +2905,20 @@ export class DatabaseRepository {
       twoCopies: twoCopiesCount,
       threeCopies: threeCopiesCount,
       fourPlusCopies: fourPlusCopiesCount,
-      oneCopyPercent: totalSessions > 0 ? Number(((oneCopyCount / totalSessions) * 100).toFixed(1)) : 0,
-      twoCopiesPercent: totalSessions > 0 ? Number(((twoCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
-      threeCopiesPercent: totalSessions > 0 ? Number(((threeCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
-      fourPlusCopiesPercent: totalSessions > 0 ? Number(((fourPlusCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+      oneCopyPercent:
+        totalSessions > 0 ? Number(((oneCopyCount / totalSessions) * 100).toFixed(1)) : 0,
+      twoCopiesPercent:
+        totalSessions > 0 ? Number(((twoCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+      threeCopiesPercent:
+        totalSessions > 0 ? Number(((threeCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
+      fourPlusCopiesPercent:
+        totalSessions > 0 ? Number(((fourPlusCopiesCount / totalSessions) * 100).toFixed(1)) : 0,
     };
 
     // Sort timeseries chronologically
-    const timeseries = Array.from(timeseriesMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const timeseries = Array.from(timeseriesMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date),
+    );
 
     return {
       summary: {

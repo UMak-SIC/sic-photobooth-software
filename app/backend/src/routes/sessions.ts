@@ -21,10 +21,6 @@ const createSessionSchema = z.object({
   type: z.enum(['photo_strip', 'flipbook']),
 });
 
-const transitionSessionSchema = z.object({
-  targetState: z.string().min(1),
-});
-
 const selectFrameSchema = z.object({
   frameId: z.string().min(1),
 });
@@ -54,6 +50,26 @@ function stripToken<T extends { token: string }>(session: T | null): Omit<T, 'to
   if (!session) return null;
   const { token: _token, ...safe } = session;
   return safe;
+}
+
+function resolveFlipbookAssetPath(assetPath: string | null | undefined): string | null {
+  if (!assetPath) return null;
+
+  const storageDir = path.resolve(config.storageDir);
+  const isInsideStorage = (candidatePath: string) =>
+    candidatePath.startsWith(`${storageDir}${path.sep}`);
+  const resolved = path.isAbsolute(assetPath)
+    ? path.resolve(assetPath)
+    : path.resolve(storageDir, assetPath);
+
+  if (isInsideStorage(resolved)) return resolved;
+
+  const marker = `${path.sep}storage${path.sep}`;
+  const markerIndex = resolved.lastIndexOf(marker);
+  if (markerIndex < 0) return null;
+
+  const relocated = path.resolve(storageDir, resolved.slice(markerIndex + marker.length));
+  return isInsideStorage(relocated) ? relocated : null;
 }
 
 export async function resolveFlipbookTemplate(frameId?: string | null) {
@@ -949,14 +965,10 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           const resolvedTemplate = await resolveFlipbookTemplate(targetFrameId);
           if (resolvedTemplate) {
             if (resolvedTemplate.coverPath) {
-              coverOverlayPath = resolvedTemplate.coverPath.startsWith('/')
-                ? path.resolve(process.cwd(), resolvedTemplate.coverPath.replace(/^\//, ''))
-                : path.resolve(config.storageDir, resolvedTemplate.coverPath);
+              coverOverlayPath = resolveFlipbookAssetPath(resolvedTemplate.coverPath);
             }
             if (resolvedTemplate.backgroundPath) {
-              motionOverlayPath = resolvedTemplate.backgroundPath.startsWith('/')
-                ? path.resolve(process.cwd(), resolvedTemplate.backgroundPath.replace(/^\//, ''))
-                : path.resolve(config.storageDir, resolvedTemplate.backgroundPath);
+              motionOverlayPath = resolveFlipbookAssetPath(resolvedTemplate.backgroundPath);
             }
             if (resolvedTemplate.placements && resolvedTemplate.placements.length > 0) {
               templatePlacements = resolvedTemplate.placements;
@@ -1005,7 +1017,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         await gifRenderer.renderFlipbookGif(
           selectedCover.filePath,
           selectedVideo.filePath,
-          null,
+          motionOverlayPath,
           outputPath,
           path.join(intermediateDir, 'render'),
           {
@@ -1016,6 +1028,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             outputHeight: dynamicOutputHeight,
             timeoutMs: flipbookConfig.gifTimeoutMs,
             placements: templatePlacements,
+            coverOverlayPath,
+            motionOverlayPath,
           },
         );
 
@@ -1023,7 +1037,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         await gifRenderer.renderFlipbookGif(
           selectedCover.filePath,
           selectedVideo.filePath,
-          null,
+          motionOverlayPath,
           outputMotionPath,
           path.join(intermediateDir, 'render_motion'),
           {
@@ -1034,6 +1048,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
             outputHeight: dynamicOutputHeight,
             timeoutMs: flipbookConfig.gifTimeoutMs,
             placements: templatePlacements,
+            coverOverlayPath,
+            motionOverlayPath,
           },
         );
 

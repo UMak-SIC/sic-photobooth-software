@@ -209,6 +209,18 @@ function resolveAssetPath(filePath?: string | null): string | null {
   if (!filePath) return null;
 
   const storageDir = path.resolve(config.storageDir);
+  const isInsideStorage = (candidatePath: string) =>
+    candidatePath.startsWith(`${storageDir}${path.sep}`);
+
+  // Template rows created before a checkout move can retain an obsolete absolute path.
+  // Keep the storage-relative suffix and resolve it through the active storage root.
+  const resolveLegacyStoragePath = (candidatePath: string) => {
+    const marker = `${path.sep}storage${path.sep}`;
+    const markerIndex = candidatePath.lastIndexOf(marker);
+    if (markerIndex < 0) return null;
+    const relocated = path.resolve(storageDir, candidatePath.slice(markerIndex + marker.length));
+    return isInsideStorage(relocated) && fs.existsSync(relocated) ? relocated : null;
+  };
 
   // 1. If it is a template asset URL endpoint (e.g. /templates/:id/background or /templates/:id/overlays/:overlayId)
   const urlMatch = filePath.match(
@@ -237,14 +249,19 @@ function resolveAssetPath(filePath?: string | null): string | null {
   }
 
   // 2. Absolute path inside storage directory
-  if (path.isAbsolute(filePath) && filePath.startsWith(storageDir) && fs.existsSync(filePath)) {
+  if (path.isAbsolute(filePath) && isInsideStorage(filePath) && fs.existsSync(filePath)) {
     return filePath;
+  }
+
+  if (path.isAbsolute(filePath)) {
+    const relocatedPath = resolveLegacyStoragePath(filePath);
+    if (relocatedPath) return relocatedPath;
   }
 
   // 3. Clean relative path inside storage directory
   const cleanPath = filePath.replace(/^\/?storage\//, '').replace(/^\//, '');
   const candidateStorage = path.resolve(storageDir, cleanPath);
-  if (candidateStorage.startsWith(storageDir) && fs.existsSync(candidateStorage)) {
+  if (isInsideStorage(candidateStorage) && fs.existsSync(candidateStorage)) {
     return candidateStorage;
   }
 
@@ -253,14 +270,14 @@ function resolveAssetPath(filePath?: string | null): string | null {
     'templates',
     cleanPath.replace(/^templates\//, ''),
   );
-  if (candidateTemplates.startsWith(storageDir) && fs.existsSync(candidateTemplates)) {
+  if (isInsideStorage(candidateTemplates) && fs.existsSync(candidateTemplates)) {
     return candidateTemplates;
   }
 
   // 4. Safe basename match directly in storage directory (prevents path traversal ../..)
   const baseName = path.basename(filePath);
   const candidateBase = path.resolve(storageDir, baseName);
-  if (candidateBase.startsWith(storageDir) && fs.existsSync(candidateBase)) {
+  if (isInsideStorage(candidateBase) && fs.existsSync(candidateBase)) {
     return candidateBase;
   }
 

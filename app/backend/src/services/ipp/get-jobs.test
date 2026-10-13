@@ -7,5 +7,6 @@
   ATTR uri printer-uri $PRINTER_URI
   ATTR keyword which-jobs all
   ATTR boolean my-jobs false
+  ATTR keyword requested-attributes job-id,job-state,job-state-reasons
   STATUS successful-ok
 }

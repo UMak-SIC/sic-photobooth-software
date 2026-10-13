@@ -50,7 +50,12 @@ export async function registerPublicOutput(output: PublicOutputPublication): Pro
     },
     { onConflict: 'public_id' },
   );
-  if (error) throw new Error(`Supabase publication record failed: ${error.message}`);
+  if (error) {
+    const diagnostic = [error.code, error.message, error.details, error.hint]
+      .filter(Boolean)
+      .join(' | ');
+    throw new Error(`Supabase publication record failed: ${diagnostic}`);
+  }
 }
 
 /** Best-effort mirror of the locally authoritative print count for an uploaded output. */

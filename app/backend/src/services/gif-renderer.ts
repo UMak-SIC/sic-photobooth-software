@@ -202,7 +202,9 @@ export class GifRenderer {
       if (frameFiles.length === 0) {
         for (let i = 1; i <= frameCount; i++) {
           const fallbackPath = path.join(framesDir, `frame_${String(i).padStart(3, '0')}.png`);
-          await sharp(coverPath).resize(width, height, { fit: 'cover', position: 'center' }).toFile(fallbackPath);
+          await sharp(coverPath)
+            .resize(width, height, { fit: 'cover', position: 'center' })
+            .toFile(fallbackPath);
           frameFiles.push(fallbackPath);
         }
       }
@@ -211,14 +213,24 @@ export class GifRenderer {
       const coverOverlayBuffer = await this.prepareOverlayBuffer(coverOverlay, width, height);
       const motionOverlayBuffer = await this.prepareOverlayBuffer(motionOverlay, width, height);
 
-      // Helper to process individual frame to exact slot dimensions
-      const processFrame = async (imgSrc: string, overlayBuf: Buffer | null = null): Promise<Uint8ClampedArray> => {
-        let pipeline = sharp(imgSrc).resize(width, height, { fit: 'cover', position: 'center' });
+      // Frame artwork is the background; captured media must remain above its photo slot.
+      const processFrame = async (
+        imgSrc: string,
+        overlayBuf: Buffer | null = null,
+      ): Promise<Uint8ClampedArray> => {
+        const frameBuffer = await sharp(imgSrc)
+          .resize(width, height, { fit: 'cover', position: 'center' })
+          .ensureAlpha()
+          .png()
+          .toBuffer();
+        let pipeline = sharp(frameBuffer);
         if (overlayBuf) {
-          const resizedOverlay = await sharp(overlayBuf)
-            .resize(width, height, { fit: 'cover', position: 'center' })
+          const backgroundBuffer = await sharp(overlayBuf)
+            .resize(width, height, { fit: 'fill' })
+            .ensureAlpha()
+            .png()
             .toBuffer();
-          pipeline = pipeline.composite([{ input: resizedOverlay, blend: 'over' }]);
+          pipeline = sharp(backgroundBuffer).composite([{ input: frameBuffer, blend: 'over' }]);
         }
         const { data } = await pipeline.ensureAlpha().raw().toBuffer({ resolveWithObject: true });
         return new Uint8ClampedArray(data);

@@ -130,6 +130,8 @@ export const flipbookConfig: FlipbookConfig = {
 export interface PrinterConfig {
   printerName: string;
   mediaSize: string;
+  /** Printer-driver media type passed to CUPS, such as PMPHOTO_HIGH. */
+  printQuality: string;
   fitToPage: boolean;
   enableHardwarePrint: boolean;
   cupsServer: string;
@@ -139,6 +141,7 @@ export interface PrinterConfig {
 export const printerConfig: PrinterConfig = {
   printerName: process.env.PRINTER_NAME || 'Epson_L3250',
   mediaSize: process.env.PRINTER_MEDIA_SIZE || 'Custom.4x6in',
+  printQuality: process.env.PRINT_QUALITY || 'PMPHOTO_HIGH',
   fitToPage: true,
   enableHardwarePrint: process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
   cupsServer: process.env.CUPS_SERVER || 'localhost:631',

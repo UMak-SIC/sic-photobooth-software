@@ -1,4 +1,5 @@
 import type { Publication, FlipbookPublicationData } from './types';
+import type { PrintJob } from '../../components/printing/types';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://localhost:3000';
 
@@ -16,11 +17,11 @@ export const publicationApi = {
   removeCloud: (id: string) => request<Publication>(`/api/publications/${id}/cloud`, { method: 'DELETE' }),
   getFlipbookData: (id: string) =>
     request<FlipbookPublicationData>(`/api/publications/${id}/flipbook-data`),
-  print: (id: string, options?: { copies?: number; recordOnly?: boolean }) =>
-    request<{ jobId?: string; copiesPrinted?: number }>(`/api/publications/${id}/print`, {
+  queuePrint: (publicId: string, copies: number) =>
+    request<PrintJob>('/api/print-jobs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(options || {}),
+      body: JSON.stringify({ publicId, copies, requestKey: crypto.randomUUID() }),
     }),
   getPdfBlob: async (id: string): Promise<Blob | null> => {
     const res = await fetch(`${API_URL}/api/publications/${id}/pdf`);

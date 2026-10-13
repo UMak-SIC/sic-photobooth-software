@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { buildApp } from '../src/app.js';
@@ -15,6 +16,7 @@ import {
   generateDatePillSvg,
 } from '../src/services/photo-strip-renderer.js';
 import { dbRepository } from '../src/db/repository.js';
+import { config } from '../src/config.js';
 
 describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
   let app: FastifyInstance;
@@ -195,8 +197,7 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
       headers: { 'x-session-token': token },
       payload: { copies: 2 },
     });
-    expect(earlyPrintRes.statusCode).toBe(400);
-    expect(JSON.parse(earlyPrintRes.body).error.code).toBe('INVALID_STATE');
+    expect(earlyPrintRes.statusCode).toBe(410);
 
     // 9. Upload the required captures
     const requiredPhotos =
@@ -243,33 +244,20 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
     expect(confirmBody.data.publicId).toBeDefined();
     expect(confirmBody.data.qrUrl).toContain('https://umak-sic-photobooth.vercel.app/');
 
-    // 11. Record first print (1 copy) -> transitions to printed
+    // 11. Queue the first print without prematurely marking the session printed.
     const print1Res = await app.inject({
       method: 'POST',
-      url: `/api/sessions/${sessionId}/print`,
+      url: `/api/sessions/${sessionId}/print-jobs`,
       headers: { 'x-session-token': token },
-      payload: { copies: 1, recordOnly: true },
+      payload: { copies: 1, requestKey: '66bb2ac9-8ed0-4ad0-b820-e8249c0c0f14' },
     });
-    expect(print1Res.statusCode).toBe(200);
+    expect(print1Res.statusCode).toBe(202);
     const print1Body = JSON.parse(print1Res.body);
     expect(print1Body.success).toBe(true);
-    expect(print1Body.data.state).toBe('printed');
-    expect(print1Body.data.isPrinted).toBe(true);
-    expect(print1Body.data.copiesPrinted).toBe(1);
-
-    // 12. Record subsequent print (2 additional copies) -> stays printed and increments count to 3
-    const print2Res = await app.inject({
-      method: 'POST',
-      url: `/api/sessions/${sessionId}/print`,
-      headers: { 'x-session-token': token },
-      payload: { copies: 2 },
-    });
-    expect(print2Res.statusCode).toBe(200);
-    const print2Body = JSON.parse(print2Res.body);
-    expect(print2Body.success).toBe(true);
-    expect(print2Body.data.state).toBe('printed');
-    expect(print2Body.data.isPrinted).toBe(true);
-    expect(print2Body.data.copiesPrinted).toBe(3);
+    expect(print1Body.data.status).toBe('queued');
+    const sessionAfterQueue = await dbRepository.getSessionById(sessionId);
+    expect(sessionAfterQueue?.state).toBe('booth_confirmed');
+    expect(sessionAfterQueue?.copiesPrinted).toBe(0);
   });
 
   it('renders high-resolution 300 DPI 4R PNG buffer', async () => {
@@ -360,6 +348,69 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
     expect(Buffer.isBuffer(pngBuffer)).toBe(true);
     expect(pngBuffer[0]).toBe(0x89);
+  });
+
+  it('composites storage-relative and relocated template assets into the final PNG', async () => {
+    const templateDir = path.join(config.storageDir, 'templates', randomUUID());
+    const backgroundPath = path.join(templateDir, 'background.png');
+    const overlayPath = path.join(templateDir, 'overlay.png');
+
+    try {
+      await fs.promises.mkdir(templateDir, { recursive: true });
+      await sharp({
+        create: {
+          width: 500,
+          height: 500,
+          channels: 4,
+          background: { r: 230, g: 20, b: 20, alpha: 1 },
+        },
+      })
+        .png()
+        .toFile(backgroundPath);
+      await sharp({
+        create: {
+          width: 100,
+          height: 100,
+          channels: 4,
+          background: { r: 20, g: 20, b: 230, alpha: 1 },
+        },
+      })
+        .png()
+        .toFile(overlayPath);
+
+      const output = await photoStripRenderer.renderStrip({
+        width: 500,
+        height: 500,
+        backgroundPath: path.join(
+          '/retired-photobooth/storage',
+          path.relative(config.storageDir, backgroundPath),
+        ),
+        placements: [],
+        overlays: [
+          {
+            label: 'Frame overlay',
+            assetPath: path.relative(config.storageDir, overlayPath),
+            x: 200,
+            y: 200,
+            width: 100,
+            height: 100,
+            zIndex: 1,
+          },
+        ],
+        captures: [],
+        publicId: 'Ab1Cd2E',
+      });
+      const { data, info } = await sharp(output).raw().toBuffer({ resolveWithObject: true });
+      const pixelAt = (x: number, y: number) => {
+        const offset = (y * info.width + x) * info.channels;
+        return [data[offset], data[offset + 1], data[offset + 2]];
+      };
+
+      expect(pixelAt(10, 10)).toEqual([230, 20, 20]);
+      expect(pixelAt(250, 250)).toEqual([20, 20, 230]);
+    } finally {
+      await fs.promises.rm(templateDir, { recursive: true, force: true });
+    }
   });
 
   it('safely tolerates floating-point placement dimensions without throwing sharp error', async () => {

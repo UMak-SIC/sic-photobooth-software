@@ -90,17 +90,15 @@ describe('Publication routes', () => {
     expect(flipData.publicId).toBe(publicId);
     expect(flipData.mediaType).toBe('image/gif');
     expect(flipData.motionFrameUrls).toHaveLength(15);
+    expect(flipData.motionSheetUrl).toMatch(/^\/templates\/.+\/background$/);
 
-    // Test printing publication with 2 copies
+    // Publication printing now uses the shared print-job queue endpoint.
     const printRes = await app.inject({
       method: 'POST',
       url: `/api/publications/${publication.id}/print`,
       payload: { copies: 2, recordOnly: true },
     });
-    expect(printRes.statusCode).toBe(200);
-    const printBody = JSON.parse(printRes.body);
-    expect(printBody.success).toBe(true);
-    expect(printBody.data.copiesPrinted).toBe(2);
+    expect(printRes.statusCode).toBe(410);
 
     // Test PDF not found initially
     const pdfMissingRes = await app.inject({

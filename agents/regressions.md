@@ -17,6 +17,18 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 
 ## Entries
 
+### 2026-10-13: Flipbook Frame Artwork Hid Captured Media
+
+- Symptom: A completed Flipbook displayed the selected frame artwork but the captured photo/video slot was blank.
+- Root cause: `gif-renderer.ts` composited the frame background over each captured frame; opaque template photo slots therefore covered the camera image.
+- Prevention: `app/backend/test/gif-renderer.test.ts` renders an opaque frame background and verifies the captured media remains visible.
+
+### 2026-10-13: Flipbook Confirmation Dropped the Selected Frame
+
+- Symptom: The final Flipbook GIF and its confirmation preview contained only the captured photo/video instead of the selected cover and motion frame artwork.
+- Root cause: The processing route resolved the frame asset paths but passed `null` to both primary GIF renders. Persisted Photo Strip asset paths also referenced the former checkout.
+- Prevention: `app/backend/src/routes/sessions.ts` passes the resolved cover and motion overlays to both final GIF variants. `photo-strip-renderer.ts` resolves legacy absolute paths through the configured storage root, verified by `photo-strip-workflow.test.ts`.
+
 ### 2026-09-11: Warm Golden Render Was Monochrome
 
 - Symptom: Selecting the Warm Golden photo filter produced a black-and-white output instead of a colored warm adjustment.

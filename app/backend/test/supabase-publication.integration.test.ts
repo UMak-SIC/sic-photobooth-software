@@ -39,6 +39,7 @@ describeIntegration('Supabase public output integration', () => {
         media_type: 'image/png',
         event_name: 'Integration Test',
         event_date: '2026-09-05',
+        print_count: 0,
         status: 'uploaded',
         cloud_finalized_at: new Date().toISOString(),
         expires_at: expiresAt,

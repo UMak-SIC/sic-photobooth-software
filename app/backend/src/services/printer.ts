@@ -15,7 +15,8 @@ export interface PrintJobResult {
   error?: string;
 }
 
-export type CupsJobState = 'pending' | 'processing' | 'stopped' | 'completed' | 'failed' | 'canceled';
+export type CupsJobState =
+  'pending' | 'processing' | 'stopped' | 'completed' | 'failed' | 'canceled';
 
 const ippStateMap: Record<number, CupsJobState> = {
   3: 'pending',
@@ -29,7 +30,13 @@ const ippStateMap: Record<number, CupsJobState> = {
 
 function textValue(value: unknown): string | undefined {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
-  if (!Array.isArray(value) || value.length !== 1 || typeof value[0] !== 'object' || value[0] === null) return undefined;
+  if (
+    !Array.isArray(value) ||
+    value.length !== 1 ||
+    typeof value[0] !== 'object' ||
+    value[0] === null
+  )
+    return undefined;
   const nested = value[0] as Record<string, unknown>;
   return typeof nested['#text'] === 'string' || typeof nested['#text'] === 'number'
     ? String(nested['#text'])
@@ -100,6 +107,8 @@ export class PrinterService {
       String(safeCopies),
       '-o',
       `media=${this.config.mediaSize}`,
+      '-o',
+      `MediaType=${this.config.printQuality}`,
     ];
 
     if (this.config.fitToPage) {
@@ -110,7 +119,9 @@ export class PrinterService {
 
     try {
       const { stdout } = await execFileAsync('/usr/bin/lp', args, {
-        env: { ...process.env, LANG: 'C' }, timeout: 15_000, maxBuffer: 64 * 1024,
+        env: { ...process.env, LANG: 'C' },
+        timeout: 15_000,
+        maxBuffer: 64 * 1024,
       });
       const match = stdout.match(/request id is ([^\s]+)/i);
       const jobId = match ? match[1] : undefined;
@@ -133,9 +144,15 @@ export class PrinterService {
     try {
       const printerUri = `ipp://${this.config.cupsServer}/printers/${encodeURIComponent(this.config.printerName)}`;
       const requestFile = path.join(__dirname, 'ipp', 'get-jobs.test');
-      const { stdout } = await execFileAsync('/usr/bin/ipptool', ['-X', '-d', `PRINTER_URI=${printerUri}`, printerUri, requestFile], {
-        env: { ...process.env, LANG: 'C' }, timeout: 10_000, maxBuffer: 64 * 1024,
-      });
+      const { stdout } = await execFileAsync(
+        '/usr/bin/ipptool',
+        ['-X', '-d', `PRINTER_URI=${printerUri}`, printerUri, requestFile],
+        {
+          env: { ...process.env, LANG: 'C' },
+          timeout: 10_000,
+          maxBuffer: 64 * 1024,
+        },
+      );
       const parsed = new XMLParser({ preserveOrder: true }).parse(stdout);
       const jobs: Array<{ id: string; state: CupsJobState }> = [];
       collectIppJobs(parsed, jobs);
@@ -143,6 +160,19 @@ export class PrinterService {
       return jobs.find((job) => job.id === numericJobId)?.state ?? null;
     } catch {
       return null;
+    }
+  }
+
+  public async cancelJob(jobId: string): Promise<void> {
+    if (!this.config.enableHardwarePrint) return;
+    try {
+      await execFileAsync('/usr/bin/cancel', [jobId], {
+        env: { ...process.env, LANG: 'C' },
+        timeout: 10_000,
+        maxBuffer: 64 * 1024,
+      });
+    } catch {
+      // The queue state is still canceled locally; a completed physical sheet requires operator attention.
     }
   }
 }

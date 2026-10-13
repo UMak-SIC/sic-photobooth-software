@@ -106,6 +106,36 @@ describe('GifRenderer Service', () => {
     expect(metadata.height).toBe(360);
   });
 
+  it('keeps captured media visible above an opaque frame background', async () => {
+    const opaqueOverlayPath = path.join(tempDir, 'opaque-overlay.png');
+    const layeredOutputPath = path.join(tempDir, 'layered-output.gif');
+    await sharp({
+      create: {
+        width: 482,
+        height: 264,
+        channels: 4,
+        background: { r: 220, g: 20, b: 20, alpha: 1 },
+      },
+    })
+      .png()
+      .toFile(opaqueOverlayPath);
+
+    await gifRenderer.renderFlipbookGif(
+      coverPath,
+      mockVideoPath,
+      opaqueOverlayPath,
+      layeredOutputPath,
+      path.join(tempDir, 'intermediate-layered'),
+      { frameCount: 1, coverHoldMs: 1000, frameDelayMs: 250, timeoutMs: 10000 },
+    );
+
+    const pixel = await sharp(layeredOutputPath, { page: 0 })
+      .extract({ left: 241, top: 132, width: 1, height: 1 })
+      .raw()
+      .toBuffer();
+    expect(pixel[2]).toBeGreaterThan(pixel[0]);
+  });
+
   it('proportionally scales down oversized template slots to max dimension 800px', async () => {
     const scaledOutputPath = path.join(tempDir, 'output-scaled.gif');
     await gifRenderer.renderFlipbookGif(

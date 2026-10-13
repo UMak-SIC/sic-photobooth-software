@@ -4,16 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PublicationDashboard } from '../../../src/admin/publications/publication-dashboard';
 
 vi.mock('../../../src/services/flipbook-pdf', () => ({
-  generateFlipbookPdf: vi
-    .fn()
-    .mockResolvedValue({ blob: new Blob([]), url: 'blob:mock-pdf', filename: 'flipbook-mock.pdf' }),
-  generatePhotoStripPdf: vi.fn().mockResolvedValue({
-    blob: new Blob([]),
-    url: 'blob:mock-pdf',
-    filename: 'photostrip-mock.pdf',
-  }),
-  uploadPdfBlob: vi.fn().mockResolvedValue(true),
-  printPdfBlobUrl: vi.fn().mockResolvedValue(undefined),
+  renderGangSheetToPng: vi.fn().mockResolvedValue('data:image/png;base64,mock-sheet'),
 }));
 
 const failedPublication = {
@@ -164,19 +155,14 @@ describe('PublicationDashboard', () => {
     expect(screen.getByText('Photo20')).toBeTruthy();
   });
 
-  it('allows printing photo strips, opens copies prompt modal, and records copies', async () => {
+  it('previews a photo strip and queues the selected number of copies', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
         new Response(JSON.stringify({ data: [failedPublication] }), { status: 200 }),
       )
-      // GET /pdf -> 404
-      .mockResolvedValueOnce(new Response(null, { status: 404 }))
-      // POST /pdf -> 200
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
-      // POST /print -> 200
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: { jobId: 'job-123', copiesPrinted: 2 } }), {
+        new Response(JSON.stringify({ data: { id: 'job-123', status: 'queued' } }), {
           status: 200,
         }),
       );
@@ -187,24 +173,22 @@ describe('PublicationDashboard', () => {
     const printButton = await screen.findByRole('button', { name: /^Print$/i });
     fireEvent.click(printButton);
 
-    // Modal should appear
-    expect(await screen.findByRole('dialog', { name: /Record printed copies/i })).toBeTruthy();
-    expect(screen.getByText(/After printing, record the printed copy count/i)).toBeTruthy();
-
-    // Select 2 copies and click Record copies
-    const select = screen.getByLabelText(/Copies printed/i);
-    fireEvent.change(select, { target: { value: '2' } });
-
-    const recordBtn = screen.getByRole('button', { name: /Record copies/i });
-    fireEvent.click(recordBtn);
+    const printDialog = await screen.findByRole('dialog', { name: /Print output/i });
+    expect(screen.getByRole('img', { name: /Print preview for AbC1234/i })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Copies to print'), { target: { value: '2' } });
+    fireEvent.click(within(printDialog).getByRole('button', { name: /^Print$/i }));
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Record printed copies/i })).toBeNull();
-      expect(screen.getByText('2 copies recorded.')).toBeTruthy();
+      expect(screen.getByText('2 copies queued for printing.')).toBeTruthy();
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith('http://localhost:3000/api/print-jobs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: expect.stringMatching(/"publicId":"AbC1234".*"copies":2/),
     });
   });
 
-  it('allows printing flipbooks, fetches flipbook data, and records copies', async () => {
+  it('renders print sheets before queueing a flipbook', async () => {
     const flipbookPub = {
       ...failedPublication,
       id: 'e1b692d8-ef13-4b79-922d-c5bb31056d99',
@@ -216,28 +200,21 @@ describe('PublicationDashboard', () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: [flipbookPub] }), { status: 200 }))
-      // GET /pdf -> 404
-      .mockResolvedValueOnce(new Response(null, { status: 404 }))
-      // GET /flipbook-data -> 200
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
             data: {
-              publicId: 'Flip123',
-              mediaType: 'image/gif',
-              frame: null,
               coverUrl: '/frames/cover',
               motionFrameUrls: ['/frames/1', '/frames/2'],
+              motionSheetUrl: '/templates/frame/background',
+              frame: { placements: [{ x: 0, y: 0, width: 1, height: 1 }] },
             },
           }),
           { status: 200 },
         ),
       )
-      // POST /pdf -> 200
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }))
-      // POST /print -> 200
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: { jobId: 'job-fb', copiesPrinted: 3 } }), {
+        new Response(JSON.stringify({ data: { id: 'job-fb', status: 'queued' } }), {
           status: 200,
         }),
       );
@@ -247,62 +224,17 @@ describe('PublicationDashboard', () => {
 
     const printButton = await screen.findByRole('button', { name: /^Print$/i });
     fireEvent.click(printButton);
-
-    // Modal should appear
-    expect(await screen.findByRole('dialog', { name: /Record printed copies/i })).toBeTruthy();
-
-    const select = screen.getByLabelText(/Copies printed/i);
-    fireEvent.change(select, { target: { value: '3' } });
-
-    const recordBtn = screen.getByRole('button', { name: /Record copies/i });
-    fireEvent.click(recordBtn);
+    const printDialog = await screen.findByRole('dialog', { name: /Print output/i });
+    expect(await screen.findByRole('img', { name: /Print sheet 1 for Flip123/i })).toBeTruthy();
+    fireEvent.click(
+      within(printDialog).getByRole('button', {
+        name: /^Print$/i,
+      }),
+    );
 
     await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Record printed copies/i })).toBeNull();
-      expect(screen.getByText('3 copies recorded.')).toBeTruthy();
+      expect(screen.getByText('1 copy queued for printing.')).toBeTruthy();
     });
   });
 
-  it('uses cached 4R PDF when available in storage', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: [failedPublication] }), { status: 200 }),
-      )
-      // GET /pdf -> 200 (PDF blob)
-      .mockResolvedValueOnce(
-        new Response(new Blob(['%PDF-1.4']), {
-          status: 200,
-          headers: { 'Content-Type': 'application/pdf' },
-        }),
-      )
-      // POST /print -> 200
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ data: { jobId: 'job-cached', copiesPrinted: 1 } }), {
-          status: 200,
-        }),
-      );
-    vi.stubGlobal('fetch', fetchMock);
-
-    // Mock URL.createObjectURL
-    const origCreateObjectURL = URL.createObjectURL;
-    URL.createObjectURL = vi.fn().mockReturnValue('blob:cached-pdf-url');
-
-    render(<PublicationDashboard />);
-
-    const printButton = await screen.findByRole('button', { name: /^Print$/i });
-    fireEvent.click(printButton);
-
-    expect(await screen.findByRole('dialog', { name: /Record printed copies/i })).toBeTruthy();
-
-    const recordBtn = screen.getByRole('button', { name: /Record copies/i });
-    fireEvent.click(recordBtn);
-
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog', { name: /Record printed copies/i })).toBeNull();
-      expect(screen.getByText('1 copy recorded.')).toBeTruthy();
-    });
-
-    URL.createObjectURL = origCreateObjectURL;
-  });
 });

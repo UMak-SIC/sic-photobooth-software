@@ -42,6 +42,10 @@ export function FlipbookCompletionScreen() {
 
   const previewCoverUrl = coverUrls[selectedCoverIndex - 1] || coverUrls[0];
   const selectedMotionFrames = videoFrames[selectedVideoIndex - 1] || [];
+  const printableFrames = previewCoverUrl
+    ? [previewCoverUrl, ...selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount)]
+    : selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount);
+  const printableSheetCount = Math.ceil(printableFrames.length / 4);
   const publicCode = publicId || 'M7p4XaV';
   const formattedPublicId = publicCode;
   const qrDisplayUrl = qrUrl || `https://umak-sic-photobooth.vercel.app/${publicCode}`;
@@ -98,16 +102,12 @@ export function FlipbookCompletionScreen() {
 
     try {
       // Assemble all 16 frames: Frame 01 (cover photo) + 15 motion frames
-      const allMotionFrames = previewCoverUrl
-        ? [previewCoverUrl, ...selectedMotionFrames.slice(0, FLIPBOOK_CONFIG.motionFrameCount)]
-        : selectedMotionFrames;
-
       const { blob, url } = await generateFlipbookPdf(
         {
           publicId: publicCode,
           frame: selectedFrame,
           coverUrl: previewCoverUrl,
-          allMotionFrames,
+          allMotionFrames: printableFrames,
           motionSheetUrl,
           scope: 'all',
           activeSheet: 1,
@@ -197,6 +197,29 @@ export function FlipbookCompletionScreen() {
       top: `${((p.y % 450) / 450) * 100}%`,
       width: `${(p.width / 1200) * 100}%`,
       height: `${(p.height / 450) * 100}%`,
+    };
+  };
+
+  const getPrintPreviewSlotStyle = (frame: typeof selectedFrame, slotIndex: number) => {
+    const stripHeight = 1800 / 4;
+    const specificSlot = frame?.placements?.[slotIndex];
+    const p = specificSlot || frame?.placements?.[0];
+    if (!p) {
+      return {
+        left: `${(290 / 1200) * 100}%`,
+        top: `${((slotIndex * stripHeight + 150) / 1800) * 100}%`,
+        width: `${(620 / 1200) * 100}%`,
+        height: `${(348.75 / 1800) * 100}%`,
+      };
+    }
+    const slotY = specificSlot
+      ? p.y
+      : slotIndex * stripHeight + (p.y % stripHeight);
+    return {
+      left: `${(p.x / 1200) * 100}%`,
+      top: `${(slotY / 1800) * 100}%`,
+      width: `${(p.width / 1200) * 100}%`,
+      height: `${(p.height / 1800) * 100}%`,
     };
   };
 
@@ -552,10 +575,53 @@ export function FlipbookCompletionScreen() {
           {recordToast}
         </div>
       )}
-      {showQueueDialog && sessionId && <PrintDialog sessionId={sessionId} previewUrl={previewCoverUrl} label="booklet set" onClose={() => setShowQueueDialog(false)} onCompleted={(job) => {
-        setHasPrinted(true);
-        recordPrintSuccess(job.copiesCompleted);
-      }} />}
+      {showQueueDialog && sessionId && (
+        <PrintDialog
+          sessionId={sessionId}
+          label="booklet set"
+          preview={
+            <div className="mt-4 max-h-[50vh] space-y-4 overflow-y-auto pr-1">
+              {Array.from({ length: printableSheetCount }, (_, sheetIndex) => (
+                <div key={sheetIndex} className="overflow-hidden rounded-lg border border-[#d9e8e3] bg-[#f4f6f5]">
+                  <p className="px-3 py-2 text-sm font-bold text-[#1f2937]">Sheet {sheetIndex + 1} of {printableSheetCount}</p>
+                  <div className="relative aspect-[2/3] w-full overflow-hidden">
+                    {motionSheetUrl && (
+                      <img
+                        src={motionSheetUrl}
+                        alt="Flipbook print template"
+                        className="absolute inset-0 size-full object-fill"
+                      />
+                    )}
+                    {Array.from({ length: 4 }, (_, slotIndex) => {
+                      const frameIndex = sheetIndex * 4 + slotIndex;
+                      return (
+                        <div
+                          key={slotIndex}
+                          className="absolute overflow-hidden bg-black/10"
+                          style={getPrintPreviewSlotStyle(selectedFrame, slotIndex)}
+                        >
+                          {printableFrames[frameIndex] && (
+                            <img
+                              src={printableFrames[frameIndex]}
+                              alt={`Print strip ${frameIndex + 1}`}
+                              className="size-full object-cover"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          }
+          onClose={() => setShowQueueDialog(false)}
+          onCompleted={(job) => {
+            setHasPrinted(true);
+            recordPrintSuccess(job.copiesCompleted);
+          }}
+        />
+      )}
     </>
   );
 }
