@@ -20,8 +20,9 @@ This document provides a single source of truth for tracking project tasks again
 | Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **TSK-1101** | Record PostgreSQL backup, restore-drill, and cutover gates | `docs/decisions`, `docs/runbooks` | Contract § Delivery Scope; local-first constraints | Production facts are recorded without credentials; no cutover proceeds without two protected backup copies and a passing restore drill. | `[/] In Progress` |
-| **TSK-1102** | Add side-by-side SQLite foundation while PostgreSQL remains default | `app/backend/src/db/sqlite` | Contract § Delivery Scope | SQLite connection/migration implementation builds independently; runtime remains PostgreSQL. | `[ ] Planned` |
-| **TSK-1103** | Port repositories, validate imported data, and perform gated cutover | `app/backend`, `docs/runbooks` | Contract § Publishing and Retrieval | Parity, integrity, workflow, print, and publication checks pass before write enable. | `[ ] Planned` |
+| **TSK-1102** | Add side-by-side SQLite foundation while PostgreSQL remains default | `app/backend/src/db/sqlite` | Contract § Delivery Scope | SQLite connection/migration implementation builds independently; runtime remains PostgreSQL. | `[x] Completed` |
+| **TSK-1103** | Port repositories, validate imported data, and perform gated cutover | `app/backend`, `docs/runbooks` | Contract § Publishing and Retrieval | Parity, integrity, workflow, print, and publication checks pass before write enable. | `[/] In Progress` |
+| **TSK-1104** | Remove the PostgreSQL runtime and operationalize SQLite backups | `app/backend`, `docs/runbooks` | Contract § Delivery Scope; local-first constraints | `app/backend/src` never imports `pg` (`test/runtime-boundaries.test.ts`); legacy migrations are non-executable evidence; WAL-safe backups verify and restore to a disposable path. Merge only after cutover sign-off. | `[/] In Progress` |
 
 ### EPIC-01: Monorepo Foundation & Workspace Tooling
 **Owner**: Monorepo Root | **Scope**: Workspace configuration, dependency orchestration, testing harness, lint/format standards.

@@ -11,7 +11,7 @@
 
 - Preserve local-first behavior: capture, confirmation, printing, and local retrieval must work without internet access.
 - Treat every client as untrusted. Enforce workflow state, session isolation, media validation, and generated storage paths in `app/backend/`.
-- `app/backend/` is the only application with PostgreSQL and local filesystem authority.
+- `app/backend/` is the only application with database (SQLite) and local filesystem authority.
 - `app/photobooth-software/` uses backend APIs for persisted work and must not write arbitrary local files.
 - `app/captive-website/` provides guest-safe local retrieval only. It extracts the ID from the printed public URL; it must not navigate to it or expose booth controls.
 - `app/public-website/` resolves public IDs through Supabase and Cloudinary. It must never contact the local backend.

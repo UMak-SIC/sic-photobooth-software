@@ -14,7 +14,7 @@
 
 ## Application Boundaries
 
-- `app/backend/` will be the local Fastify source of truth: PostgreSQL access, session/workflow enforcement, media validation, local storage, rendering, printing, and asynchronous publishing. Clients never access PostgreSQL directly.
+- `app/backend/` will be the local Fastify source of truth: SQLite database ownership, session/workflow enforcement, media validation, local storage, rendering, printing, and asynchronous publishing. Clients never access the database directly.
 - `app/photobooth-software/` will be the local React/Vite booth UI. It uses the backend for persisted operations and must not write arbitrary local files.
 - `app/captive-website/` will be the local Next.js guest retrieval portal. It parses the ID from the permanent public QR URL and retrieves only local approved outputs through the backend; it must not expose booth controls.
 - `app/public-website/` will be the Vercel-hosted Next.js retrieval site. It resolves public IDs through Supabase/Cloudinary and must never contact the local backend.

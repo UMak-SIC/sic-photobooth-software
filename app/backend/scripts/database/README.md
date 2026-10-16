@@ -8,7 +8,7 @@ Phase 4 of `plans/sqlite-local-database-migration-plan.md`. These commands build
 | `pnpm --filter @photobooth/backend db:validate-parity` | `validate-postgres-sqlite-parity.ts` |
 | `pnpm --filter @photobooth/backend typecheck:scripts` | type-checks these scripts and their tests (`tsconfig.scripts.json`) |
 
-Both commands run through `tsx` from the backend package, so they have declared access to `pg` and `better-sqlite3`.
+Both commands run through `tsx` from the backend package. `pg` is a backend **devDependency** used only by these scripts; the application under `src/` never imports it (`test/runtime-boundaries.test.ts`), and `pnpm install --prod` does not install it. Like every `db:*` command, they need a full install, since `tsx` is a devDependency too. They verify the source ledger against the PostgreSQL migrations kept as evidence in `src/db/legacy-postgres/migrations/`.
 
 ## Safety rules
 
@@ -100,7 +100,7 @@ The importer copies paths exactly as stored. On the live database, some of those
 2. Run `db:import-legacy` into a new versioned file.
 3. Run `db:validate-parity` with the backup set's media manifest. Store the report beside the secured backup.
 4. Any mismatch blocks cutover.
-5. Start Fastify with `LOCAL_DATABASE_ENGINE=sqlite` against the shadow file and smoke-test it. This needs the Phase 3 SQLite provider.
+5. Start Fastify with `SQLITE_DATABASE_PATH` pointing at the shadow file and `DATABASE_CUTOVER_HOLD=1`, then smoke-test it.
 
 ## Tests
 

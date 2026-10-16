@@ -16,6 +16,11 @@ Complete workflows to verify once the applications and test runner exist. Test e
 2. Let the review timer expire and confirm the first cover and video are selected.
 3. Force GIF processing past its timeout and confirm assets are discarded, the recovery message appears, and cover capture restarts.
 
+## Database Operations
+
+1. Take a SQLite backup with `db:backup` while the booth is idle, verify it with `db:verify-backup`, and restore it to a disposable path following `docs/runbooks/sqlite-backup-and-restore.md`.
+2. Stop the backend, make the database file unreadable, and confirm the backend refuses to start and the supervisor keeps restarting it until the file is restored.
+
 ## Retrieval And Publication
 
 1. Scan a printed full public URL from the captive portal; confirm it is parsed locally and does not navigate to the public site.

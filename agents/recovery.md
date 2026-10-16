@@ -24,6 +24,11 @@ Expected failure handling from the Authoritative Implementation Contract. Preser
 - Show: `Printing was not confirmed. Complete printing in Firefox/CUPS, then record the printed copy count.`
 - Do not retry printing automatically. The administrator resolves CUPS and records `is_printed` and `copies_printed`.
 
+## Backend Refuses To Start
+
+- Log: `Database (sqlite) is unavailable; refusing to start.` The process exits with status `1`, and the supervisor restarts it.
+- Check `SQLITE_DATABASE_PATH`, file ownership and permissions, free disk space, and the migration error in the log. If the file is damaged, close the booth and restore the latest verified backup per `docs/runbooks/sqlite-backup-and-restore.md`. Never reconnect to the retired PostgreSQL database.
+
 ## Publishing Failed
 
 - Show: `Saved locally. Online delivery will retry automatically.`
