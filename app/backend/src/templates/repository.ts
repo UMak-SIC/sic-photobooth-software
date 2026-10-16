@@ -1,3 +1,4 @@
+import type { TemplateStore } from '../db/contracts.js';
 import { pool } from '../db/pool.js';
 import { resolveStoredPath, toStoredPath } from '../services/storage-paths.js';
 import { dimensionsFor, type Template, type TemplateDraft } from './types.js';
@@ -118,7 +119,8 @@ const templateSelect = `
 
 export const isTemplateId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
 
-export class TemplateRepository {
+/** Legacy PostgreSQL implementation of the template store contract. */
+export class TemplateRepository implements TemplateStore {
   private async hydrate(row: TemplateRow): Promise<Template> {
     const [placements, overlays] = await Promise.all([
       pool.query(
