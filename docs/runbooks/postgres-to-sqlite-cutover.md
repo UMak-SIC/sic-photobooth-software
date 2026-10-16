@@ -95,12 +95,15 @@ Record the dump checksum and backup location in the sign-off table.
    pnpm --filter @photobooth/backend db:import-legacy <importer arguments per app/backend/scripts/database/README.md>
    ```
 
-3. Run the parity gate and save its report beside the backup set:
+3. Run the parity gate and save its report beside the backup set. The command writes the JSON report itself through `--report` (mode `0600`, never overwritten); its standard output is only a human summary, so do not redirect it into the report file:
 
    ```sh
-   pnpm --filter @photobooth/backend db:validate-parity <parity arguments per app/backend/scripts/database/README.md> \
-     > <BACKUP_DIR>/sqlite-parity-report.json
+   pnpm --filter @photobooth/backend db:validate-parity -- \
+     --report <BACKUP_DIR>/sqlite-parity-report.json \
+     <source, --sqlite <CANDIDATE>, and media arguments per app/backend/scripts/database/README.md>
    ```
+
+   If the source ledger contains the retired migration `011_storage_relative_paths.sql` with its allowlisted checksum, the report lists it in `migrationLedger.retired` and in `warnings`. That is expected for the live booth database; record it in the sign-off table.
 
 4. Any importer error or parity mismatch stops the cutover. Do not edit the candidate by hand; delete it and start again from a new versioned file.
 
@@ -117,7 +120,7 @@ pnpm --silent --filter @photobooth/backend db:validate-cutover -- \
 echo "exit=$?"
 ```
 
-The exit code must be `0` and `"passed": true`. The validator opens the file read-only and checks `PRAGMA integrity_check`, `PRAGMA foreign_key_check`, the `schema_migrations` ledger against the shipped SQLite migration checksums, the expected tables and indexes, and the per-table counts in the parity report. It may leave empty `-wal`/`-shm` sidecars beside the file; that is expected.
+The exit code must be `0` and `"passed": true`. The validator opens the file read-only and checks `PRAGMA integrity_check`, `PRAGMA foreign_key_check`, the `schema_migrations` ledger against the shipped SQLite migration checksums, the expected tables and indexes, and the parity report. The report must be a passing `db:validate-parity` report (`tool: "validate-postgres-sqlite-parity"`, `reportVersion: 1`, `status: "pass"`, no mismatches, a passing source ledger) with an `ok` entry for every legacy table. The candidate's row counts must match it, and while the main-file checksum covers all data, the candidate's SHA-256 must equal the report's `sqlite.sha256After`; any change to the file after the parity gate fails this check (`parity_counts.details.candidateChecksumCompared` shows whether the binding was checked). It may leave empty `-wal`/`-shm` sidecars beside the file; that is expected.
 
 Record `candidate.sha256` from the output as the SQLite candidate checksum. Then run `sha256sum <CANDIDATE>` and confirm it matches.
 

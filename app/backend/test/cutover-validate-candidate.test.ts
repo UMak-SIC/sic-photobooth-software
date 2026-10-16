@@ -6,6 +6,15 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { closeSqliteConnection, createSqliteConnection } from '../src/db/sqlite/connection.js';
 import { runSqliteMigrations } from '../src/db/sqlite/migrations.js';
 import { parseCutoverParityReport } from '../scripts/database/cutover-parity-report.js';
+import { importLegacyPostgres } from '../scripts/database/import-legacy-postgres.js';
+import {
+  expectedLegacyLedger,
+  RETIRED_LEGACY_MIGRATIONS,
+} from '../scripts/database/lib/import-catalog.js';
+import type { LegacyReader } from '../scripts/database/lib/import-source.js';
+import { LEGACY_TABLES } from '../scripts/database/lib/import-schema.js';
+import { validateParity } from '../scripts/database/validate-postgres-sqlite-parity.js';
+import { createFakeReader, legacyFixture } from './legacy-import-fixture.js';
 import {
   parseCutoverArgs,
   validateCutoverCandidate,
@@ -32,6 +41,21 @@ function createCandidate(seed?: (db: Database.Database) => void): string {
   seed?.(db);
   closeSqliteConnection(db);
   return filename;
+}
+
+/** A candidate built by the real Phase 4 importer from the legacy fixture. */
+async function importedCandidate(): Promise<string> {
+  const filename = tempPath('photobooth-imported.sqlite');
+  await importLegacyPostgres({ reader: createFakeReader(legacyFixture()), destinationPath: filename, env: {} });
+  return filename;
+}
+
+/** Runs the real parity gate and writes its report as the CLI does (JSON on disk). */
+async function writeParityReport(sqlitePath: string, reader: LegacyReader): Promise<string> {
+  const report = await validateParity({ reader, sqlitePath });
+  const reportPath = tempPath('parity-report.json');
+  fs.writeFileSync(reportPath, JSON.stringify(report));
+  return reportPath;
 }
 
 function check(result: CutoverValidationResult, name: string) {
@@ -120,35 +144,86 @@ describe('validateCutoverCandidate', () => {
     expect(details.unexpected).toEqual(['table:stray']);
   });
 
-  it('compares counts against a parity report', () => {
-    const candidate = createCandidate();
-    const matching = tempPath('parity.json');
-    fs.writeFileSync(matching, JSON.stringify({ passed: true, tables: { events: { postgresCount: 1, sqliteCount: 1 }, sessions: 0 } }));
-    const ok = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: matching });
-    expect(ok.passed).toBe(true);
-    expect(check(ok, 'parity_counts')?.details).toEqual({ tablesCompared: 2 });
+  it('accepts a passing report written by db:validate-parity and binds it to the candidate', async () => {
+    const candidate = await importedCandidate();
+    const reportPath = await writeParityReport(candidate, createFakeReader(legacyFixture()));
 
-    const mismatched = tempPath('parity.json');
-    fs.writeFileSync(mismatched, JSON.stringify({ expectedCounts: { events: 2, missing_table: 0 } }));
-    const bad = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: mismatched });
-    expect(bad.passed).toBe(false);
-    expect(check(bad, 'parity_counts')?.details).toMatchObject({
-      mismatches: { events: { expected: 2, actual: 1 }, missing_table: { expected: 0, actual: null } },
+    const ok = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: reportPath });
+    expect(check(ok, 'parity_counts')).toEqual({
+      name: 'parity_counts',
+      passed: true,
+      details: { tablesCompared: LEGACY_TABLES.length, candidateChecksumCompared: true },
+    });
+    expect(ok.passed).toBe(true);
+
+    // Any change to the candidate after the parity gate breaks the binding.
+    const db = new Database(candidate);
+    db.prepare('DELETE FROM print_job_attempts').run();
+    db.pragma('wal_checkpoint(TRUNCATE)');
+    db.close();
+    const changed = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: reportPath });
+    expect(changed.passed).toBe(false);
+    expect(check(changed, 'parity_counts')?.details).toMatchObject({
+      candidateChecksumMismatch: true,
+      mismatches: { print_job_attempts: { expected: 2, actual: 0 } },
     });
 
     const unreadable = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: tempPath('none.json') });
     expect(check(unreadable, 'parity_counts')).toMatchObject({ passed: false, details: { reason: 'parity report unreadable' } });
   });
+
+  it('carries the retired-migration note and rejects a failing parity report', async () => {
+    const candidate = await importedCandidate();
+    const retiredReport = await writeParityReport(
+      candidate,
+      createFakeReader(legacyFixture(), { ledger: [...expectedLegacyLedger(), ...RETIRED_LEGACY_MIGRATIONS] }),
+    );
+    const retired = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: retiredReport });
+    expect(retired.passed).toBe(true);
+    expect(check(retired, 'parity_counts')?.details).toMatchObject({
+      retiredSourceMigrations: ['011_storage_relative_paths.sql'],
+    });
+
+    const failingReport = await writeParityReport(
+      candidate,
+      createFakeReader(legacyFixture(), { ledger: expectedLegacyLedger().slice(0, -1) }),
+    );
+    const failed = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: failingReport });
+    expect(failed.passed).toBe(false);
+    expect(check(failed, 'parity_counts')?.details).toMatchObject({
+      reportRecordsFailure: true,
+      problems: ['Parity report does not record a passing source ledger.'],
+    });
+  });
 });
 
 describe('parseCutoverParityReport', () => {
-  it('flags failed reports, engine disagreements, and unusable shapes', () => {
-    expect(parseCutoverParityReport({ status: 'failed', expectedCounts: { events: 1 } }).reportRecordsFailure).toBe(true);
-    expect(
-      parseCutoverParityReport({ tables: [{ table: 'events', postgresCount: 2, sqliteCount: 1 }] }).problems,
-    ).toEqual(['Parity report records a count mismatch for "events".', 'Parity report contains no usable table counts.']);
+  it('fails closed on foreign, failed, incomplete, or inconsistent reports', async () => {
+    const candidate = await importedCandidate();
+    const report = await validateParity({ reader: createFakeReader(legacyFixture()), sqlitePath: candidate });
+    const passing = JSON.parse(JSON.stringify(report)) as Record<string, unknown>;
+    const parsed = parseCutoverParityReport(passing);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.reportRecordsFailure).toBe(false);
+    expect(parsed.candidateSha256).toBe(report.sqlite.sha256After);
+
     expect(parseCutoverParityReport([]).problems).toEqual(['Parity report is not a JSON object.']);
-    expect(parseCutoverParityReport({}).problems).toEqual(['Parity report has neither "expectedCounts" nor "tables".']);
+    expect(parseCutoverParityReport({ expectedCounts: { events: 1 } })).toMatchObject({
+      reportRecordsFailure: true,
+      problems: ['Parity report is not a validate-postgres-sqlite-parity report version 1.'],
+    });
+    expect(parseCutoverParityReport({ ...passing, status: 'fail' }).reportRecordsFailure).toBe(true);
+    expect(parseCutoverParityReport({ ...passing, mismatches: ['x'] }).reportRecordsFailure).toBe(true);
+
+    const tables = { ...(passing.tables as Record<string, Record<string, unknown>>) };
+    delete tables.print_jobs;
+    tables.events = { ...tables.events, sqliteCount: (tables.events.sourceCount as number) + 1 };
+    tables.stray = { ok: true, sourceCount: 0, sqliteCount: 0 };
+    expect(parseCutoverParityReport({ ...passing, tables }).problems).toEqual([
+      'Parity report records a count mismatch for "events".',
+      'Parity report has no entry for "print_jobs".',
+      'Parity report contains unknown table "stray".',
+    ]);
   });
 });
 

@@ -166,28 +166,49 @@ function checkSchema(actual: SchemaObject[]): CutoverCheck {
   };
 }
 
+/**
+ * Binds the candidate to the `db:validate-parity` report: the report must pass,
+ * cover every legacy table, match the candidate's row counts, and (when the
+ * main-file checksum covers all data) name this exact file by SHA-256.
+ */
 function checkParity(
   parityReportPath: string,
   rowCounts: Record<string, number>,
+  candidate: CutoverValidationResult['candidate'],
 ): CutoverCheck {
   let report: unknown;
   try {
     report = JSON.parse(fs.readFileSync(parityReportPath, 'utf8'));
   } catch (error) {
-    return { name: 'parity_counts', passed: false, details: { reason: 'parity report unreadable', code: errorCode(error) } };
+    return {
+      name: 'parity_counts',
+      passed: false,
+      details: { reason: 'parity report unreadable', code: errorCode(error) },
+    };
   }
-  const { expectedCounts, reportRecordsFailure, problems } = parseCutoverParityReport(report);
+  const { expectedCounts, reportRecordsFailure, candidateSha256, retiredSourceMigrations, problems } =
+    parseCutoverParityReport(report);
   const mismatches: Record<string, { expected: number; actual: number | null }> = {};
   for (const [table, expected] of Object.entries(expectedCounts)) {
     const actual = rowCounts[table];
     if (actual !== expected) mismatches[table] = { expected, actual: actual ?? null };
   }
-  const passed = !reportRecordsFailure && problems.length === 0 && Object.keys(mismatches).length === 0;
+  // A non-empty WAL (backend running) means the main-file hash is incomplete.
+  const checksumCompared = candidate.checksumCoversAllData === true && candidateSha256 !== undefined;
+  const checksumMismatch = checksumCompared && candidate.sha256 !== candidateSha256;
+  const passed =
+    !reportRecordsFailure &&
+    problems.length === 0 &&
+    Object.keys(mismatches).length === 0 &&
+    !checksumMismatch;
   return {
     name: 'parity_counts',
     passed,
     details: {
       tablesCompared: Object.keys(expectedCounts).length,
+      candidateChecksumCompared: checksumCompared,
+      ...(checksumMismatch ? { candidateChecksumMismatch: true } : {}),
+      ...(retiredSourceMigrations.length > 0 ? { retiredSourceMigrations } : {}),
       ...(reportRecordsFailure ? { reportRecordsFailure } : {}),
       ...(problems.length > 0 ? { problems } : {}),
       ...(Object.keys(mismatches).length > 0 ? { mismatches } : {}),
@@ -239,7 +260,7 @@ export function validateCutoverCandidate(options: CutoverValidationOptions): Cut
       const row = db.prepare(`SELECT COUNT(*) AS count FROM ${quoteIdentifier(table)}`).get() as { count: number };
       result.rowCounts[table] = row.count;
     }
-    if (options.parityReportPath) result.checks.push(checkParity(options.parityReportPath, result.rowCounts));
+    if (options.parityReportPath) result.checks.push(checkParity(options.parityReportPath, result.rowCounts, result.candidate));
   } catch (error) {
     result.checks.push({ name: 'validation_completed', passed: false, details: { code: errorCode(error) } });
   } finally {

@@ -1,19 +1,27 @@
+import { LEGACY_TABLES } from './lib/import-schema.js';
+import type { ParityReport } from './validate-postgres-sqlite-parity.js';
+
 /**
- * Extracts expected per-table row counts from a parity report JSON document.
+ * Reads the report written by `db:validate-parity` (validate-postgres-sqlite-parity.ts,
+ * `ParityReport`, `reportVersion: 1`) and extracts what the cutover gate needs.
  *
- * Accepted shapes (first match wins):
- *   { "expectedCounts": { "<table>": <n> } }
- *   { "tables": { "<table>": { "postgresCount": <n>, "sqliteCount": <n> } } }
- *   { "tables": [ { "table": "<table>", "postgresCount": <n>, "sqliteCount": <n> } ] }
- * Within a table entry, `postgresCount`, `sqliteCount`, or `count` are read; when both
- * engine counts are present they must agree. A top-level `passed: false`, `ok: false`,
- * or `status: "failed"` marks the report itself as a failed parity gate.
+ * Fail-closed: any other tool, version, or shape is a problem. The report counts
+ * as failed unless `status` is `"pass"` with no mismatches, and every legacy table
+ * must have an `ok` entry whose source and SQLite counts agree.
  */
 export interface CutoverParityExpectations {
+  /** Per-table SQLite row counts the parity gate validated. */
   expectedCounts: Record<string, number>;
   reportRecordsFailure: boolean;
+  /** SHA-256 of the candidate file after parity validation (`sqlite.sha256After`). */
+  candidateSha256?: string;
+  /** Allowlisted retired legacy migrations the parity gate saw in the source ledger. */
+  retiredSourceMigrations: string[];
   problems: string[];
 }
+
+export const PARITY_REPORT_TOOL: ParityReport['tool'] = 'validate-postgres-sqlite-parity';
+export const PARITY_REPORT_VERSION: ParityReport['reportVersion'] = 1;
 
 type JsonRecord = Record<string, unknown>;
 
@@ -25,54 +33,71 @@ function isCount(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 }
 
-function countFromEntry(table: string, entry: unknown, problems: string[]): number | undefined {
-  if (isCount(entry)) return entry;
-  if (!isRecord(entry)) {
-    problems.push(`Parity entry for "${table}" is not a count or object.`);
-    return undefined;
-  }
-  const postgres = entry.postgresCount;
-  const sqlite = entry.sqliteCount;
-  if (isCount(postgres) && isCount(sqlite) && postgres !== sqlite) {
-    problems.push(`Parity report records a count mismatch for "${table}".`);
-    return undefined;
-  }
-  const count = [postgres, sqlite, entry.count].find(isCount);
-  if (count === undefined) problems.push(`Parity entry for "${table}" has no numeric count.`);
-  return count;
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 export function parseCutoverParityReport(report: unknown): CutoverParityExpectations {
   const problems: string[] = [];
   const expectedCounts: Record<string, number> = {};
+  const result: CutoverParityExpectations = {
+    expectedCounts,
+    reportRecordsFailure: true,
+    retiredSourceMigrations: [],
+    problems,
+  };
   if (!isRecord(report)) {
-    return { expectedCounts, reportRecordsFailure: false, problems: ['Parity report is not a JSON object.'] };
+    problems.push('Parity report is not a JSON object.');
+    return result;
+  }
+  if (report.tool !== PARITY_REPORT_TOOL || report.reportVersion !== PARITY_REPORT_VERSION) {
+    problems.push(
+      `Parity report is not a ${PARITY_REPORT_TOOL} report version ${PARITY_REPORT_VERSION}.`,
+    );
+    return result;
   }
 
-  const reportRecordsFailure =
-    report.passed === false || report.ok === false || report.status === 'failed';
+  const mismatches = isStringArray(report.mismatches) ? report.mismatches : undefined;
+  if (!mismatches) problems.push('Parity report has no "mismatches" list.');
+  result.reportRecordsFailure = report.status !== 'pass' || (mismatches?.length ?? 1) > 0;
 
-  let entries: Array<[string, unknown]> = [];
-  if (isRecord(report.expectedCounts)) {
-    entries = Object.entries(report.expectedCounts);
-  } else if (isRecord(report.tables)) {
-    entries = Object.entries(report.tables);
-  } else if (Array.isArray(report.tables)) {
-    for (const item of report.tables) {
-      const name = isRecord(item) ? (item.table ?? item.name) : undefined;
-      if (typeof name === 'string') entries.push([name, item]);
-      else problems.push('Parity table entry is missing a table name.');
-    }
+  const sqlite = isRecord(report.sqlite) ? report.sqlite : {};
+  if (typeof sqlite.sha256After === 'string' && /^[0-9a-f]{64}$/.test(sqlite.sha256After)) {
+    result.candidateSha256 = sqlite.sha256After;
   } else {
-    problems.push('Parity report has neither "expectedCounts" nor "tables".');
+    problems.push('Parity report has no candidate checksum ("sqlite.sha256After").');
   }
 
-  for (const [table, entry] of entries) {
-    const count = countFromEntry(table, entry, problems);
-    if (count !== undefined) expectedCounts[table] = count;
+  const ledger = isRecord(report.migrationLedger) ? report.migrationLedger : undefined;
+  if (ledger?.ok !== true) problems.push('Parity report does not record a passing source ledger.');
+  else if (isStringArray(ledger.retired)) result.retiredSourceMigrations = ledger.retired;
+
+  const tables = isRecord(report.tables) ? report.tables : undefined;
+  if (!tables) {
+    problems.push('Parity report has no "tables" object.');
+    return result;
   }
-  if (entries.length > 0 && Object.keys(expectedCounts).length === 0) {
-    problems.push('Parity report contains no usable table counts.');
+  for (const { name } of LEGACY_TABLES) {
+    const entry = tables[name];
+    if (!isRecord(entry)) {
+      problems.push(`Parity report has no entry for "${name}".`);
+      continue;
+    }
+    if (entry.ok !== true) {
+      problems.push(`Parity report records a failure for "${name}".`);
+      continue;
+    }
+    if (!isCount(entry.sourceCount) || !isCount(entry.sqliteCount)) {
+      problems.push(`Parity entry for "${name}" has no numeric counts.`);
+    } else if (entry.sourceCount !== entry.sqliteCount) {
+      problems.push(`Parity report records a count mismatch for "${name}".`);
+    } else {
+      expectedCounts[name] = entry.sqliteCount;
+    }
   }
-  return { expectedCounts, reportRecordsFailure, problems };
+  const known = new Set(LEGACY_TABLES.map((table) => table.name));
+  for (const name of Object.keys(tables)) {
+    if (!known.has(name)) problems.push(`Parity report contains unknown table "${name}".`);
+  }
+  return result;
 }
