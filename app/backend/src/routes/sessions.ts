@@ -194,10 +194,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: frames,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -252,10 +253,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -279,10 +281,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeSession,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -1437,10 +1440,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeCancelled,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
