@@ -90,7 +90,7 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
 
     const sessionId = output.sessionId;
     let frame = null;
-    let coverUrl: string | null = `/api/publications/${request.params.id}/frames/cover`;
+    const coverUrl: string | null = `/api/publications/${request.params.id}/frames/cover`;
     const motionFrameUrls: string[] = Array.from(
       { length: 15 },
       (_, i) => `/api/publications/${request.params.id}/frames/${i + 1}`,
@@ -278,7 +278,9 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
           try {
             const frameBuf = await sharp(candidate, { page: 0 }).png().toBuffer();
             return reply.type('image/png').send(frameBuf);
-          } catch {}
+          } catch {
+            // Try the next candidate GIF.
+          }
         }
 
         return reply.status(404).send({
@@ -336,7 +338,9 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
             const targetPage = Math.min(Math.max(0, frameNum - 1), totalPages - 1);
             const frameBuf = await sharp(candidate, { page: targetPage }).png().toBuffer();
             return reply.type('image/png').send(frameBuf);
-          } catch {}
+          } catch {
+            // Try the next candidate GIF.
+          }
         }
 
         return reply.status(404).send({

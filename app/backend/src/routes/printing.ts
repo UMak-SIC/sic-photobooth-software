@@ -10,7 +10,6 @@ const createSchema = z.object({
   copies: z.number().int().min(1).max(10),
   requestKey: z.string().uuid(),
 });
-const idSchema = z.object({ id: z.string().uuid() });
 
 function authorized(header: string | string[] | undefined, token: string) {
   return typeof header === 'string' && header === token;
