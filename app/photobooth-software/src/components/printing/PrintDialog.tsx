@@ -51,7 +51,7 @@ export function PrintDialog({ sessionId, previewUrl, preview, label = 'copy', on
       </label>
       {job && <p role="status" className="mt-4 rounded bg-slate-100 p-3 font-medium">{job.status === 'completed' ? 'CUPS reported this job completed.' : `Printer status: ${job.status}`}</p>}
       {error && <p role="alert" className="mt-4 text-red-700">{error}</p>}
-      {job?.lastError && <p role="alert" className="mt-4 text-red-700">{job.lastError}. Recover it from Admin Print.</p>}
+      {job?.lastError && <p role="alert" className="mt-4 text-red-700">{job.lastError.replace(/\.$/, '')}. Recover it from Admin Print.</p>}
       <div className="mt-6 flex justify-end gap-3">
         <button type="button" className="rounded px-4 py-2 font-bold" onClick={onClose}>{submitted ? 'Okay' : job?.status === 'failed' ? 'Okay' : 'Cancel'}</button>
         {!job && <button type="button" className="rounded bg-[#1e6147] px-5 py-2 font-bold text-white" onClick={submit}>Queue print</button>}

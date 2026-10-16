@@ -24,7 +24,11 @@ vi.mock('@supabase/supabase-js', () => ({
 describe('Publishing worker', () => {
   /** Publications reference real sessions; foreign keys are enforced. */
   async function confirmedSession(label: string): Promise<string> {
-    const event = await repo.dbRepository.getOrCreateEvent('Worker Test Event', '2099-09-05', 'Tester');
+    const event = await repo.dbRepository.getOrCreateEvent(
+      'Worker Test Event',
+      '2099-09-05',
+      'Tester',
+    );
     const session = await repo.dbRepository.createSession(event.id, 'photo_strip', label);
     return session.id;
   }
@@ -42,7 +46,7 @@ describe('Publishing worker', () => {
     process.env.SUPABASE_URL = 'https://test.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
     process.env.PUBLIC_APP_URL = '';
-      vi.resetModules();
+    vi.resetModules();
     mocks.supabaseEq.mockReturnValue({ maybeSingle: mocks.supabaseMaybeSingle });
     mocks.supabaseSelect.mockReturnValue({ eq: mocks.supabaseEq });
     mocks.supabaseFrom.mockReturnValue({
@@ -55,7 +59,11 @@ describe('Publishing worker', () => {
     await repo.runDatabaseMigrations();
   });
 
+  let consoleError: ReturnType<typeof vi.spyOn>;
+
   beforeEach(() => {
+    consoleError?.mockRestore();
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     cloudinaryV2.uploader.upload.mockClear();
     cloudinaryV2.uploader.destroy.mockClear();
     mocks.supabaseUpsert.mockClear();
@@ -127,7 +135,7 @@ describe('Publishing worker', () => {
       const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrFl1x');
       expect(pub.status).toBe('queued');
       expect(pub.retryCount).toBe(attempt);
-      expect(pub.lastError).toBe('network down');
+      expect(pub.lastError).toBe(worker.PUBLICATION_RETRYING_MESSAGE);
       expect(pub.nextAttemptAt).not.toBeNull();
     }
 
@@ -137,6 +145,11 @@ describe('Publishing worker', () => {
     expect(pub.status).toBe('failed');
     expect(pub.retryCount).toBe(5);
     expect(pub.nextAttemptAt).toBeNull();
+    expect(pub.lastError).toBe(worker.PUBLICATION_FAILED_MESSAGE);
+    expect(consoleError).toHaveBeenCalledWith(
+      'Publication upload failed:',
+      expect.objectContaining({ publicId: 'WkrFl1x', attempt: 5, error: 'network down' }),
+    );
   });
 
   it('retries when Cloudinary succeeds but Supabase registration fails', async () => {
@@ -161,7 +174,14 @@ describe('Publishing worker', () => {
     );
     expect(pub.status).toBe('queued');
     expect(pub.retryCount).toBe(1);
-    expect(pub.lastError).toContain('Supabase publication record failed: database unavailable');
+    expect(pub.lastError).toBe(worker.PUBLICATION_RETRYING_MESSAGE);
+    expect(pub.lastError).not.toContain('database unavailable');
+    expect(consoleError).toHaveBeenCalledWith(
+      'Publication upload failed:',
+      expect.objectContaining({
+        error: expect.stringContaining('Supabase publication record failed: database unavailable'),
+      }),
+    );
   });
 
   it('finalizes locally when a completed Supabase upsert times out', async () => {
