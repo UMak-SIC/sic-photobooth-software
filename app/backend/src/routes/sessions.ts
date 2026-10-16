@@ -181,14 +181,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      let frames = await dbRepository.listActiveFrames();
-      // Seed default frames if none exist
-      if (frames.length === 0) {
-        await dbRepository.createFrame('SIC Seal', 'frames/sic-seal.png');
-        await dbRepository.createFrame('Emerald Motion', 'frames/emerald-motion.png');
-        await dbRepository.createFrame('Pioneer Grid', 'frames/pioneer-grid.png');
-        frames = await dbRepository.listActiveFrames();
-      }
+      // A read never writes: with no stored frames the repository returns the built-in set.
+      const frames = await dbRepository.listActiveFrames();
       return reply.send({
         success: true,
         data: frames,
