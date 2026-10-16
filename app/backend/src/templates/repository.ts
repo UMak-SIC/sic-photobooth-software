@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { resolveStoredPath, toStoredPath } from '../services/storage-paths.js';
 import { dimensionsFor, type Template, type TemplateDraft } from './types.js';
 
 type TemplateRow = {
@@ -74,8 +75,8 @@ export function mapTemplate(
     height: row.output_height,
     active: row.is_active,
     requiredCaptureCount: row.required_capture_count,
-    backgroundPath: row.background_path,
-    coverPath: row.cover_path,
+    backgroundPath: resolveStoredPath(row.background_path),
+    coverPath: resolveStoredPath(row.cover_path),
     sortOrder: row.sort_order,
     background: {
       x: Number(row.background_x),
@@ -96,6 +97,7 @@ export function mapTemplate(
     })),
     overlays: overlays.map((overlay) => ({
       ...overlay,
+      path: resolveStoredPath(overlay.path),
       x: Number(overlay.x),
       y: Number(overlay.y),
       width: Number(overlay.width),
@@ -204,7 +206,7 @@ export class TemplateRepository {
           overlay.id,
           id,
           overlay.label,
-          overlay.path ?? null,
+          toStoredPath(overlay.path) ?? null,
           overlay.x,
           overlay.y,
           overlay.width,
@@ -270,7 +272,7 @@ export class TemplateRepository {
   public async setBackgroundPath(id: string, path: string): Promise<Template | null> {
     const result = await pool.query<TemplateRow>(
       `UPDATE templates SET background_path=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
-      [id, path],
+      [id, toStoredPath(path)],
     );
     return result.rows[0] ? this.hydrate(result.rows[0]) : null;
   }
@@ -278,7 +280,7 @@ export class TemplateRepository {
   public async setCoverPath(id: string, path: string): Promise<Template | null> {
     const result = await pool.query<TemplateRow>(
       `UPDATE templates SET cover_path=$2, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING id, name, type, orientation, output_width, output_height, background_path, cover_path, background_x, background_y, background_width, background_height, is_active, required_capture_count, sort_order, created_at, updated_at`,
-      [id, path],
+      [id, toStoredPath(path)],
     );
     return result.rows[0] ? this.hydrate(result.rows[0]) : null;
   }
@@ -310,7 +312,7 @@ export class TemplateRepository {
   ): Promise<Template | null> {
     const result = await pool.query(
       'UPDATE template_overlays SET asset_path=$3 WHERE template_id=$1 AND id=$2 RETURNING id',
-      [id, overlayId, path],
+      [id, overlayId, toStoredPath(path)],
     );
     if (!result.rowCount) return null;
     return this.get(id);

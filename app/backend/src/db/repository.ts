@@ -3,6 +3,7 @@ import { pool } from './pool.js';
 import type { SessionData, SessionState } from '../services/session-state-machine.js';
 import type { SessionType } from '@photobooth/public-output';
 import { classifyTemplateLayout } from '../services/layout-classifier.js';
+import { resolveStoredPath, toStoredPath, withResolvedFilePath } from '../services/storage-paths.js';
 
 export interface EventData {
   id: string;
@@ -954,7 +955,7 @@ export class DatabaseRepository {
         VALUES ($1, $2, $3, true, false)
         ON CONFLICT DO NOTHING
       `;
-      await pool.query(query, [sessionId, captureIndex, filePath]);
+      await pool.query(query, [sessionId, captureIndex, toStoredPath(filePath)]);
     } catch {
       const list = this.inMemoryCaptures.get(sessionId) || [];
       list.push({
@@ -1001,14 +1002,14 @@ export class DatabaseRepository {
             `UPDATE session_captures
              SET file_path = $3, created_at = CURRENT_TIMESTAMP
              WHERE session_id = $1 AND capture_index = $2 AND is_cover = false`,
-            [sessionId, captureIndex, filePath],
+            [sessionId, captureIndex, toStoredPath(filePath)],
           );
 
           if (updCapRes.rowCount === 0) {
             await client.query(
               `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
                VALUES ($1, $2, $3, false, true)`,
-              [sessionId, captureIndex, filePath],
+              [sessionId, captureIndex, toStoredPath(filePath)],
             );
           }
 
@@ -1030,7 +1031,7 @@ export class DatabaseRepository {
           await client.query(
             `INSERT INTO session_captures (session_id, capture_index, file_path, is_cover, is_selected)
              VALUES ($1, $2, $3, false, true)`,
-            [sessionId, captureIndex, filePath],
+            [sessionId, captureIndex, toStoredPath(filePath)],
           );
 
           const sessRes = await client.query(
@@ -1120,7 +1121,7 @@ export class DatabaseRepository {
         VALUES ($1, $2, $3, $4, false)
         ON CONFLICT DO NOTHING
       `;
-      await pool.query(query, [sessionId, videoIndex, filePath, durationSeconds]);
+      await pool.query(query, [sessionId, videoIndex, toStoredPath(filePath), durationSeconds]);
     } catch {
       const list = this.inMemoryVideos.get(sessionId) || [];
       list.push({
@@ -1169,8 +1170,8 @@ export class DatabaseRepository {
       ]);
 
       return {
-        covers: coversRes.rows,
-        videos: videosRes.rows,
+        covers: coversRes.rows.map((row) => withResolvedFilePath(row)),
+        videos: videosRes.rows.map((row) => withResolvedFilePath(row)),
       };
     } catch {
       const covers = (this.inMemoryCaptures.get(sessionId) || [])
@@ -1306,7 +1307,7 @@ export class DatabaseRepository {
           sessionId,
           publicId,
           mediaType,
-          filePath,
+          toStoredPath(filePath),
           width,
           height,
         ]);
@@ -1398,7 +1399,7 @@ export class DatabaseRepository {
         WHERE o.public_id = $1 AND s.state IN ('booth_confirmed', 'printed')
       `;
       const res = await pool.query(query, [publicId]);
-      return res.rows[0] || this.inMemoryOutputs.get(publicId) || null;
+      return withResolvedFilePath(res.rows[0]) || this.inMemoryOutputs.get(publicId) || null;
     } catch {
       return this.inMemoryOutputs.get(publicId) || null;
     }
@@ -1438,7 +1439,7 @@ export class DatabaseRepository {
          WHERE p.id = $1`,
         [id],
       );
-      if (result.rows[0]) return result.rows[0];
+      if (result.rows[0]) return withResolvedFilePath(result.rows[0]);
     } catch {}
     const publication = this.inMemoryPublications.get(id);
     if (!publication) return null;
@@ -1505,7 +1506,7 @@ export class DatabaseRepository {
          RETURNING public_id AS "publicId", file_path AS "filePath", media_type AS "mediaType"`,
         [id],
       );
-      if (result.rows[0]) return result.rows[0];
+      if (result.rows[0]) return withResolvedFilePath(result.rows[0]);
     } catch {}
     const publication = this.inMemoryPublications.get(id);
     const output = publication && this.inMemoryOutputs.get(publication.publicId);
@@ -1587,7 +1588,7 @@ export class DatabaseRepository {
            ORDER BY p.created_at`,
           [claim.rows.map((r) => r.id)],
         );
-        pgClaimed = details.rows;
+        pgClaimed = details.rows.map((row) => withResolvedFilePath(row));
       }
     } catch {
       pgClaimed = [];
@@ -1751,7 +1752,7 @@ export class DatabaseRepository {
         LIMIT 1
       `;
       const res = await pool.query(query, [sessionId]);
-      if (res.rows[0]) return res.rows[0];
+      if (res.rows[0]) return withResolvedFilePath(res.rows[0]);
     } catch {
       // fallback to in-memory
     }
@@ -1771,7 +1772,7 @@ export class DatabaseRepository {
        FROM generated_outputs o JOIN sessions s ON s.id = o.session_id JOIN events e ON e.id = s.event_id WHERE o.public_id = $1`,
       [publicId],
     );
-    return result.rows[0] ?? null;
+    return withResolvedFilePath(result.rows[0]) ?? null;
   }
 
   public async createPrintJob(input: {
@@ -1857,7 +1858,7 @@ export class DatabaseRepository {
         input.output.id,
         input.output.sessionId,
         input.requestKey,
-        input.artifactPath,
+        toStoredPath(input.artifactPath),
         input.artifactType,
         input.output.publicId,
         input.output.mediaType === 'image/png' ? 'photo_strip' : 'flipbook',
@@ -1888,7 +1889,7 @@ export class DatabaseRepository {
       'SELECT artifact_path AS "artifactPath" FROM print_jobs WHERE id = $1',
       [id],
     );
-    return result.rows[0]?.artifactPath ?? null;
+    return resolveStoredPath(result.rows[0]?.artifactPath) ?? null;
   }
 
   public async listPrintJobs(limit: number, before?: Date): Promise<PrintJob[]> {
@@ -2266,7 +2267,7 @@ export class DatabaseRepository {
           orientation,
           outputWidth,
           outputHeight,
-          backgroundPath,
+          toStoredPath(backgroundPath),
           requiredCaptureCount,
           countdownSeconds,
         ],
@@ -2310,7 +2311,7 @@ export class DatabaseRepository {
             [
               templateId,
               o.label,
-              o.assetPath || '',
+              toStoredPath(o.assetPath) || '',
               o.x || 0,
               o.y || 0,
               o.width,
@@ -2404,7 +2405,7 @@ export class DatabaseRepository {
           [
             templateId,
             o.label,
-            o.assetPath || '',
+            toStoredPath(o.assetPath) || '',
             o.x || 0,
             o.y || 0,
             o.width,
@@ -2525,7 +2526,7 @@ export class DatabaseRepository {
         ORDER BY capture_index ASC
       `;
       const res = await pool.query(query, [sessionId]);
-      return res.rows;
+      return res.rows.map((row) => withResolvedFilePath(row));
     } catch {
       const captures = this.inMemoryCaptures.get(sessionId) || [];
       return captures
