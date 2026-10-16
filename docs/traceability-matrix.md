@@ -14,6 +14,15 @@ This document provides a single source of truth for tracking project tasks again
 
 ## Forward Traceability Matrix (By Epic)
 
+### EPIC-11: Local PostgreSQL To SQLite Migration
+**Owner**: `app/backend` | **Scope**: A gated, local-only database migration that preserves existing booth data and offline behavior.
+
+| Task ID | Description | Target Component | PRD / Contract Mapping | Verification Criteria | Status |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **TSK-1101** | Record PostgreSQL backup, restore-drill, and cutover gates | `docs/decisions`, `docs/runbooks` | Contract § Delivery Scope; local-first constraints | Production facts are recorded without credentials; no cutover proceeds without two protected backup copies and a passing restore drill. | `[/] In Progress` |
+| **TSK-1102** | Add side-by-side SQLite foundation while PostgreSQL remains default | `app/backend/src/db/sqlite` | Contract § Delivery Scope | SQLite connection/migration implementation builds independently; runtime remains PostgreSQL. | `[ ] Planned` |
+| **TSK-1103** | Port repositories, validate imported data, and perform gated cutover | `app/backend`, `docs/runbooks` | Contract § Publishing and Retrieval | Parity, integrity, workflow, print, and publication checks pass before write enable. | `[ ] Planned` |
+
 ### EPIC-01: Monorepo Foundation & Workspace Tooling
 **Owner**: Monorepo Root | **Scope**: Workspace configuration, dependency orchestration, testing harness, lint/format standards.
 

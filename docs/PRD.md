@@ -376,7 +376,7 @@ This section resolves implementation details established after the original user
 * Local and public QR retrieval follows `docs/system-architecture.md`: every printed card contains the full public URL, the Captive Website extracts its public ID for local retrieval, and the public website resolves that same ID online. There is no split DNS.
 * The supported runtime is Linux. Camera setup, OBS, scrcpy, and iphone-streamer are external operating infrastructure; the application only requires an administrator-selected browser camera device.
 * The application does not detect black frames. If OBS has no usable source, it displays the feed it receives and the administrator handles recovery.
-* PostgreSQL is always local. A photobooth administrator initializes it with a CLI command before use.
+* PostgreSQL is the current local production database. The approved SQLite migration is pending; until the documented cutover validation succeeds, PostgreSQL remains the sole production write authority. See `docs/decisions/local-sqlite-migration.md` and `docs/runbooks/postgres-to-sqlite-cutover.md`.
 * The administrator and assisted guest use the same Photobooth Software over physical/VNC access. There is no separate application authentication boundary for local administrator routes.
 
 #### Assisted Booth Workflow
