@@ -28,6 +28,7 @@ export function PublicationDashboard() {
   const [flipbookPrintSheets, setFlipbookPrintSheets] = useState<string[]>([]);
   const [loadingFlipbookPrintSheets, setLoadingFlipbookPrintSheets] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastIsError, setToastIsError] = useState(false);
   const [page, setPage] = useState(1);
   const [preview, setPreview] = useState<Publication | null>(null);
   const [qrPublication, setQrPublication] = useState<Publication | null>(null);
@@ -209,9 +210,13 @@ export function PublicationDashboard() {
     setError('');
     try {
       await publicationApi.queuePrint(publication.publicId, copies);
+      setToastIsError(false);
       setToastMessage(`${copies} ${copies === 1 ? 'copy' : 'copies'} queued for printing.`);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setError(message);
+      setToastIsError(true);
+      setToastMessage(`Print failed: ${message}`);
     } finally {
       setPrinting(null);
     }
@@ -571,9 +576,9 @@ export function PublicationDashboard() {
       )}
       {toastMessage && (
         <div
-          role="status"
-          aria-live="polite"
-          className="fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl bg-[#146a56] px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl"
+          role={toastIsError ? 'alert' : 'status'}
+          aria-live={toastIsError ? 'assertive' : 'polite'}
+          className={`fixed top-8 left-1/2 z-[60] -translate-x-1/2 rounded-2xl ${toastIsError ? 'bg-[#b42318]' : 'bg-[#146a56]'} px-8 py-5 text-lg font-bold text-white shadow-2xl sm:px-10 sm:py-6 sm:text-2xl`}
         >
           {toastMessage}
         </div>
