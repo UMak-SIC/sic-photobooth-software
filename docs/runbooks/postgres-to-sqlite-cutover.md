@@ -12,7 +12,7 @@ Populate this section before scheduling a cutover. Do not put credentials in thi
 
 | Item | Recorded value |
 | --- | --- |
-| Process manager and service name | TBD |
+| Process manager and service name (must restart on failure, see Startup failure and supervision) | TBD |
 | Service owner | TBD |
 | Backend launch command | TBD |
 | Environment or secret source | TBD |
@@ -45,9 +45,13 @@ While `DATABASE_CUTOVER_HOLD=1`:
 
 - every non-`GET`/`HEAD`/`OPTIONS` request returns `503` with error code `MAINTENANCE_HOLD`;
 - `/health` and read-only routes keep working;
-- the publishing and print workers must not start. Confirm this in the backend log before trusting the hold; if the deployed build does not log that the workers were skipped, stop and treat the hold as unavailable.
+- the publishing and print workers do not start. The backend logs exactly `Database cutover hold is active: publishing and print workers were not started.` Confirm this line in the backend log before trusting the hold. If the deployed build does not log it, stop and treat the hold as unavailable.
 
-Known caveat: `GET /api/frames` seeds default frames when the database has no flipbook templates and no frames. Do not call it during validation unless the candidate already contains templates or frames.
+A held startup on an already-migrated candidate does not write to the database. Migrations are already recorded, SQLite startup does not rewrite stored paths, no worker runs stale-job recovery, and read routes such as `GET /api/frames` fall back to built-in frames and templates without inserting them. An automated test checks that a held startup and shutdown leaves the candidate file byte-for-byte unchanged.
+
+## Startup failure and supervision
+
+The backend refuses to start when the selected database is unhealthy or its migrations fail. It logs `Database (<engine>) is unavailable; refusing to start.` with the cause and exits with status `1`. Earlier builds started in a degraded mode instead; that mode no longer exists. Run the backend under a process manager that restarts it on failure, for example a systemd unit with `Restart=on-failure` and a `RestartSec=` delay. A failed start then retries instead of leaving the booth without a backend. A restart loop in the log means the database file, its path, or its migrations need attention; it cannot be fixed by waiting.
 
 ## Pre-write rollback window
 
@@ -137,7 +141,7 @@ Record `candidate.sha256` from the output as the SQLite candidate checksum. Then
 
    Keep every other existing setting unchanged.
 3. Run `<START_CMD>`. Start exactly one Fastify process.
-4. In the backend log, confirm the cutover hold warning, that the SQLite migrations applied without error, and that the publishing and print workers did not start.
+4. In the backend log, confirm the cutover hold warning (`Database cutover hold is active: mutation routes are disabled.`), that the SQLite migrations applied without error, and the line `Database cutover hold is active: publishing and print workers were not started.`
 
 ### 8. Read-only verification with the hold active
 
@@ -168,7 +172,7 @@ This step closes the PostgreSQL rollback window. Perform it only after every che
 
 1. Write a temporary env file identical to the current one except `DATABASE_CUTOVER_HOLD=0` (or the line removed), then rename it over `<ENV_FILE>`. `LOCAL_DATABASE_ENGINE` and `SQLITE_DATABASE_PATH` must not change.
 2. Run `<STOP_CMD>`, then `<START_CMD>`. Confirm exactly one Fastify process is running.
-3. Confirm in the log that the hold warning is absent and both workers started.
+3. Confirm in the log that neither cutover hold line appears, so both workers started.
 4. Record the hold release time (UTC) and the rollback-window closure time (UTC) in the sign-off table. They are the moment mutation routes or either worker can accept SQLite-backed production work.
 5. Reopen the booth.
 
