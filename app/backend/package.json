@@ -6,7 +6,7 @@
   "types": "./dist/server.d.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -b && node -e \"const fs=require('node:fs'), path=require('node:path'); for (const source of ['src/db/migrations', 'src/services/ipp']) { const dest=path.resolve('dist', source.slice(4)); fs.mkdirSync(path.dirname(dest), {recursive:true}); fs.cpSync(path.resolve(source), dest, {recursive:true}); } if (fs.existsSync('src/db/schema.sql')) fs.copyFileSync(path.resolve('src/db/schema.sql'), path.resolve('dist/db/schema.sql'));\"",
+    "build": "tsc -b && node -e \"const fs=require('node:fs'), path=require('node:path'); for (const source of ['src/db/migrations', 'src/db/sqlite/migrations', 'src/services/ipp']) { const dest=path.resolve('dist', source.slice(4)); fs.mkdirSync(path.dirname(dest), {recursive:true}); fs.cpSync(path.resolve(source), dest, {recursive:true}); } if (fs.existsSync('src/db/schema.sql')) fs.copyFileSync(path.resolve('src/db/schema.sql'), path.resolve('dist/db/schema.sql'));\"",
     "typecheck": "tsc --noEmit",
     "test:integration": "vitest run test/supabase-publication.integration.test.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",
@@ -19,6 +19,7 @@
     "@fastify/rate-limit": "^10.2.2",
     "@photobooth/public-output": "workspace:*",
     "@supabase/supabase-js": "^2.115.0",
+    "better-sqlite3": "^12.11.1",
     "cloudinary": "^2.11.0",
     "dotenv": "^16.4.7",
     "fast-xml-parser": "^5.11.2",
@@ -32,6 +33,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/fluent-ffmpeg": "^2.1.27",
     "@types/node": "^22.13.4",
     "@types/pg": "^8.11.11",

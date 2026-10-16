@@ -28,6 +28,8 @@ export interface AppConfig {
   port: number;
   host: string;
   databaseUrl: string;
+  localDatabaseEngine: 'postgres' | 'sqlite';
+  sqliteDatabasePath: string;
   storageDir: string;
   nodeEnv: string;
   /** Empty when unset: the publishing worker then skips the online gate and attempts uploads. */
@@ -40,11 +42,22 @@ export interface AppConfig {
 
 const defaultStorageDir = path.resolve(__dirname, '../../storage');
 
+function localDatabaseEngine(value: string | undefined): 'postgres' | 'sqlite' {
+  const engine = value || 'postgres';
+  if (engine === 'postgres' || engine === 'sqlite') return engine;
+  throw new Error('LOCAL_DATABASE_ENGINE must be either "postgres" or "sqlite".');
+}
+
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
   databaseUrl:
     process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/photobooth',
+  // PostgreSQL remains the default until the documented production cutover completes.
+  localDatabaseEngine: localDatabaseEngine(process.env.LOCAL_DATABASE_ENGINE),
+  sqliteDatabasePath: path.resolve(
+    process.env.SQLITE_DATABASE_PATH || path.join(defaultStorageDir, 'database', 'photobooth.sqlite'),
+  ),
   storageDir: process.env.STORAGE_DIR || defaultStorageDir,
   nodeEnv: process.env.NODE_ENV || 'development',
   publicAppUrl: process.env.PUBLIC_APP_URL || '',
