@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PoolClient } from 'pg';
+import { normalizeStoredPaths } from './normalize-storage-paths.js';
 import { pool } from './pool.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -125,6 +126,9 @@ export async function runMigrations(): Promise<MigrationSummary> {
         );
       }
     }
+
+    // Path normalization depends on the runtime STORAGE_DIR, so it runs here instead of as SQL.
+    await normalizeStoredPaths(client);
 
     return {
       applied: newlyApplied,

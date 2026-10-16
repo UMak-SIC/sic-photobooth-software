@@ -30,11 +30,14 @@ export function resolveStoredPath<T extends string | null | undefined>(filePath:
   const root = storageRoot();
   if (!path.isAbsolute(filePath)) return path.resolve(root, filePath) as T;
   if (fs.existsSync(filePath)) return filePath;
+  // Try every `/storage/` segment, outermost first, so nested folders named
+  // `storage` inside the old storage directory still relocate correctly.
   const marker = `${path.sep}storage${path.sep}`;
-  const markerIndex = filePath.lastIndexOf(marker);
-  if (markerIndex < 0) return filePath;
-  const relocated = path.resolve(root, filePath.slice(markerIndex + marker.length));
-  return (relocated.startsWith(`${root}${path.sep}`) && fs.existsSync(relocated) ? relocated : filePath) as T;
+  for (let index = filePath.indexOf(marker); index >= 0; index = filePath.indexOf(marker, index + 1)) {
+    const relocated = path.resolve(root, filePath.slice(index + marker.length));
+    if (relocated.startsWith(`${root}${path.sep}`) && fs.existsSync(relocated)) return relocated as T;
+  }
+  return filePath;
 }
 
 /** Resolves `filePath` on a repository row in place of the stored value. */
