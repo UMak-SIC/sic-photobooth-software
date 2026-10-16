@@ -15,7 +15,7 @@ import {
   toBool,
 } from '../db/sqlite/mappers.js';
 import { toStoredPath } from '../services/storage-paths.js';
-import { isTemplateId, mapTemplate, mergeOverlayAssetPaths, type ExistingOverlay } from './repository.js';
+import { isTemplateId, mapTemplate, mergeOverlayAssetPaths, type ExistingOverlay } from './mapping.js';
 import { dimensionsFor, type Template, type TemplateDraft } from './types.js';
 
 type Row = Record<string, unknown>;

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { config } from '../src/config.js';
-import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
+import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/mapping.js';
 import { validateTemplateDraft, type Template } from '../src/templates/types.js';
 import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
 import { zip } from '../src/templates/zip.js';
