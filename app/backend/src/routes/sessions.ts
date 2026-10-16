@@ -3,7 +3,8 @@ import path from 'node:path';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { generatePublicId } from '@photobooth/public-output';
-import { dbRepository, type TemplatePlacement, type TemplateOverlay } from '../db/repository.js';
+import type { TemplatePlacement, TemplateOverlay } from '../db/contracts.js';
+import { dbRepository, templateRepository } from '../db/provider.js';
 import { sessionStateMachine, type SessionState } from '../services/session-state-machine.js';
 import { storageService } from '../services/storage.js';
 import { mediaValidator } from '../services/media-validator.js';
@@ -11,8 +12,8 @@ import { gifRenderer } from '../services/gif-renderer.js';
 import { config, flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
 import type { SessionType } from '@photobooth/public-output';
-import { templateRepository } from '../templates/repository.js';
 import { toTemplateDto } from '../templates/routes.js';
+import { sendError } from '../errors.js';
 
 const createSessionSchema = z.object({
   eventName: z.string().min(1),
@@ -159,7 +160,7 @@ export async function resolveFlipbookTemplate(frameId?: string | null) {
 
 export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
   // 0. List active frames for Flipbook
-  fastify.get('/api/frames', async (_request, reply) => {
+  fastify.get('/api/frames', async (request, reply) => {
     try {
       const templates = await templateRepository.list('flipbook');
       if (templates.length > 0) {
@@ -181,36 +182,27 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      let frames = await dbRepository.listActiveFrames();
-      // Seed default frames if none exist
-      if (frames.length === 0) {
-        await dbRepository.createFrame('SIC Seal', 'frames/sic-seal.png');
-        await dbRepository.createFrame('Emerald Motion', 'frames/emerald-motion.png');
-        await dbRepository.createFrame('Pioneer Grid', 'frames/pioneer-grid.png');
-        frames = await dbRepository.listActiveFrames();
-      }
+      // A read never writes: with no stored frames the repository returns the built-in set.
+      const frames = await dbRepository.listActiveFrames();
       return reply.send({
         success: true,
         data: frames,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Listing frames failed');
     }
   });
 
   // 0b. List active templates for Photo Strip (unifies with canonical templateRepository)
-  fastify.get('/api/templates', async (_request, reply) => {
+  fastify.get('/api/templates', async (request, reply) => {
     try {
       const all = await templateRepository.list('photo_strip');
       return reply.send({
         success: true,
         data: all.filter((t) => t.active).map(toTemplateDto),
       });
-    } catch {
+    } catch (err: unknown) {
+      request.log.error({ err }, 'Listing templates failed; serving the legacy template list');
       const fallback = await dbRepository.listActiveTemplates();
       return reply.send({
         success: true,
@@ -252,11 +244,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Creating a session failed');
     }
   });
 
@@ -279,11 +267,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeSession,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Loading a session failed', { sessionId: request.params.id });
     }
   });
 
@@ -333,11 +317,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           data: stripToken(updated),
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(400).send({
-          success: false,
-          error: { code: 'INVALID_STATE_TRANSITION', message },
-        });
+        return sendError(request, reply, err, 'Session transition rejected', { sessionId: request.params.id });
       }
     },
   );
@@ -388,11 +368,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: stripToken(updated),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(400).send({
-        success: false,
-        error: { code: 'WORKFLOW_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Frame selection failed', { sessionId: request.params.id });
     }
   });
 
@@ -445,11 +421,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: stripToken(updated),
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(400).send({
-        success: false,
-        error: { code: 'WORKFLOW_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Template selection failed', { sessionId: request.params.id });
     }
   };
 
@@ -512,11 +484,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           data: stripToken(updated),
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(400).send({
-          success: false,
-          error: { code: 'WORKFLOW_ERROR', message },
-        });
+        return sendError(request, reply, err, 'Instruction acknowledgement failed', { sessionId: request.params.id });
       }
     },
   );
@@ -659,11 +627,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({
-          success: false,
-          error: { code: 'UPLOAD_ERROR', message },
-        });
+        return sendError(request, reply, err, 'Photo capture upload failed', { sessionId: request.params.id });
       }
     },
   );
@@ -761,11 +725,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({
-          success: false,
-          error: { code: 'UPLOAD_ERROR', message },
-        });
+        return sendError(request, reply, err, 'Cover photo upload failed', { sessionId: request.params.id });
       }
     },
   );
@@ -859,11 +819,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({
-          success: false,
-          error: { code: 'UPLOAD_ERROR', message },
-        });
+        return sendError(request, reply, err, 'Video clip upload failed', { sessionId: request.params.id });
       }
     },
   );
@@ -914,11 +870,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(400).send({
-          success: false,
-          error: { code: 'WORKFLOW_ERROR', message },
-        });
+        return sendError(request, reply, err, 'Flipbook selection failed', { sessionId: request.params.id });
       }
     },
   );
@@ -1125,7 +1077,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
               : undefined,
           },
         });
-      } catch {
+      } catch (err: unknown) {
+        request.log.error({ err, sessionId: id }, 'Flipbook GIF processing failed');
         // Reset to cover_capture on timeout or fatal rendering failure per contract
         try {
           await dbRepository.resetFlipbookToCoverCapture(id);
@@ -1133,8 +1086,8 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           if (fs.existsSync(intDir)) {
             fs.rmSync(intDir, { recursive: true, force: true });
           }
-        } catch {
-          // ignore cleanup errors
+        } catch (cleanupErr: unknown) {
+          request.log.warn({ err: cleanupErr, sessionId: id }, 'Flipbook recovery cleanup failed');
         }
 
         return reply.status(500).send({
@@ -1182,11 +1135,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           data: { state: 'cover_capture' },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({
-          success: false,
-          error: { code: 'RESET_FAILED', message },
-        });
+        return sendError(request, reply, err, 'Flipbook recovery reset failed', { sessionId: request.params.id });
       }
     },
   );
@@ -1382,14 +1331,17 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        return reply.status(500).send({
-          success: false,
-          error: {
+        return sendError(
+          request,
+          reply,
+          err,
+          'Photo strip composition failed',
+          { sessionId: request.params.id },
+          {
             code: 'COMPOSITION_FAILED',
-            message: `Could not generate the photo strip. Your original photos are safe. (${message})`,
+            message: 'Could not generate the photo strip. Your original photos are safe.',
           },
-        });
+        );
       }
     },
   );
@@ -1437,11 +1389,7 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeCancelled,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message },
-      });
+      return sendError(request, reply, err, 'Cancelling a session failed', { sessionId: request.params.id });
     }
   });
 };

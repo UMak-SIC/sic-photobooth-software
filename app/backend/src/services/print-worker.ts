@@ -1,7 +1,11 @@
-import { dbRepository, type PrintJobStatus } from '../db/repository.js';
+import type { PrintJobStatus } from '../db/contracts.js';
+import { dbRepository } from '../db/provider.js';
 import { printerConfig } from '../config.js';
 import { printerService, type CupsJobState } from './printer.js';
 import { updatePublicOutputPrintCount } from './supabase-publication.js';
+
+export const PRINT_SUBMISSION_FAILED_MESSAGE =
+  'The printer did not accept this job. Check that it is on, connected, and loaded with paper.';
 
 let timer: NodeJS.Timeout | undefined;
 let running = false;
@@ -43,8 +47,20 @@ async function reconcile() {
         attempt.title,
       );
       if (!result.success) {
-        await dbRepository.updatePrintAttempt(attempt.id, 'failed', undefined, result.error);
-        await dbRepository.updatePrintJobStatus(job.id, 'failed', result.error, 'submitting');
+        // CUPS text stays in the server log; the booth and admin see an authored message.
+        console.error('Print submission failed:', { jobId: job.id, error: result.error });
+        await dbRepository.updatePrintAttempt(
+          attempt.id,
+          'failed',
+          undefined,
+          PRINT_SUBMISSION_FAILED_MESSAGE,
+        );
+        await dbRepository.updatePrintJobStatus(
+          job.id,
+          'failed',
+          PRINT_SUBMISSION_FAILED_MESSAGE,
+          'submitting',
+        );
         continue;
       }
       await dbRepository.updatePrintAttempt(

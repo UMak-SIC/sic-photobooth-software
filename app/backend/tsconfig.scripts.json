@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": [
+    "src/**/*",
+    "scripts/**/*.ts",
+    "test/legacy-import*.ts",
+    "test/parity*.ts",
+    "test/cutover*.ts",
+    "test/sqlite-backup.test.ts"
+  ]
+}

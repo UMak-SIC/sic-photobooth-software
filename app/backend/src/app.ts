@@ -1,4 +1,9 @@
-import Fastify, { type FastifyInstance, type FastifyError } from 'fastify';
+import Fastify, {
+  type FastifyError,
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyRequest,
+} from 'fastify';
 import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 import multipart from '@fastify/multipart';
@@ -12,6 +17,43 @@ import { templateRoutes } from './templates/routes.js';
 import { publicationRoutes } from './routes/publications.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { printingRoutes } from './routes/printing.js';
+import { cutoverHoldPlugin } from './plugins/cutover-hold.js';
+import { sendError, UserFacingError } from './errors.js';
+
+/** Global error handler: only authored messages reach clients; everything is logged. */
+export function handleError(
+  error: FastifyError | Error,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): FastifyReply {
+  const fastifyErr = error as FastifyError;
+  const statusCode = fastifyErr.statusCode;
+  const frameworkAuthored =
+    (typeof fastifyErr.code === 'string' && fastifyErr.code.startsWith('FST_')) ||
+    Boolean(fastifyErr.validation) ||
+    statusCode === 429;
+  if (
+    !(error instanceof UserFacingError) &&
+    statusCode !== undefined &&
+    statusCode >= 400 &&
+    statusCode < 500
+  ) {
+    // Fastify and its plugins (body parsing, validation, rate limit, multipart) author
+    // these messages; any other 4xx text is replaced with a generic one.
+    return sendError(
+      request,
+      reply,
+      new UserFacingError(
+        statusCode,
+        frameworkAuthored && fastifyErr.code ? fastifyErr.code : 'BAD_REQUEST',
+        frameworkAuthored ? error.message : 'The request could not be processed.',
+      ),
+      'Request rejected',
+      { cause: error },
+    );
+  }
+  return sendError(request, reply, error, 'Unhandled request error');
+}
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -54,6 +96,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
   });
 
+  // Cutover hold precedes routes so mutations are rejected before any handler runs.
+  await app.register(cutoverHoldPlugin);
+
   // 5. Register Routes
   await app.register(healthRoutes);
   await app.register(sessionRoutes);
@@ -64,25 +109,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(analyticsRoutes);
   await app.register(printingRoutes);
 
-  // 6. Global Error Handler
-  app.setErrorHandler((error: FastifyError | Error, _request, reply) => {
-    app.log.error(error);
-
-    const fastifyErr = error as FastifyError;
-    const statusCode = fastifyErr.statusCode || 500;
-    const message =
-      statusCode === 500
-        ? 'Something went wrong. Your saved captures have not been deleted.'
-        : error.message;
-
-    return reply.status(statusCode).send({
-      success: false,
-      error: {
-        code: fastifyErr.code || 'INTERNAL_SERVER_ERROR',
-        message,
-      },
-    });
-  });
+  // 6. Global Error Handler: only authored messages reach clients; everything is logged.
+  app.setErrorHandler(handleError);
 
   return app;
 }

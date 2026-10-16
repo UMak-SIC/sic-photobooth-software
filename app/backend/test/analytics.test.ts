@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
-import { dbRepository } from '../src/db/repository.js';
+import { dbRepository } from '../src/db/provider.js';
 import { classifyTemplateLayout } from '../src/services/layout-classifier.js';
 
 describe('Analytics & KPI Engine', () => {

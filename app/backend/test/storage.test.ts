@@ -27,9 +27,9 @@ describe('StorageService', () => {
   });
 
   it('sanitizes identifiers and rejects path traversal', () => {
-    expect(() => storage.sanitizeId('../traversal')).toThrowError(/Path traversal/);
-    expect(() => storage.sanitizeId('session/123')).toThrowError(/Path traversal/);
-    expect(() => storage.sanitizeId('session\0injection')).toThrowError(/Path traversal/);
+    expect(() => storage.sanitizeId('../traversal')).toThrowError(/invalid identifier/);
+    expect(() => storage.sanitizeId('session/123')).toThrowError(/invalid identifier/);
+    expect(() => storage.sanitizeId('session\0injection')).toThrowError(/invalid identifier/);
     expect(storage.sanitizeId('session-123_abc')).toBe('session-123_abc');
   });
 

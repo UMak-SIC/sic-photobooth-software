@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
+import { UserFacingError } from '../errors.js';
 
 export type StorageCategory = 'originals' | 'videos' | 'intermediate' | 'outputs';
 
@@ -29,12 +30,12 @@ export class StorageService {
    */
   public sanitizeId(id: string): string {
     if (!id || typeof id !== 'string') {
-      throw new Error('Invalid identifier');
+      throw new UserFacingError(400, 'INVALID_IDENTIFIER', 'The request contains an invalid identifier.');
     }
     // Allow alphanumeric characters, dashes, and underscores only
     const sanitized = id.replace(/[^a-zA-Z0-9_-]/g, '');
     if (!sanitized || sanitized !== id) {
-      throw new Error(`Path traversal or invalid identifier detected: "${id}"`);
+      throw new UserFacingError(400, 'INVALID_IDENTIFIER', 'The request contains an invalid identifier.');
     }
     return sanitized;
   }
@@ -50,7 +51,7 @@ export class StorageService {
 
     // Safety guard: ensure target directory resides within baseDir
     if (!targetDir.startsWith(this.baseDir)) {
-      throw new Error('Path traversal violation');
+      throw new UserFacingError(400, 'INVALID_IDENTIFIER', 'The request contains an invalid identifier.');
     }
 
     if (!fs.existsSync(targetDir)) {

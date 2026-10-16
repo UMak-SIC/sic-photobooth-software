@@ -38,9 +38,19 @@ export interface AppConfig {
   cloudinary: CloudinaryConfig;
   supabase: SupabaseConfig;
   publishing: PublishingConfig;
+  /** Phase 5 validation hold: rejects mutation routes and keeps workers stopped. */
+  databaseCutoverHold: boolean;
 }
 
 const defaultStorageDir = path.resolve(__dirname, '../../storage');
+
+function cutoverHoldFlag(value: string | undefined): boolean {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized === '' || normalized === '0' || normalized === 'false') return false;
+  if (normalized === '1' || normalized === 'true') return true;
+  // Fail closed on typos so an operator never believes the hold is active when it is not.
+  throw new Error('DATABASE_CUTOVER_HOLD must be one of "1", "true", "0", or "false".');
+}
 
 function localDatabaseEngine(value: string | undefined): 'postgres' | 'sqlite' {
   const engine = value || 'postgres';
@@ -48,15 +58,50 @@ function localDatabaseEngine(value: string | undefined): 'postgres' | 'sqlite' {
   throw new Error('LOCAL_DATABASE_ENGINE must be either "postgres" or "sqlite".');
 }
 
+/** The live booth database. Tests must never resolve to it. */
+const LIVE_DATABASE_NAME = 'photobooth';
+const DEVELOPMENT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/photobooth';
+/** Unreachable on purpose, so a test without its own database fails instead of using the booth's. */
+export const TEST_UNSET_DATABASE_URL =
+  'postgresql://test-no-database@127.0.0.1:1/photobooth_test_unset';
+
+function isTestRun(env: NodeJS.ProcessEnv): boolean {
+  return Boolean(env.VITEST) || env.NODE_ENV === 'test';
+}
+
+function databaseName(url: string): string | undefined {
+  try {
+    return decodeURIComponent(new URL(url).pathname.replace(/^\//, ''));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolves DATABASE_URL. Under Vitest or NODE_ENV=test an unset value falls back to an
+ * unreachable URL instead of the live booth database, and a URL naming the live
+ * `photobooth` database is refused.
+ */
+export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+  if (!isTestRun(env)) return env.DATABASE_URL || DEVELOPMENT_DATABASE_URL;
+  const url = env.DATABASE_URL || TEST_UNSET_DATABASE_URL;
+  if (databaseName(url) === LIVE_DATABASE_NAME) {
+    throw new Error(
+      `Refusing to run tests against the live "${LIVE_DATABASE_NAME}" database. Set DATABASE_URL to a disposable test database.`,
+    );
+  }
+  return url;
+}
+
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
-  databaseUrl:
-    process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/photobooth',
+  databaseUrl: resolveDatabaseUrl(),
   // PostgreSQL remains the default until the documented production cutover completes.
   localDatabaseEngine: localDatabaseEngine(process.env.LOCAL_DATABASE_ENGINE),
   sqliteDatabasePath: path.resolve(
-    process.env.SQLITE_DATABASE_PATH || path.join(defaultStorageDir, 'database', 'photobooth.sqlite'),
+    process.env.SQLITE_DATABASE_PATH ||
+      path.join(defaultStorageDir, 'database', 'photobooth.sqlite'),
   ),
   storageDir: process.env.STORAGE_DIR || defaultStorageDir,
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -84,6 +129,7 @@ export const config: AppConfig = {
         'http://127.0.0.1:5173',
         'http://127.0.0.1:5174',
       ],
+  databaseCutoverHold: cutoverHoldFlag(process.env.DATABASE_CUTOVER_HOLD),
 };
 
 export interface FlipbookConfig {
@@ -156,7 +202,8 @@ export const printerConfig: PrinterConfig = {
   mediaSize: process.env.PRINTER_MEDIA_SIZE || 'Custom.4x6in',
   printQuality: process.env.PRINT_QUALITY || 'PMPHOTO_HIGH',
   fitToPage: true,
-  enableHardwarePrint: process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
+  enableHardwarePrint:
+    process.env.ENABLE_HARDWARE_PRINT !== 'false' && process.env.NODE_ENV !== 'test',
   cupsServer: process.env.CUPS_SERVER || 'localhost:631',
   pollIntervalMs: Number.parseInt(process.env.PRINT_POLL_INTERVAL_MS || '5000', 10),
 };

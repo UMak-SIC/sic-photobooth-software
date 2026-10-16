@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository } from '../db/provider.js';
 import { printerConfig } from '../config.js';
 import { printerService } from '../services/printer.js';
 import { storageService } from '../services/storage.js';
@@ -10,7 +10,6 @@ const createSchema = z.object({
   copies: z.number().int().min(1).max(10),
   requestKey: z.string().uuid(),
 });
-const idSchema = z.object({ id: z.string().uuid() });
 
 function authorized(header: string | string[] | undefined, token: string) {
   return typeof header === 'string' && header === token;

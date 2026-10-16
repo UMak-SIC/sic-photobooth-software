@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository, templateRepository } from '../db/provider.js';
 import { storageService } from '../services/storage.js';
 import { deleteCloudPublication } from '../services/publishing-worker.js';
-import { templateRepository } from '../templates/repository.js';
 import { resolveFlipbookTemplate } from './sessions.js';
 
 const publicationIdSchema = z.object({ id: z.string().uuid() });
@@ -91,7 +90,7 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
 
     const sessionId = output.sessionId;
     let frame = null;
-    let coverUrl: string | null = `/api/publications/${request.params.id}/frames/cover`;
+    const coverUrl: string | null = `/api/publications/${request.params.id}/frames/cover`;
     const motionFrameUrls: string[] = Array.from(
       { length: 15 },
       (_, i) => `/api/publications/${request.params.id}/frames/${i + 1}`,
@@ -164,7 +163,13 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
             coverSheetUrl = templateAssetUrl(defaultTemplate.id, 'cover');
           }
         }
-      } catch {}
+      } catch (err: unknown) {
+        // The frame layout is optional for the flipbook viewer; serve what is known.
+        request.log.warn(
+          { err, publicationId: request.params.id, sessionId },
+          'Resolving the flipbook frame layout failed',
+        );
+      }
     }
 
     return reply.send({
@@ -273,7 +278,9 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
           try {
             const frameBuf = await sharp(candidate, { page: 0 }).png().toBuffer();
             return reply.type('image/png').send(frameBuf);
-          } catch {}
+          } catch {
+            // Try the next candidate GIF.
+          }
         }
 
         return reply.status(404).send({
@@ -331,7 +338,9 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
             const targetPage = Math.min(Math.max(0, frameNum - 1), totalPages - 1);
             const frameBuf = await sharp(candidate, { page: targetPage }).png().toBuffer();
             return reply.type('image/png').send(frameBuf);
-          } catch {}
+          } catch {
+            // Try the next candidate GIF.
+          }
         }
 
         return reply.status(404).send({

@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { isUniqueViolation } from '../db/contracts.js';
+import { dbRepository } from '../db/provider.js';
+import { sendError } from '../errors.js';
 
 const eventSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -21,13 +23,13 @@ const eventSchema = z.object({
 });
 
 export const eventRoutes: FastifyPluginAsync = async (fastify) => {
-  fastify.get('/api/events', async (_request, reply) => {
+  fastify.get('/api/events', async (request, reply) => {
     try {
       return reply.send({ success: true, data: await dbRepository.listEvents() });
-    } catch {
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message: 'Could not load events.' },
+    } catch (error: unknown) {
+      return sendError(request, reply, error, 'Listing events failed', {}, {
+        code: 'DATABASE_ERROR',
+        message: 'Could not load events.',
       });
     }
   });
@@ -50,12 +52,7 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
       );
       return reply.status(201).send({ success: true, data: event });
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23505'
-      ) {
+      if (isUniqueViolation(error)) {
         return reply.status(409).send({
           success: false,
           error: {
@@ -64,9 +61,9 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
           },
         });
       }
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message: 'Could not create event.' },
+      return sendError(request, reply, error, 'Creating an event failed', {}, {
+        code: 'DATABASE_ERROR',
+        message: 'Could not create event.',
       });
     }
   });
@@ -82,10 +79,10 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
       return reply.send({ success: true, data: { id } });
-    } catch {
-      return reply.status(500).send({
-        success: false,
-        error: { code: 'DATABASE_ERROR', message: 'Could not delete event.' },
+    } catch (error: unknown) {
+      return sendError(request, reply, error, 'Deleting an event failed', { eventId: id }, {
+        code: 'DATABASE_ERROR',
+        message: 'Could not delete event.',
       });
     }
   });

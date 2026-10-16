@@ -1,22 +1,40 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
-import { dbRepository } from '../src/db/repository.js';
+import { dbRepository, templateRepository } from '../src/db/provider.js';
 
 describe('Publication routes', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
     app = await buildApp();
+    // Flipbook data falls back to the first active flipbook template's motion sheet.
+    const flipbook = await templateRepository.create({
+      name: 'Publication Test Flipbook',
+      type: 'flipbook',
+      orientation: 'portrait',
+      background: { x: 0, y: 0, width: 1200, height: 1800 },
+      placements: [
+        { captureIndex: 1, x: 290, y: 150, width: 620, height: 348.75, rotation: 0, borderRadius: 0, zIndex: 1 },
+      ],
+      overlays: [],
+    });
+    await templateRepository.setBackgroundPath(flipbook.id, `flipbook/${flipbook.id}/background.png`);
   });
 
   afterAll(async () => {
     await app.close();
   });
 
+  /** Publications reference real sessions; foreign keys are enforced. */
+  async function sessionFor(label: string): Promise<string> {
+    const event = await dbRepository.getOrCreateEvent('Publication Test Event', '2026-09-10', 'SIC Admin');
+    return (await dbRepository.createSession(event.id, 'photo_strip', label)).id;
+  }
+
   it('lists local publication records and rejects retrying a queued job', async () => {
     await dbRepository.saveGeneratedOutput(
-      'publication-test-session',
+      await sessionFor('publication-test-session'),
       'PubTest',
       'image/png',
       'outputs/publication-test.png',
@@ -40,7 +58,7 @@ describe('Publication routes', () => {
   it('deletes a local output and its publication record', async () => {
     const publicId = `D${crypto.randomUUID().replaceAll('-', '').slice(0, 6)}`;
     await dbRepository.saveGeneratedOutput(
-      'publication-delete-session',
+      await sessionFor('publication-delete-session'),
       publicId,
       'image/png',
       'outputs/publication-delete.png',
@@ -59,11 +77,7 @@ describe('Publication routes', () => {
 
   it('prints publication with copy count and returns flipbook data', async () => {
     const publicId = `F${crypto.randomUUID().replaceAll('-', '').slice(0, 6)}`;
-    const event = await dbRepository.createEvent({
-      name: 'Flipbook Event',
-      date: '2026-09-10',
-      operatorName: 'SIC Admin',
-    });
+    const event = await dbRepository.createEvent('Flipbook Event', '2026-09-10', 'SIC Admin');
     const session = await dbRepository.createSession(event.id, 'flipbook', 'token-pub-print');
     await dbRepository.updateSessionState(session.id, 'booth_confirmed');
 
