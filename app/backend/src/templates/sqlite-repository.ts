@@ -1,7 +1,6 @@
 /**
- * SQLite implementation of the admin template store contract. Mirrors the
- * legacy PostgreSQL `TemplateRepository` statement-for-statement; row
- * hydration reuses its `mapTemplate` so both engines return identical shapes.
+ * SQLite implementation of the admin template store contract. Row hydration
+ * goes through `mapTemplate` in `mapping.ts`.
  */
 import type { TemplateStore } from '../db/contracts.js';
 import type { SqliteDatabase } from '../db/sqlite/connection.js';

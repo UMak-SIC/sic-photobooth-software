@@ -1,40 +1,40 @@
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { config, resolveDatabaseUrl, TEST_UNSET_DATABASE_URL } from '../src/config.js';
+import { config, resolveSqliteDatabasePath, resolveStorageDir } from '../src/config.js';
 
 const env = (values: Record<string, string>) => values as NodeJS.ProcessEnv;
 
 describe('test database guard', () => {
-  it('never resolves this test run to the live booth database', () => {
-    expect(new URL(config.databaseUrl).pathname).not.toBe('/photobooth');
+  it('runs this suite on a temporary database and storage directory', () => {
+    expect(process.env.SQLITE_DATABASE_PATH).toBeTruthy();
+    expect(config.sqliteDatabasePath).toBe(path.resolve(process.env.SQLITE_DATABASE_PATH!));
+    expect(config.storageDir).toBe(process.env.STORAGE_DIR);
   });
 
-  it('falls back to an unreachable URL when DATABASE_URL is unset under test', () => {
-    expect(resolveDatabaseUrl(env({ VITEST: 'true' }))).toBe(TEST_UNSET_DATABASE_URL);
-    expect(resolveDatabaseUrl(env({ NODE_ENV: 'test' }))).toBe(TEST_UNSET_DATABASE_URL);
-    expect(new URL(TEST_UNSET_DATABASE_URL).port).toBe('1');
-  });
-
-  it('refuses the live photobooth database under test, even when set explicitly', () => {
+  it('refuses an unset database path or storage directory under test', () => {
     for (const testEnv of [{ VITEST: 'true' }, { NODE_ENV: 'test' }]) {
-      expect(() =>
-        resolveDatabaseUrl(
-          env({
-            ...testEnv,
-            DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/photobooth',
-          }),
-        ),
-      ).toThrow(/live "photobooth" database/);
+      expect(() => resolveSqliteDatabasePath(env(testEnv))).toThrow(/booth SQLite database/);
+      expect(() => resolveStorageDir(env(testEnv))).toThrow(/booth storage directory/);
     }
   });
 
-  it('allows a differently named test database', () => {
-    const url = 'postgresql://postgres@localhost:5432/photobooth_scratch_1';
-    expect(resolveDatabaseUrl(env({ VITEST: 'true', DATABASE_URL: url }))).toBe(url);
+  it('refuses the default booth files under test even when set explicitly', () => {
+    const boothDatabase = resolveSqliteDatabasePath(env({ NODE_ENV: 'production' }));
+    const boothStorage = resolveStorageDir(env({ NODE_ENV: 'production' }));
+    expect(() =>
+      resolveSqliteDatabasePath(env({ VITEST: 'true', SQLITE_DATABASE_PATH: boothDatabase })),
+    ).toThrow(/booth SQLite database/);
+    expect(() => resolveStorageDir(env({ VITEST: 'true', STORAGE_DIR: boothStorage }))).toThrow(
+      /booth storage directory/,
+    );
   });
 
-  it('keeps the development default outside tests', () => {
-    expect(resolveDatabaseUrl(env({ NODE_ENV: 'production' }))).toBe(
-      'postgresql://postgres:postgres@localhost:5432/photobooth',
+  it('keeps the production defaults outside tests', () => {
+    expect(resolveSqliteDatabasePath(env({ NODE_ENV: 'production' }))).toMatch(
+      /storage[/\\]database[/\\]photobooth\.sqlite$/,
     );
+    expect(
+      resolveSqliteDatabasePath(env({ VITEST: 'true', SQLITE_DATABASE_PATH: '/tmp/x.sqlite' })),
+    ).toBe(path.resolve('/tmp/x.sqlite'));
   });
 });

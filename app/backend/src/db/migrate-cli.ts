@@ -1,8 +1,7 @@
-import { config } from '../config.js';
 import { closeDatabaseProvider, runDatabaseMigrations } from './provider.js';
 
 async function main() {
-  console.log(`🚀 Running ${config.localDatabaseEngine} database migrations...`);
+  console.log('🚀 Running SQLite database migrations...');
   try {
     const summary = await runDatabaseMigrations();
     if (summary.applied.length > 0) {

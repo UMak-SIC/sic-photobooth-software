@@ -16,9 +16,12 @@ import type { CatalogColumn, MigrationLedgerRow } from './import-source.js';
 
 const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 
-/** The repository's PostgreSQL migrations, relative to this script (not the process cwd). */
+/**
+ * The PostgreSQL migrations as applied in production, kept as non-executable evidence
+ * under src/db/legacy-postgres/. Resolved relative to this script (not the process cwd).
+ */
 export function legacyMigrationsDirectory(): string {
-  return path.resolve(moduleDirectory, '../../../src/db/migrations');
+  return path.resolve(moduleDirectory, '../../../src/db/legacy-postgres/migrations');
 }
 
 function readMigrationLedger(directory: string): MigrationLedgerRow[] {

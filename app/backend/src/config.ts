@@ -27,8 +27,6 @@ export interface PublishingConfig {
 export interface AppConfig {
   port: number;
   host: string;
-  databaseUrl: string;
-  localDatabaseEngine: 'postgres' | 'sqlite';
   sqliteDatabasePath: string;
   storageDir: string;
   nodeEnv: string;
@@ -52,58 +50,42 @@ function cutoverHoldFlag(value: string | undefined): boolean {
   throw new Error('DATABASE_CUTOVER_HOLD must be one of "1", "true", "0", or "false".');
 }
 
-function localDatabaseEngine(value: string | undefined): 'postgres' | 'sqlite' {
-  const engine = value || 'postgres';
-  if (engine === 'postgres' || engine === 'sqlite') return engine;
-  throw new Error('LOCAL_DATABASE_ENGINE must be either "postgres" or "sqlite".');
-}
-
-/** The live booth database. Tests must never resolve to it. */
-const LIVE_DATABASE_NAME = 'photobooth';
-const DEVELOPMENT_DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/photobooth';
-/** Unreachable on purpose, so a test without its own database fails instead of using the booth's. */
-export const TEST_UNSET_DATABASE_URL =
-  'postgresql://test-no-database@127.0.0.1:1/photobooth_test_unset';
-
 function isTestRun(env: NodeJS.ProcessEnv): boolean {
   return Boolean(env.VITEST) || env.NODE_ENV === 'test';
 }
 
-function databaseName(url: string): string | undefined {
-  try {
-    return decodeURIComponent(new URL(url).pathname.replace(/^\//, ''));
-  } catch {
-    return undefined;
-  }
-}
-
 /**
- * Resolves DATABASE_URL. Under Vitest or NODE_ENV=test an unset value falls back to an
- * unreachable URL instead of the live booth database, and a URL naming the live
- * `photobooth` database is refused.
+ * Resolves the SQLite database file. Under Vitest or NODE_ENV=test the path must be
+ * set explicitly and must not be the default production file, so a test can never
+ * open the booth's database.
  */
-export function resolveDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
-  if (!isTestRun(env)) return env.DATABASE_URL || DEVELOPMENT_DATABASE_URL;
-  const url = env.DATABASE_URL || TEST_UNSET_DATABASE_URL;
-  if (databaseName(url) === LIVE_DATABASE_NAME) {
+export function resolveSqliteDatabasePath(env: NodeJS.ProcessEnv = process.env): string {
+  const productionDefault = path.join(defaultStorageDir, 'database', 'photobooth.sqlite');
+  const resolved = path.resolve(env.SQLITE_DATABASE_PATH || productionDefault);
+  if (isTestRun(env) && (!env.SQLITE_DATABASE_PATH || resolved === productionDefault)) {
     throw new Error(
-      `Refusing to run tests against the live "${LIVE_DATABASE_NAME}" database. Set DATABASE_URL to a disposable test database.`,
+      'Refusing to open the booth SQLite database under test. Set SQLITE_DATABASE_PATH to a temporary file.',
     );
   }
-  return url;
+  return resolved;
+}
+
+/** Resolves STORAGE_DIR; under test it must be set and must not be the booth's storage. */
+export function resolveStorageDir(env: NodeJS.ProcessEnv = process.env): string {
+  const resolved = env.STORAGE_DIR || defaultStorageDir;
+  if (isTestRun(env) && (!env.STORAGE_DIR || path.resolve(resolved) === defaultStorageDir)) {
+    throw new Error(
+      'Refusing to use the booth storage directory under test. Set STORAGE_DIR to a temporary directory.',
+    );
+  }
+  return resolved;
 }
 
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   host: process.env.HOST || '0.0.0.0',
-  databaseUrl: resolveDatabaseUrl(),
-  // PostgreSQL remains the default until the documented production cutover completes.
-  localDatabaseEngine: localDatabaseEngine(process.env.LOCAL_DATABASE_ENGINE),
-  sqliteDatabasePath: path.resolve(
-    process.env.SQLITE_DATABASE_PATH ||
-      path.join(defaultStorageDir, 'database', 'photobooth.sqlite'),
-  ),
-  storageDir: process.env.STORAGE_DIR || defaultStorageDir,
+  sqliteDatabasePath: resolveSqliteDatabasePath(),
+  storageDir: resolveStorageDir(),
   nodeEnv: process.env.NODE_ENV || 'development',
   publicAppUrl: process.env.PUBLIC_APP_URL || '',
   cloudinary: {

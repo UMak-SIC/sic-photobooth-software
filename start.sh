@@ -76,9 +76,8 @@ run_infrastructure() {
     exit 1
   }
 
-  printf 'Starting PostgreSQL, CUPS, Caddy, and %s. sudo may ask for your password.\n' "$hotspot_service"
-  sudo systemctl start postgresql.service cups.socket cups.service caddy "$hotspot_service"
-  printf 'PostgreSQL: %s\n' "$(service_status postgresql.service)"
+  printf 'Starting CUPS, Caddy, and %s. sudo may ask for your password.\n' "$hotspot_service"
+  sudo systemctl start cups.socket cups.service caddy "$hotspot_service"
   printf 'CUPS socket: %s\n' "$(service_status cups.socket)"
   printf 'CUPS service: %s\n' "$(service_status cups.service)"
   printf 'Caddy: %s\n' "$(service_status caddy)"
@@ -123,7 +122,6 @@ print_summary() {
   printf '  Guest portal:    %s\n' "$CAPTIVE_PORTAL_URL"
 
   printf '\nHealth check\n'
-  printf '  PostgreSQL:      %s\n' "$(service_status postgresql.service)"
   printf '  CUPS socket:     %s\n' "$(service_status cups.socket)"
   printf '  CUPS service:    %s\n' "$(service_status cups.service)"
   printf '  Caddy:           %s\n' "$(service_status caddy)"

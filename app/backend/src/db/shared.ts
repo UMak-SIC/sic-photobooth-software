@@ -1,7 +1,6 @@
 /**
- * Engine-neutral repository logic shared by the PostgreSQL and SQLite
- * implementations: built-in read-only defaults, template snapshots, and
- * analytics aggregation. Nothing here stores state.
+ * Repository logic that does not touch SQL: built-in read-only defaults,
+ * template snapshots, and analytics aggregation. Nothing here stores state.
  */
 import { classifyTemplateLayout } from '../services/layout-classifier.js';
 import type {

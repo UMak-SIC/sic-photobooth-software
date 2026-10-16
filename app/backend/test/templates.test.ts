@@ -100,7 +100,7 @@ describe('template persistence boundaries', () => {
     expect(files.get('assets/template/overlay.svg')?.toString()).toBe('<svg />');
   });
 
-  it('normalizes numeric PostgreSQL values when loading a template', () => {
+  it('normalizes numeric string values when loading a template', () => {
     const template = mapTemplate(
       {
         id: '22222222-2222-4222-8222-222222222222',
