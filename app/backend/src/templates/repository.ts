@@ -212,7 +212,7 @@ export class TemplateRepository implements TemplateStore {
           overlay.x,
           overlay.y,
           overlay.width,
-          overlay.width,
+          overlay.height,
           overlay.rotation,
           overlay.zIndex,
         ],
