@@ -45,6 +45,14 @@ import {
 
 export type * from './contracts.js';
 
+/**
+ * An ILIKE pattern that matches `term` literally anywhere, as the SQLite engine's
+ * instr() lookup does: `%`, `_`, and the default escape `\\` lose their wildcard meaning.
+ */
+export function containsPattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+}
+
 const SESSION_RETURNING = `
   id,
   token,
@@ -214,8 +222,9 @@ export class DatabaseRepository implements CoreRepository {
           `SELECT id, name, overlay_path AS "overlayPath", is_active AS "isActive"
            FROM frames
            WHERE name ILIKE $1 OR overlay_path ILIKE $1
+           ORDER BY created_at ASC, id ASC
            LIMIT 1`,
-          [`%${frameId}%`],
+          [containsPattern(frameId)],
         );
     if (res.rows[0]) return withDefaultFramePlacements(res.rows[0]);
     return findBuiltInFrame(frameId);
@@ -977,9 +986,10 @@ export class DatabaseRepository implements CoreRepository {
   public async getTemplateById(templateId: string): Promise<TemplateItem | null> {
     const res = isUuid(templateId)
       ? await pool.query(`${this.templateSelectFields} WHERE t.id = $1`, [templateId])
-      : await pool.query(`${this.templateSelectFields} WHERE t.name ILIKE $1 LIMIT 1`, [
-          `%${templateId}%`,
-        ]);
+      : await pool.query(
+          `${this.templateSelectFields} WHERE t.name ILIKE $1 ORDER BY t.created_at ASC, t.id ASC LIMIT 1`,
+          [containsPattern(templateId)],
+        );
     return res.rows[0] ?? findBuiltInTemplate(templateId);
   }
 

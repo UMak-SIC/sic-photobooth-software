@@ -22,7 +22,7 @@ import {
   setDatabaseProvider,
   templateRepository,
 } from '../src/db/provider.js';
-import { DatabaseRepository } from '../src/db/repository.js';
+import { containsPattern, DatabaseRepository } from '../src/db/repository.js';
 import { SqliteDatabaseRepository } from '../src/db/sqlite/repository.js';
 import { TemplateRepository } from '../src/templates/repository.js';
 import { SqliteTemplateRepository } from '../src/templates/sqlite-repository.js';
@@ -152,5 +152,27 @@ describe('legacy PostgreSQL repository failure semantics', () => {
     await expect(repository.getPrintJob('not-a-uuid')).resolves.toBeNull();
     await expect(repository.deleteEvent('not-a-uuid')).resolves.toBe(false);
     expect(pg.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('legacy PostgreSQL name lookup', () => {
+  it('matches %, _, and backslash literally, like the SQLite instr() lookup', () => {
+    expect(containsPattern('Party')).toBe('%Party%');
+    expect(containsPattern('100%_off\\x')).toBe('%100\\%\\_off\\\\x%');
+  });
+
+  it('escapes the term and orders deterministically for non-UUID frame and template ids', async () => {
+    pg.query.mockResolvedValue({ rows: [] });
+    const repository = new DatabaseRepository();
+
+    await repository.getFrameById('50%_frame');
+    const [frameSql, frameParams] = pg.query.mock.calls[0];
+    expect(frameSql).toMatch(/ORDER BY created_at ASC, id ASC\s+LIMIT 1/);
+    expect(frameParams).toEqual(['%50\\%\\_frame%']);
+
+    await repository.getTemplateById('a_b');
+    const [templateSql, templateParams] = pg.query.mock.calls[1];
+    expect(templateSql).toMatch(/ORDER BY t\.created_at ASC, t\.id ASC LIMIT 1/);
+    expect(templateParams).toEqual(['%a\\_b%']);
   });
 });
