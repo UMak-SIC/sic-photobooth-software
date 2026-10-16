@@ -1,20 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
-import { runMigrations } from '../src/db/migrations.js';
 import { sessionStateMachine } from '../src/services/session-state-machine.js';
-import { dbRepository } from '../src/db/repository.js';
+import { dbRepository } from '../src/db/provider.js';
 
 describe('Flipbook Workflow & State Transitions', () => {
   let app: FastifyInstance;
 
   beforeAll(async () => {
     app = await buildApp();
-    try {
-      await runMigrations();
-    } catch {
-      // Postgres might not be running in isolated CI test run; gracefully proceed
-    }
   });
 
   afterAll(async () => {

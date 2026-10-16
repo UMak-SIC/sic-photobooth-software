@@ -3,7 +3,8 @@ import path from 'node:path';
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { generatePublicId } from '@photobooth/public-output';
-import { dbRepository, type TemplatePlacement, type TemplateOverlay } from '../db/repository.js';
+import type { TemplatePlacement, TemplateOverlay } from '../db/contracts.js';
+import { dbRepository, templateRepository } from '../db/provider.js';
 import { sessionStateMachine, type SessionState } from '../services/session-state-machine.js';
 import { storageService } from '../services/storage.js';
 import { mediaValidator } from '../services/media-validator.js';
@@ -11,7 +12,6 @@ import { gifRenderer } from '../services/gif-renderer.js';
 import { config, flipbookConfig } from '../config.js';
 import { photoStripRenderer } from '../services/photo-strip-renderer.js';
 import type { SessionType } from '@photobooth/public-output';
-import { templateRepository } from '../templates/repository.js';
 import { toTemplateDto } from '../templates/routes.js';
 
 const createSessionSchema = z.object({
@@ -194,10 +194,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: frames,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -252,10 +253,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -279,10 +281,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeSession,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });
@@ -1437,10 +1440,11 @@ export const sessionRoutes: FastifyPluginAsync = async (fastify) => {
         data: safeCancelled,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      // Database errors are logged, never echoed: they can expose engine internals.
+      fastify.log.error(err, 'Session database operation failed');
       return reply.status(500).send({
         success: false,
-        error: { code: 'DATABASE_ERROR', message },
+        error: { code: 'DATABASE_ERROR', message: 'A database error occurred. Please try again.' },
       });
     }
   });

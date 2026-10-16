@@ -1,10 +1,10 @@
-import { runMigrations } from './migrations.js';
-import { pool } from './pool.js';
+import { config } from '../config.js';
+import { closeDatabaseProvider, runDatabaseMigrations } from './provider.js';
 
 async function main() {
-  console.log('🚀 Running database migrations...');
+  console.log(`🚀 Running ${config.localDatabaseEngine} database migrations...`);
   try {
-    const summary = await runMigrations();
+    const summary = await runDatabaseMigrations();
     if (summary.applied.length > 0) {
       console.log(`✅ Successfully applied ${summary.applied.length} migration(s):`);
       for (const m of summary.applied) {
@@ -15,9 +15,9 @@ async function main() {
     }
   } catch (err) {
     console.error('❌ Migration failed:', err);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
-    await pool.end();
+    await closeDatabaseProvider();
   }
 }
 

@@ -6,7 +6,6 @@ import { randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import sharp from 'sharp';
 import { buildApp } from '../src/app.js';
-import { runMigrations } from '../src/db/migrations.js';
 import { sessionStateMachine } from '../src/services/session-state-machine.js';
 import {
   photoStripRenderer,
@@ -15,7 +14,7 @@ import {
   detectCutLayout,
   generateDatePillSvg,
 } from '../src/services/photo-strip-renderer.js';
-import { dbRepository } from '../src/db/repository.js';
+import { dbRepository, templateRepository } from '../src/db/provider.js';
 import { config } from '../src/config.js';
 
 describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
@@ -23,11 +22,24 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
 
   beforeAll(async () => {
     app = await buildApp();
-    try {
-      await runMigrations();
-    } catch {
-      // Postgres might not be running in isolated CI test run; in-memory fallback handles state
-    }
+    // Each test file starts from an empty database, so seed one active 3-cut strip template.
+    await templateRepository.create({
+      name: 'Workflow Test 3-Cut Strip',
+      type: 'photo_strip',
+      orientation: 'portrait',
+      background: { x: 0, y: 0, width: 1200, height: 1800 },
+      placements: [100, 650, 1200].map((y, index) => ({
+        captureIndex: index + 1,
+        x: 100,
+        y,
+        width: 1000,
+        height: 500,
+        rotation: 0,
+        borderRadius: 0,
+        zIndex: 1,
+      })),
+      overlays: [],
+    });
   });
 
   afterAll(async () => {
@@ -524,8 +536,8 @@ describe('Photo Strip Workflow & Compositor Engine (EPIC-05)', () => {
   });
 
   it('enforces maximum 4-retake ceiling atomically in repository', async () => {
-    const fakeSessionId = 'atomic-retake-session';
-    // Simulate retakes in in-memory repository
+    const event = await dbRepository.getOrCreateEvent('Retake Ceiling Expo', '2026-09-08', 'Joey Dev');
+    const fakeSessionId = (await dbRepository.createSession(event.id, 'photo_strip', 'retake-token')).id;
     await dbRepository.savePhotoCapture(fakeSessionId, 1, '/tmp/1.jpg', false);
     await dbRepository.savePhotoCapture(fakeSessionId, 1, '/tmp/1_r1.jpg', true); // 1
     await dbRepository.savePhotoCapture(fakeSessionId, 1, '/tmp/1_r2.jpg', true); // 2

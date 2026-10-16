@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { isUniqueViolation } from '../db/contracts.js';
+import { dbRepository } from '../db/provider.js';
 
 const eventSchema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -50,12 +51,7 @@ export const eventRoutes: FastifyPluginAsync = async (fastify) => {
       );
       return reply.status(201).send({ success: true, data: event });
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23505'
-      ) {
+      if (isUniqueViolation(error)) {
         return reply.status(409).send({
           success: false,
           error: {

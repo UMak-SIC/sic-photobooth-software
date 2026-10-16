@@ -21,18 +21,19 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({ from: mocks.supabaseFrom })),
 }));
 
-vi.mock('../src/db/pool.js', () => ({
-  pool: {
-    query: vi.fn().mockRejectedValue(new Error('Database offline in test')),
-  },
-}));
-
 describe('Publishing worker', () => {
+  /** Publications reference real sessions; foreign keys are enforced. */
+  async function confirmedSession(label: string): Promise<string> {
+    const event = await repo.dbRepository.getOrCreateEvent('Worker Test Event', '2099-09-05', 'Tester');
+    const session = await repo.dbRepository.createSession(event.id, 'photo_strip', label);
+    return session.id;
+  }
+
   let cloudinaryV2: {
     uploader: { upload: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> };
   };
   let worker: typeof import('../src/services/publishing-worker.js');
-  let repo: typeof import('../src/db/repository.js');
+  let repo: typeof import('../src/db/provider.js');
 
   beforeAll(async () => {
     process.env.CLOUDINARY_CLOUD_NAME = 'test-cloud';
@@ -50,7 +51,8 @@ describe('Publishing worker', () => {
     });
     cloudinaryV2 = (await import('cloudinary')).v2;
     worker = await import('../src/services/publishing-worker.js');
-    repo = await import('../src/db/repository.js');
+    repo = await import('../src/db/provider.js');
+    await repo.runDatabaseMigrations();
   });
 
   beforeEach(() => {
@@ -64,13 +66,13 @@ describe('Publishing worker', () => {
 
   it('uploads a queued publication and marks it uploaded', async () => {
     cloudinaryV2.uploader.upload.mockResolvedValue({
-      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrTst',
-      public_id: 'photobooth/WkrTst',
+      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrTstx',
+      public_id: 'photobooth/WkrTstx',
     });
     mocks.supabaseUpsert.mockResolvedValue({ error: null });
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-happy-session',
-      'WkrTst',
+      await confirmedSession('worker-happy-session'),
+      'WkrTstx',
       'image/png',
       'outputs/worker-happy.png',
       1200,
@@ -81,13 +83,13 @@ describe('Publishing worker', () => {
     await worker.processQueuedPublications(finalizedAt);
 
     expect(cloudinaryV2.uploader.upload).toHaveBeenCalledWith(
-      'outputs/worker-happy.png',
+      expect.stringMatching(/outputs\/worker-happy\.png$/),
       expect.objectContaining({ resource_type: 'image', timeout: 30_000 }),
     );
     expect(mocks.supabaseUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        public_id: 'WkrTst',
-        cloudinary_public_id: 'photobooth/WkrTst',
+        public_id: 'WkrTstx',
+        cloudinary_public_id: 'photobooth/WkrTstx',
         print_count: 0,
         status: 'uploaded',
         cloud_finalized_at: expect.any(String),
@@ -95,12 +97,12 @@ describe('Publishing worker', () => {
       { onConflict: 'public_id' },
     );
     const pubs = await repo.dbRepository.listPublications();
-    const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrTst');
+    const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrTstx');
     expect(pub.status).toBe('uploaded');
     expect(pub.cloudinaryUrl).toBe(
-      'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrTst',
+      'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrTstx',
     );
-    expect(pub.cloudinaryPublicId).toBe('photobooth/WkrTst');
+    expect(pub.cloudinaryPublicId).toBe('photobooth/WkrTstx');
     expect(pub.cloudFinalizedAt).not.toBeNull();
     expect(pub.expiresAt).not.toBeNull();
   });
@@ -108,8 +110,8 @@ describe('Publishing worker', () => {
   it('requeues a failed upload and dead-letters after five attempts', async () => {
     cloudinaryV2.uploader.upload.mockRejectedValue(new Error('network down'));
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-fail-session',
-      'WkrFl1',
+      await confirmedSession('worker-fail-session'),
+      'WkrFl1x',
       'image/png',
       'outputs/worker-fail.png',
       1200,
@@ -122,7 +124,7 @@ describe('Publishing worker', () => {
         new Date(firstAttempt.getTime() + (attempt - 1) * 60 * 60 * 1000),
       );
       const pubs = await repo.dbRepository.listPublications();
-      const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrFl1');
+      const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrFl1x');
       expect(pub.status).toBe('queued');
       expect(pub.retryCount).toBe(attempt);
       expect(pub.lastError).toBe('network down');
@@ -131,7 +133,7 @@ describe('Publishing worker', () => {
 
     await worker.processQueuedPublications(new Date(firstAttempt.getTime() + 4 * 60 * 60 * 1000));
     const pubs = await repo.dbRepository.listPublications();
-    const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrFl1');
+    const pub = pubs.find((p: { publicId: string }) => p.publicId === 'WkrFl1x');
     expect(pub.status).toBe('failed');
     expect(pub.retryCount).toBe(5);
     expect(pub.nextAttemptAt).toBeNull();
@@ -139,13 +141,13 @@ describe('Publishing worker', () => {
 
   it('retries when Cloudinary succeeds but Supabase registration fails', async () => {
     cloudinaryV2.uploader.upload.mockResolvedValue({
-      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrSb1',
-      public_id: 'photobooth/WkrSb1',
+      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrSb1x',
+      public_id: 'photobooth/WkrSb1x',
     });
     mocks.supabaseUpsert.mockResolvedValue({ error: { message: 'database unavailable' } });
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-supabase-session',
-      'WkrSb1',
+      await confirmedSession('worker-supabase-session'),
+      'WkrSb1x',
       'image/png',
       'outputs/worker-supabase.png',
       1200,
@@ -155,7 +157,7 @@ describe('Publishing worker', () => {
     await worker.processQueuedPublications(new Date('2099-09-05T14:00:00.000Z'));
 
     const pub = (await repo.dbRepository.listPublications()).find(
-      (item: { publicId: string }) => item.publicId === 'WkrSb1',
+      (item: { publicId: string }) => item.publicId === 'WkrSb1x',
     );
     expect(pub.status).toBe('queued');
     expect(pub.retryCount).toBe(1);
@@ -164,14 +166,14 @@ describe('Publishing worker', () => {
 
   it('finalizes locally when a completed Supabase upsert times out', async () => {
     cloudinaryV2.uploader.upload.mockResolvedValue({
-      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrRc1',
-      public_id: 'photobooth/WkrRc1',
+      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrRc1x',
+      public_id: 'photobooth/WkrRc1x',
     });
     mocks.supabaseUpsert.mockResolvedValue({ error: { message: 'request timed out' } });
-    mocks.supabaseMaybeSingle.mockResolvedValue({ data: { public_id: 'WkrRc1' }, error: null });
+    mocks.supabaseMaybeSingle.mockResolvedValue({ data: { public_id: 'WkrRc1x' }, error: null });
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-reconcile-session',
-      'WkrRc1',
+      await confirmedSession('worker-reconcile-session'),
+      'WkrRc1x',
       'image/png',
       'outputs/worker-reconcile.png',
       1200,
@@ -181,29 +183,29 @@ describe('Publishing worker', () => {
     await worker.processQueuedPublications(new Date('2099-09-05T14:15:00.000Z'));
 
     const pub = (await repo.dbRepository.listPublications()).find(
-      (item: { publicId: string }) => item.publicId === 'WkrRc1',
+      (item: { publicId: string }) => item.publicId === 'WkrRc1x',
     );
     expect(pub.status).toBe('uploaded');
   });
 
   it('cleans up a Cloudinary asset when the final Supabase attempt is definitely absent', async () => {
     cloudinaryV2.uploader.upload.mockResolvedValue({
-      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrOr1',
-      public_id: 'photobooth/WkrOr1',
+      secure_url: 'https://res.cloudinary.com/test/image/upload/v1/photobooth/WkrOr1x',
+      public_id: 'photobooth/WkrOr1x',
     });
     cloudinaryV2.uploader.destroy.mockResolvedValue({ result: 'ok' });
     mocks.supabaseUpsert.mockResolvedValue({ error: { message: 'database unavailable' } });
     mocks.supabaseMaybeSingle.mockResolvedValue({ data: null, error: null });
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-orphan-session',
-      'WkrOr1',
+      await confirmedSession('worker-orphan-session'),
+      'WkrOr1x',
       'image/png',
       'outputs/worker-orphan.png',
       1200,
       1800,
     );
     const publication = (await repo.dbRepository.listPublications()).find(
-      (item: { publicId: string }) => item.publicId === 'WkrOr1',
+      (item: { publicId: string }) => item.publicId === 'WkrOr1x',
     );
     for (let retry = 1; retry <= 4; retry += 1) {
       await repo.dbRepository.markPublicationFailed(
@@ -215,12 +217,12 @@ describe('Publishing worker', () => {
 
     await worker.processQueuedPublications(new Date('2099-09-05T14:30:00.000Z'));
 
-    expect(cloudinaryV2.uploader.destroy).toHaveBeenCalledWith('photobooth/WkrOr1', {
+    expect(cloudinaryV2.uploader.destroy).toHaveBeenCalledWith('photobooth/WkrOr1x', {
       resource_type: 'image',
       invalidate: true,
     });
     const updated = (await repo.dbRepository.listPublications()).find(
-      (item: { publicId: string }) => item.publicId === 'WkrOr1',
+      (item: { publicId: string }) => item.publicId === 'WkrOr1x',
     );
     expect(updated.status).toBe('failed');
     expect(updated.retryCount).toBe(5);
@@ -228,8 +230,8 @@ describe('Publishing worker', () => {
 
   it('requeues a stalled in-progress job when the worker restarts', async () => {
     await repo.dbRepository.saveGeneratedOutput(
-      'worker-stalled-session',
-      'WkrSt1',
+      await confirmedSession('worker-stalled-session'),
+      'WkrSt1x',
       'image/png',
       'outputs/worker-stalled.png',
       1200,
@@ -244,7 +246,7 @@ describe('Publishing worker', () => {
     );
 
     const pub = (await repo.dbRepository.listPublications()).find(
-      (item: { publicId: string }) => item.publicId === 'WkrSt1',
+      (item: { publicId: string }) => item.publicId === 'WkrSt1x',
     );
     expect(pub.status).toBe('queued');
     expect(pub.retryCount).toBe(1);

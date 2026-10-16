@@ -3,7 +3,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import QRCode from 'qrcode';
 import { config } from '../config.js';
-import type { TemplatePlacement, TemplateOverlay } from '../db/repository.js';
+import type { TemplatePlacement, TemplateOverlay } from '../db/contracts.js';
 
 export type CutLayoutType = 'single' | 'cut_2_vertical' | 'cut_2_horizontal' | 'cut_4';
 export type PhotoFilterType = 'normal' | 'bw' | 'sepia';

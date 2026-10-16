@@ -1,7 +1,7 @@
 import dns from 'node:dns/promises';
 import { v2 as cloudinary } from 'cloudinary';
 import { config } from '../config.js';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository } from '../db/provider.js';
 import {
   isSupabaseConfigured,
   publicOutputExists,
