@@ -6,7 +6,10 @@ import {
   importLegacyPostgres,
   ImportRefusedError,
 } from '../scripts/database/import-legacy-postgres.js';
-import { expectedLegacyLedger } from '../scripts/database/lib/import-catalog.js';
+import {
+  expectedLegacyLedger,
+  RETIRED_LEGACY_MIGRATIONS,
+} from '../scripts/database/lib/import-catalog.js';
 import { tableSpec } from '../scripts/database/lib/import-schema.js';
 import {
   buildTableSelect,
@@ -171,6 +174,32 @@ describe('legacy PostgreSQL import', () => {
       }),
     ).rejects.toThrow('simulated crash');
     expect(filesIn(path.dirname(target))).toEqual([]);
+  });
+
+  it('accepts retired migration 011 only with its exact allowlisted checksum', async () => {
+    const [retired] = RETIRED_LEGACY_MIGRATIONS;
+    expect(retired.id).toBe('011_storage_relative_paths.sql');
+
+    const summary = await importLegacyPostgres({
+      reader: createFakeReader(legacyFixture(), {
+        ledger: [...expectedLegacyLedger(), retired],
+      }),
+      destinationPath: destination(),
+      env: NO_ENV,
+    });
+    expect(summary.retiredSourceMigrations).toEqual(['011_storage_relative_paths.sql']);
+
+    const wrongTarget = destination();
+    await expect(
+      importLegacyPostgres({
+        reader: createFakeReader(legacyFixture(), {
+          ledger: [...expectedLegacyLedger(), { ...retired, checksum: 'f'.repeat(64) }],
+        }),
+        destinationPath: wrongTarget,
+        env: NO_ENV,
+      }),
+    ).rejects.toThrow(/Retired migration 011_storage_relative_paths\.sql checksum differs/);
+    expect(filesIn(path.dirname(wrongTarget))).toEqual([]);
   });
 
   it('refuses a source whose migration ledger or catalog drifted before creating any file', async () => {

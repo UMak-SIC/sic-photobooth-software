@@ -4,7 +4,10 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, describe, expect, it } from 'vitest';
 import { importLegacyPostgres } from '../scripts/database/import-legacy-postgres.js';
-import { expectedLegacyLedger } from '../scripts/database/lib/import-catalog.js';
+import {
+  expectedLegacyLedger,
+  RETIRED_LEGACY_MIGRATIONS,
+} from '../scripts/database/lib/import-catalog.js';
 import { validateParity } from '../scripts/database/validate-postgres-sqlite-parity.js';
 import {
   createFakeReader,
@@ -148,6 +151,32 @@ describe('PostgreSQL to SQLite parity gate', () => {
     });
     expect(report.migrationLedger?.ok).toBe(false);
     expect(report.status).toBe('fail');
+  });
+
+  it('reports retired migration 011 with the allowlisted checksum and rejects any other', async () => {
+    const sqlitePath = await importedCandidate();
+    const [retired] = RETIRED_LEGACY_MIGRATIONS;
+    const accepted = await validateParity({
+      reader: createFakeReader(legacyFixture(), {
+        ledger: [...expectedLegacyLedger(), retired],
+      }),
+      sqlitePath,
+    });
+    expect(accepted.migrationLedger).toEqual({
+      ok: true,
+      problems: [],
+      retired: ['011_storage_relative_paths.sql'],
+    });
+    expect(accepted.warnings.some((w) => w.includes('011_storage_relative_paths.sql'))).toBe(true);
+
+    const rejected = await validateParity({
+      reader: createFakeReader(legacyFixture(), {
+        ledger: [...expectedLegacyLedger(), { ...retired, checksum: '0'.repeat(64) }],
+      }),
+      sqlitePath,
+    });
+    expect(rejected.migrationLedger).toMatchObject({ ok: false, retired: [] });
+    expect(rejected.status).toBe('fail');
   });
 
   it('checks referenced media against the manifest and optionally re-hashes files', async () => {

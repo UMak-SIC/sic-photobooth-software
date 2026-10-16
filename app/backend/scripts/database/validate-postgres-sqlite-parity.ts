@@ -19,6 +19,8 @@ import {
 import {
   expectedLegacyLedger,
   expectedSqliteLedger,
+  RETIRED_LEGACY_MIGRATIONS,
+  retiredMigrationsIn,
   verifyMigrationLedger,
   verifySourceCatalog,
   verifySqliteSchema,
@@ -69,7 +71,8 @@ export interface ParityReport {
   warnings: string[];
   source?: RedactedSourceTarget & { serverVersion?: string };
   sqlite: { path: string; sizeBytes?: number; sha256Before?: string; sha256After?: string };
-  migrationLedger?: { ok: boolean; problems: string[] };
+  /** `retired` lists allowlisted retired migrations present in the source ledger. */
+  migrationLedger?: { ok: boolean; problems: string[]; retired: string[] };
   sqliteMigrationLedger?: { ok: boolean; problems: string[] };
   catalog?: { ok: boolean; problems: string[] };
   tables: Record<string, TableParity | { ok: false; error: string }>;
@@ -173,12 +176,24 @@ export async function validateParity(options: ParityOptions): Promise<ParityRepo
   try {
     await options.reader.begin();
     try {
+      const sourceLedger = await options.reader.migrationLedger();
       const ledgerProblems = verifyMigrationLedger(
-        await options.reader.migrationLedger(),
+        sourceLedger,
         expectedLegacyLedger(),
+        RETIRED_LEGACY_MIGRATIONS,
       );
-      report.migrationLedger = { ok: ledgerProblems.length === 0, problems: ledgerProblems };
+      const retired = retiredMigrationsIn(sourceLedger);
+      report.migrationLedger = {
+        ok: ledgerProblems.length === 0,
+        problems: ledgerProblems,
+        retired,
+      };
       ledgerProblems.forEach((problem) => fail(`ledger: ${problem}`));
+      if (retired.length > 0) {
+        report.warnings.push(
+          `Source ledger contains retired migration(s) ${retired.join(', ')} (allowlisted by checksum).`,
+        );
+      }
 
       const catalogProblems = [
         ...verifySourceCatalog(await options.reader.catalogColumns()),

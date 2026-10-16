@@ -31,6 +31,7 @@ What it does:
 
 1. **Preflight, before any file is created.**
    - The source `schema_migrations` ledger must contain exactly the repository migrations `001`–`010`, with matching checksums.
+   - The only extra ledger row allowed is a **retired** migration listed in `RETIRED_LEGACY_MIGRATIONS` (`lib/import-catalog.ts`), and only with its exact recorded checksum. A different checksum fails the preflight. Retired migrations found are listed in the summary's `retiredSourceMigrations`. See [Retired migration 011](#retired-migration-011).
    - The source catalog (tables, columns, types, nullability) must match the column map in `lib/import-schema.ts`, which is written from those migrations and not from `schema.sql`. An unknown table or column fails the import, so no data can be silently dropped.
 2. **Read every table** and convert the values:
    - Timestamps become canonical UTC `YYYY-MM-DDTHH:mm:ss.sssZ`, extracted in SQL with `AT TIME ZONE 'UTC'`, so the database's `TimeZone` setting does not matter.
@@ -64,7 +65,7 @@ The report is JSON, written with mode `0600`. It is never overwritten, so choose
 The checks:
 
 - **Ledgers and catalog.**
-  - The source migration ledger must match `001`–`010`.
+  - The source migration ledger must match `001`–`010`. An allowlisted retired migration with its exact checksum is accepted, listed in `migrationLedger.retired`, and added to `warnings`.
   - The source catalog and the SQLite schema must both match the column map.
   - The SQLite `schema_migrations` must match the current SQLite migration files.
 - **Rows.** For every table, the validator compares counts, key sets (missing and extra IDs), and each column of every row, and records a SHA-256 digest of each side.
@@ -83,6 +84,14 @@ The checks:
   - `PRAGMA integrity_check` and `PRAGMA foreign_key_check`.
   - A reopen test on a fresh connection: `quick_check`, row counts, and the migration ledger.
   - A SHA-256 of the candidate before and after validation, to prove the validator did not modify it.
+
+## Retired migration 011
+
+The live booth ledger records `011_storage_relative_paths.sql` (checksum `7f5da758ca231f1c4a53f4b94a1e49901366bd82a16631dd582a7b89caaaff96`). It was added in `efe6753` and deleted in `88644d7`. The TypeScript `normalizeStoredPaths()` in `src/db/normalize-storage-paths.ts` replaced it, and runs after migrations at startup.
+
+The migration only ran `UPDATE` statements. A regex (`^.*/storage/` → empty string) rewrote absolute stored paths to storage-relative ones in `session_captures.file_path`, `session_videos.file_path`, `generated_outputs.file_path`, `print_jobs.artifact_path`, `templates.background_path`, `templates.cover_path`, and `template_overlays.asset_path`. It changed no tables, columns, types, or constraints, so the catalog map in `lib/import-schema.ts` is unchanged.
+
+The importer copies paths exactly as stored. On the live database, some of those paths were rewritten by 011's regex, not by `normalizeStoredPaths()`. Both produce storage-relative paths, and the importer does not normalize again. Any remaining absolute path is copied unchanged. The SQLite runtime resolves it through the same stored-path resolution, and the parity media check matches it by its storage-relative form.
 
 ## Rehearsal outline (Phase 4 gate)
 

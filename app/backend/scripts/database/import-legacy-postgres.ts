@@ -18,6 +18,8 @@ import {
 import { runSqliteMigrations } from '../../src/db/sqlite/migrations.js';
 import {
   expectedLegacyLedger,
+  RETIRED_LEGACY_MIGRATIONS,
+  retiredMigrationsIn,
   verifyMigrationLedger,
   verifySourceCatalog,
   verifySqliteSchema,
@@ -59,6 +61,8 @@ export interface ImportSummary {
   sqliteMigrations: string[];
   /** Source timestamps with microseconds; the canonical format keeps milliseconds. */
   subMillisecondTimestampsTruncated: number;
+  /** Allowlisted retired migrations found in the source ledger (see RETIRED_LEGACY_MIGRATIONS). */
+  retiredSourceMigrations: string[];
 }
 
 type ConvertedTables = Map<string, SqliteRow[]>;
@@ -101,11 +105,13 @@ export function orderSelfReferences(rows: SqliteRow[], column: string): SqliteRo
 async function readSource(reader: LegacyReader): Promise<{
   tables: ConvertedTables;
   subMillisecond: number;
+  retired: string[];
 }> {
   await reader.begin();
   try {
+    const ledger = await reader.migrationLedger();
     const problems = [
-      ...verifyMigrationLedger(await reader.migrationLedger(), expectedLegacyLedger()),
+      ...verifyMigrationLedger(ledger, expectedLegacyLedger(), RETIRED_LEGACY_MIGRATIONS),
       ...verifySourceCatalog(await reader.catalogColumns()),
     ];
     if (problems.length > 0) {
@@ -117,7 +123,7 @@ async function readSource(reader: LegacyReader): Promise<{
       tables.set(table.name, rows);
     }
     const subMillisecond = await reader.subMillisecondTimestampCount(LEGACY_TABLES);
-    return { tables, subMillisecond };
+    return { tables, subMillisecond, retired: retiredMigrationsIn(ledger) };
   } finally {
     await reader.end();
   }
@@ -215,7 +221,7 @@ function publishFile(temporaryPath: string, destinationPath: string): void {
 export async function importLegacyPostgres(options: ImportOptions): Promise<ImportSummary> {
   const env = options.env ?? process.env;
   const destinationPath = assertFreshDestination(options.destinationPath, env);
-  const { tables, subMillisecond } = await readSource(options.reader);
+  const { tables, subMillisecond, retired } = await readSource(options.reader);
 
   fs.mkdirSync(path.dirname(destinationPath), { recursive: true, mode: 0o700 });
   // Build beside the destination so publishing is a same-filesystem link.
@@ -240,6 +246,7 @@ export async function importLegacyPostgres(options: ImportOptions): Promise<Impo
     ),
     sqliteMigrations: migrations,
     subMillisecondTimestampsTruncated: subMillisecond,
+    retiredSourceMigrations: retired,
   };
 }
 

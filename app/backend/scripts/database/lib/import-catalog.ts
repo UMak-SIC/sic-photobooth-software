@@ -43,10 +43,40 @@ export function expectedSqliteLedger(): MigrationLedgerRow[] {
   return readMigrationLedger(findSqliteMigrationsDir());
 }
 
-/** The source must have applied exactly the repository migrations 001-010, unmodified. */
+/**
+ * Migrations that ran in production but were later deleted from the repository.
+ * Each is accepted in the legacy ledger only with this exact checksum.
+ *
+ * 011_storage_relative_paths.sql (added in efe6753, removed in 88644d7) only
+ * rewrote stored absolute file paths to storage-relative ones with a regex
+ * (data, not schema), so the migration-derived catalog is unchanged. Its job
+ * is now done by normalizeStoredPaths() in src/db/normalize-storage-paths.ts.
+ */
+export const RETIRED_LEGACY_MIGRATIONS: readonly MigrationLedgerRow[] = [
+  {
+    id: '011_storage_relative_paths.sql',
+    checksum: '7f5da758ca231f1c4a53f4b94a1e49901366bd82a16631dd582a7b89caaaff96',
+  },
+];
+
+/** Retired migrations recorded in a ledger with their exact allowlisted checksum. */
+export function retiredMigrationsIn(
+  found: readonly MigrationLedgerRow[],
+  retired: readonly MigrationLedgerRow[] = RETIRED_LEGACY_MIGRATIONS,
+): string[] {
+  return found
+    .filter((row) => retired.some((r) => r.id === row.id && r.checksum === row.checksum))
+    .map((row) => row.id);
+}
+
+/**
+ * The source must have applied exactly the repository migrations 001-010,
+ * unmodified, plus optionally an allowlisted retired migration with its exact checksum.
+ */
 export function verifyMigrationLedger(
   found: readonly MigrationLedgerRow[],
   expected: readonly MigrationLedgerRow[],
+  retired: readonly MigrationLedgerRow[] = [],
 ): string[] {
   const problems: string[] = [];
   const foundById = new Map(found.map((row) => [row.id, row.checksum]));
@@ -58,9 +88,14 @@ export function verifyMigrationLedger(
       problems.push(`Migration ${migration.id} checksum differs from the repository file.`);
   }
   const expectedIds = new Set(expected.map((row) => row.id));
+  const retiredById = new Map(retired.map((row) => [row.id, row.checksum]));
   for (const row of found) {
-    if (!expectedIds.has(row.id))
+    if (expectedIds.has(row.id)) continue;
+    const retiredChecksum = retiredById.get(row.id);
+    if (retiredChecksum === undefined)
       problems.push(`Source ledger contains unknown migration ${row.id}.`);
+    else if (row.checksum !== retiredChecksum)
+      problems.push(`Retired migration ${row.id} checksum differs from the allowlisted value.`);
   }
   return problems;
 }
