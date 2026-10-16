@@ -257,6 +257,46 @@ export const LEGACY_TABLES: readonly TableSpec[] = [
   },
 ];
 
+/**
+ * Known drift between the production catalog and migrations 001-010, left by the
+ * pre-0c94d09 four-digit migrations (0002_templates created the template tables
+ * before 002's `CREATE TABLE IF NOT EXISTS`, and 0004_frame_cover_paths was never
+ * committed). Anything outside these entries still fails the catalog check.
+ */
+export interface LegacyDerivedColumn {
+  table: string;
+  column: string;
+  /** SQL over the source row (aliased `src`) that supplies the value when the column is absent. */
+  expression: string;
+}
+
+/** Columns absent from production; filled from the owning template's `created_at`. */
+export const LEGACY_DERIVED_COLUMNS: readonly LegacyDerivedColumn[] = [
+  {
+    table: 'template_placements',
+    column: 'created_at',
+    expression: '(SELECT t."created_at" FROM "templates" t WHERE t."id" = src."template_id")',
+  },
+  {
+    table: 'template_overlays',
+    column: 'created_at',
+    expression: '(SELECT t."created_at" FROM "templates" t WHERE t."id" = src."template_id")',
+  },
+];
+
+/** Production-only columns that are not copied; the import refuses any non-null value. */
+export const LEGACY_DROPPED_COLUMNS: readonly (readonly [string, string])[] = [
+  ['frames', 'cover_path'],
+];
+
+export function derivedColumn(table: string, column: string): LegacyDerivedColumn | undefined {
+  return LEGACY_DERIVED_COLUMNS.find((entry) => entry.table === table && entry.column === column);
+}
+
+export function isDroppedColumn(table: string, column: string): boolean {
+  return LEGACY_DROPPED_COLUMNS.some(([t, c]) => t === table && c === column);
+}
+
 /** Source tables that are expected but intentionally not copied row-for-row. */
 export const LEGACY_LEDGER_TABLE = 'schema_migrations';
 

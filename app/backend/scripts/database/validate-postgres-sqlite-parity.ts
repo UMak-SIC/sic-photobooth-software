@@ -289,6 +289,10 @@ export async function validateParity(options: ParityOptions): Promise<ParityRepo
         report.media = checkMedia(db, options.media);
         if (!report.media.ok)
           fail('media: referenced paths are missing from the manifest or failed verification.');
+        if (report.media.acceptedMissing.length > 0)
+          report.warnings.push(
+            `Accepted ${report.media.acceptedMissing.length} referenced path(s) that never existed: ${report.media.acceptedMissing.join(', ')}.`,
+          );
       } catch (error) {
         report.media = { ok: false, error: messageOf(error) };
         fail(`media: ${messageOf(error)}`);
@@ -321,7 +325,8 @@ export async function validateParity(options: ParityOptions): Promise<ParityRepo
 }
 
 const USAGE = `Usage: db:validate-parity --source-url <postgres-url> --sqlite <candidate.sqlite> --report <report.json>
-                         [--media-manifest <storage-manifest.sha256> [--storage-root <dir>] [--verify-media-files]]
+                         [--media-manifest <storage-manifest.sha256> [--storage-root <dir>] [--verify-media-files]
+                          [--accept-missing-media <path> ...]]
                          [--allow-live-source]
 
   --source-url          Restored legacy database (or set LEGACY_DATABASE_URL). DATABASE_URL is never used.
@@ -330,6 +335,8 @@ const USAGE = `Usage: db:validate-parity --source-url <postgres-url> --sqlite <c
   --media-manifest      sha256sum-style manifest from the backup set.
   --storage-root        Storage directory used to relativize absolute paths and locate files.
   --verify-media-files  Re-hash each referenced file under --storage-root.
+  --accept-missing-media  Storage-relative path confirmed to have never existed; repeatable. Excused
+                        only while absent from the manifest and storage root, and listed as a warning.
   --allow-live-source   Permit reading a database named "photobooth" during an approved, write-frozen cutover.`;
 
 async function main(): Promise<number> {
@@ -344,6 +351,7 @@ async function main(): Promise<number> {
         'media-manifest': { type: 'string' },
         'storage-root': { type: 'string' },
         'verify-media-files': { type: 'boolean', default: false },
+        'accept-missing-media': { type: 'string', multiple: true, default: [] },
         'allow-live-source': { type: 'boolean', default: false },
         help: { type: 'boolean', default: false },
       },
@@ -383,6 +391,7 @@ async function main(): Promise<number> {
               manifestPath: values['media-manifest'],
               storageRoot: values['storage-root'],
               verifyFiles: values['verify-media-files'],
+              acceptMissing: values['accept-missing-media'],
             }
           : undefined,
       });

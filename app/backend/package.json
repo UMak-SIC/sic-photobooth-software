@@ -13,6 +13,7 @@
     "db:migrate": "tsx src/db/migrate-cli.ts",
     "db:import-legacy": "tsx scripts/database/import-legacy-postgres.ts",
     "db:validate-parity": "tsx scripts/database/validate-postgres-sqlite-parity.ts",
+    "db:port-legacy-backup": "bash scripts/database/port-legacy-backup.sh",
     "db:validate-cutover": "tsx scripts/database/validate-cutover-candidate.ts",
     "db:backup": "tsx scripts/database/backup-sqlite.ts",
     "db:verify-backup": "tsx scripts/database/verify-sqlite-backup.ts",

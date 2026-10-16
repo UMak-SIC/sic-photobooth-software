@@ -8,11 +8,13 @@ import {
 } from '../scripts/database/import-legacy-postgres.js';
 import {
   expectedLegacyLedger,
+  verifySourceCatalog,
   RETIRED_LEGACY_MIGRATIONS,
 } from '../scripts/database/lib/import-catalog.js';
 import { tableSpec } from '../scripts/database/lib/import-schema.js';
 import {
   buildTableSelect,
+  createPgLegacyReader,
   resolveSourceTarget,
   scrubSecrets,
   SourceGuardError,
@@ -177,7 +179,9 @@ describe('legacy PostgreSQL import', () => {
   });
 
   it('accepts retired migration 011 only with its exact allowlisted checksum', async () => {
-    const [retired] = RETIRED_LEGACY_MIGRATIONS;
+    const retired = RETIRED_LEGACY_MIGRATIONS.find(
+      (m) => m.id === '011_storage_relative_paths.sql',
+    )!;
     expect(retired.id).toBe('011_storage_relative_paths.sql');
 
     const summary = await importLegacyPostgres({
@@ -305,13 +309,79 @@ describe('legacy source guard', () => {
   });
 });
 
+describe('known production schema drift', () => {
+  // Production was built by the pre-0c94d09 four-digit migrations.
+  const productionCatalog = () => [
+    ...fixtureCatalog().filter(
+      (c) =>
+        !(
+          ['template_placements', 'template_overlays'].includes(c.table) &&
+          c.column === 'created_at'
+        ),
+    ),
+    { table: 'frames', column: 'cover_path', dataType: 'text', nullable: true },
+  ];
+
+  it('accepts only the allowlisted missing and extra columns', () => {
+    expect(verifySourceCatalog(productionCatalog())).toEqual([]);
+    expect(
+      verifySourceCatalog([
+        ...productionCatalog(),
+        { table: 'frames', column: 'thumbnail_path', dataType: 'text', nullable: true },
+      ]),
+    ).toEqual(['Source column frames.thumbnail_path is not mapped to SQLite.']);
+    expect(
+      verifySourceCatalog(
+        productionCatalog().filter((c) => !(c.table === 'events' && c.column === 'description')),
+      ),
+    ).toEqual(['Source column events.description is missing.']);
+  });
+
+  it('refuses to drop frames.cover_path when any row holds a value', async () => {
+    const queries: string[] = [];
+    const reader = createPgLegacyReader({
+      async query(text) {
+        queries.push(text);
+        if (text.includes('information_schema.columns')) {
+          return {
+            rows: productionCatalog().map((c) => ({
+              table_name: c.table,
+              column_name: c.column,
+              data_type: c.dataType,
+              is_nullable: c.nullable ? 'YES' : 'NO',
+            })),
+          };
+        }
+        if (text.includes('"cover_path" IS NOT NULL')) return { rows: [{ n: '1' }] };
+        return { rows: [] };
+      },
+    });
+    await expect(reader.readTable(tableSpec('frames'))).rejects.toThrow(
+      'Source column frames.cover_path holds data but has no SQLite column; refusing to drop it.',
+    );
+    expect(queries.some((q) => q.startsWith('SELECT src.'))).toBe(false);
+  });
+});
+
 describe('legacy value conversion', () => {
   it('extracts timestamps in UTC with millisecond precision and an independent epoch', () => {
     const sql = buildTableSelect(tableSpec('sessions'), true);
-    expect(sql).toContain(`to_char(date_trunc('milliseconds', "created_at") AT TIME ZONE 'UTC'`);
+    expect(sql).toContain(
+      `to_char(date_trunc('milliseconds', src."created_at") AT TIME ZONE 'UTC'`,
+    );
     expect(sql).toContain('"created_at__epoch_ms"');
     expect(sql).toContain('"template_snapshot"::text');
-    expect(sql).toMatch(/ORDER BY "id"$/);
+    expect(sql).toMatch(/ORDER BY src\."id"$/);
+  });
+
+  it('reads drifted created_at columns from the owning template when the source lacks them', () => {
+    const sql = buildTableSelect(tableSpec('template_placements'), false, new Set(['created_at']));
+    expect(sql).toContain(
+      `date_trunc('milliseconds', (SELECT t."created_at" FROM "templates" t WHERE t."id" = src."template_id"))`,
+    );
+    expect(() => buildTableSelect(tableSpec('sessions'), false, new Set(['created_at']))).toThrow(
+      'Source column sessions.created_at is missing.',
+    );
   });
 
   it('accepts exact decimals and rejects lossy ones', () => {

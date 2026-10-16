@@ -181,7 +181,7 @@ describe('validateCutoverCandidate', () => {
     const retired = validateCutoverCandidate({ candidatePath: candidate, parityReportPath: retiredReport });
     expect(retired.passed).toBe(true);
     expect(check(retired, 'parity_counts')?.details).toMatchObject({
-      retiredSourceMigrations: ['011_storage_relative_paths.sql'],
+      retiredSourceMigrations: RETIRED_LEGACY_MIGRATIONS.map((m) => m.id).sort(),
     });
 
     const failingReport = await writeParityReport(

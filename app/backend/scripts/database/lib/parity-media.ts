@@ -10,6 +10,12 @@ export interface MediaOptions {
   storageRoot?: string;
   /** Re-hash every referenced file under `storageRoot` and compare with the manifest. */
   verifyFiles?: boolean;
+  /**
+   * Storage-relative paths an operator has confirmed never existed (dangling legacy
+   * references). Each is excused only while it is absent from the manifest and the
+   * storage root; every excused path is reported.
+   */
+  acceptMissing?: readonly string[];
 }
 
 export interface MediaReport {
@@ -23,6 +29,8 @@ export interface MediaReport {
   missingFileCount: number;
   checksumMismatches: string[];
   checksumMismatchCount: number;
+  /** Referenced paths excused by `acceptMissing`. */
+  acceptedMissing: string[];
 }
 
 /** Storage-relative POSIX form when a path lies inside the storage root; otherwise unchanged. */
@@ -86,7 +94,22 @@ export function checkMedia(db: SqliteDatabase, options: MediaOptions): MediaRepo
     for (const row of rows) referenced.add(normalizeMediaPath(row.p, options.storageRoot));
   }
 
-  const missingFromManifest = [...referenced].filter((stored) => !manifest.has(stored)).sort();
+  const accepted = new Set(
+    (options.acceptMissing ?? []).map((p) => normalizeMediaPath(p, options.storageRoot)),
+  );
+  const existsInStorage = (stored: string) =>
+    Boolean(options.storageRoot) &&
+    fs.existsSync(path.isAbsolute(stored) ? stored : path.resolve(options.storageRoot!, stored));
+  const acceptedMissing: string[] = [];
+  const missingFromManifest = [...referenced]
+    .filter((stored) => !manifest.has(stored))
+    .filter((stored) => {
+      // A file that turns up later is no longer "never existed": it must be in the manifest.
+      if (!accepted.has(stored) || existsInStorage(stored)) return true;
+      acceptedMissing.push(stored);
+      return false;
+    })
+    .sort();
   const missingFiles: string[] = [];
   const mismatches: string[] = [];
   let verified = 0;
@@ -115,5 +138,6 @@ export function checkMedia(db: SqliteDatabase, options: MediaOptions): MediaRepo
     missingFileCount: missingFiles.length,
     checksumMismatches: mismatches.sort().slice(0, MAX_LISTED),
     checksumMismatchCount: mismatches.length,
+    acceptedMissing: acceptedMissing.sort(),
   };
 }

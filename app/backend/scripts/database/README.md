@@ -94,6 +94,30 @@ The migration only ran `UPDATE` statements. A regex (`^.*/storage/` → empty st
 
 The importer copies paths exactly as stored. On the live database, some of those paths were rewritten by 011's regex, not by `normalizeStoredPaths()`. Both produce storage-relative paths, and the importer does not normalize again. Any remaining absolute path is copied unchanged. The SQLite runtime resolves it through the same stored-path resolution, and the parity media check matches it by its storage-relative form.
 
+## Production schema drift
+
+The production catalog was built partly by the four-digit migrations that `0c94d09` renamed. They are allowlisted in `RETIRED_LEGACY_MIGRATIONS` by exact checksum. All of them except `0004_frame_cover_paths.sql` match their files in git history; that one was never committed.
+
+Two drifts are tolerated, and both are declared in `lib/import-schema.ts`. Any other missing or extra column still fails preflight.
+
+- `template_placements.created_at` and `template_overlays.created_at` do not exist in production, because `0002_templates.sql` created those tables before `002`'s `CREATE TABLE IF NOT EXISTS`. They are filled from the owning template's `created_at` (`LEGACY_DERIVED_COLUMNS`).
+- `frames.cover_path` exists only in production. It is not copied (`LEGACY_DROPPED_COLUMNS`), and the import refuses the table if any row holds a value.
+
+## Porting a backup set (repeatable)
+
+```bash
+pnpm --filter @photobooth/backend db:port-legacy-backup -- <backup-dir> <destination-dir>
+```
+
+The backup set (`photobooth.dump`, `photobooth.dump.sha256`, `storage-manifest.sha256`, `storage/`) is only read, so the port can be rerun any number of times. Each run:
+
+1. Verifies the dump checksum and every file in the storage manifest.
+2. Restores the dump into a throwaway PostgreSQL cluster, reachable only through a Unix socket and deleted on exit. The live database is never contacted.
+3. Writes a new `photobooth-<backup>-<run>.sqlite` with `.import.json`, `.parity.json`, and `.cutover.json` beside it.
+4. Runs parity with `--verify-media-files` against the backup's `storage/`, excusing only the dangling paths listed in `legacy-known-missing-media.txt`.
+
+Switching the booth to the file is a separate step: see `docs/runbooks/postgres-to-sqlite-cutover.md`.
+
 ## Rehearsal outline (Phase 4 gate)
 
 1. Restore the verified `photobooth.dump` into a newly created disposable database, for example `photobooth_restore_<UTC>`, following `docs/runbooks/database-backup-and-restore.md`.

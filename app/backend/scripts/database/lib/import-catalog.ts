@@ -7,6 +7,8 @@ import {
   findSqliteMigrationsDir,
 } from '../../../src/db/sqlite/migrations.js';
 import {
+  derivedColumn,
+  isDroppedColumn,
   LEGACY_LEDGER_TABLE,
   LEGACY_TABLES,
   POSTGRES_DATA_TYPES,
@@ -56,6 +58,29 @@ export function expectedSqliteLedger(): MigrationLedgerRow[] {
  * is now done by normalizeStoredPaths() in src/db/normalize-storage-paths.ts.
  */
 export const RETIRED_LEGACY_MIGRATIONS: readonly MigrationLedgerRow[] = [
+  // Four-digit predecessors renamed by 0c94d09; checksums match the files in git
+  // history except 0004_frame_cover_paths, which was never committed (it only added
+  // frames.cover_path, see LEGACY_DROPPED_COLUMNS).
+  {
+    id: '0002_templates.sql',
+    checksum: 'e0b0940903b26a0c0bf629c84828bd742ac37592a26fb302e2ffc0386ca06c62',
+  },
+  {
+    id: '0003_template_sort_order.sql',
+    checksum: 'a6522ca77b34c9ca3fbb5eb062e9f237a99d5849903149ce9789ee2cf747f4c3',
+  },
+  {
+    id: '0004_frame_cover_paths.sql',
+    checksum: '52daf39dce3c04e42da1f03448e5d70beca41ecfc7f92b9493d374f222838192',
+  },
+  {
+    id: '0004_template_types.sql',
+    checksum: 'b5af23eed4bccb16c0066444580bd8556723aa2b875af0329a6a51d16670cf87',
+  },
+  {
+    id: '0005_publication_retry_schedule.sql',
+    checksum: '63a03b01333dcb3441129cda594d71d84e010890acc61a73d8eb0538eb2704a4',
+  },
   {
     id: '011_storage_relative_paths.sql',
     checksum: '7f5da758ca231f1c4a53f4b94a1e49901366bd82a16631dd582a7b89caaaff96',
@@ -121,7 +146,8 @@ export function verifySourceCatalog(columns: readonly CatalogColumn[]): string[]
     for (const column of table.columns) {
       const source = sourceByName.get(column.name);
       if (!source) {
-        problems.push(`Source column ${table.name}.${column.name} is missing.`);
+        if (!derivedColumn(table.name, column.name))
+          problems.push(`Source column ${table.name}.${column.name} is missing.`);
         continue;
       }
       if (!POSTGRES_DATA_TYPES[column.kind].includes(source.dataType)) {
@@ -137,7 +163,7 @@ export function verifySourceCatalog(columns: readonly CatalogColumn[]): string[]
     }
     const known = new Set(table.columns.map((column) => column.name));
     for (const column of sourceColumns) {
-      if (!known.has(column.column))
+      if (!known.has(column.column) && !isDroppedColumn(table.name, column.column))
         problems.push(`Source column ${table.name}.${column.column} is not mapped to SQLite.`);
     }
   }
