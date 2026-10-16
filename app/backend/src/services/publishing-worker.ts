@@ -12,6 +12,10 @@ import {
 const ONLINE_CHECK_TIMEOUT_MS = 2000;
 const CLOUDINARY_PATH = 'photobooth';
 const MAX_ATTEMPTS = 5;
+
+export const PUBLICATION_RETRYING_MESSAGE =
+  'Upload to the public site failed. It will retry automatically.';
+export const PUBLICATION_FAILED_MESSAGE = `Upload to the public site failed after ${MAX_ATTEMPTS} attempts. Check the internet connection, then use Retry.`;
 const RETRY_BASE_MS = 5000;
 const RETRY_MAX_MS = 15 * 60 * 1000;
 const UPLOAD_TIMEOUT_MS = 30 * 1000;
@@ -98,7 +102,10 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
     return await Promise.race([
       operation,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Publishing provider request timed out.')), timeoutMs);
+        timer = setTimeout(
+          () => reject(new Error('Publishing provider request timed out.')),
+          timeoutMs,
+        );
       }),
     ]);
   } finally {
@@ -106,7 +113,10 @@ export async function withTimeout<T>(operation: Promise<T>, timeoutMs: number): 
   }
 }
 
-export async function deleteCloudPublication(publicId: string, cloudinaryPublicId: string): Promise<void> {
+export async function deleteCloudPublication(
+  publicId: string,
+  cloudinaryPublicId: string,
+): Promise<void> {
   if (!configured || !isSupabaseConfigured()) {
     throw new Error('Cloud publishing is not configured.');
   }
@@ -197,7 +207,18 @@ async function processPublication(
     }
     const nextAttemptAt =
       attempt >= MAX_ATTEMPTS ? null : new Date(now.getTime() + retryDelayMs(attempt));
-    await dbRepository.markPublicationFailed(publication.id, message, nextAttemptAt);
+    // Provider text stays in the server log; operators see an authored message.
+    console.error('Publication upload failed:', {
+      publicationId: publication.id,
+      publicId: publication.publicId,
+      attempt,
+      error: message,
+    });
+    await dbRepository.markPublicationFailed(
+      publication.id,
+      nextAttemptAt ? PUBLICATION_RETRYING_MESSAGE : PUBLICATION_FAILED_MESSAGE,
+      nextAttemptAt,
+    );
   }
 }
 
