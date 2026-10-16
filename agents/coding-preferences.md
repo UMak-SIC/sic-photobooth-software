@@ -19,7 +19,7 @@ Repository-specific rules that supplement the shared frontend standards.
 
 ## Boundaries
 
-- `app/backend/` is the only application with PostgreSQL access and filesystem authority.
+- `app/backend/` is the only application with database (SQLite) access and filesystem authority. Application code under `app/backend/src/` never imports `pg`; `pg` is a devDependency only for the legacy import/parity scripts.
 - `app/photobooth-software/` must use backend APIs for persisted work and must not write arbitrary local files.
 - `app/captive-website/` exposes guest-safe local retrieval only.
 - `app/public-website/` resolves public IDs through Supabase/Cloudinary and never contacts the local backend.

@@ -15,6 +15,28 @@ Confirmed regressions and the test or check that prevents recurrence. Keep this 
 - Related change: commit, PR, or issue
 ```
 
+### 2026-10-16: Backend Tests Wrote To The Live Booth Database
+
+- Symptom: Test rows appeared in the live `photobooth` PostgreSQL database after a local test run.
+- Root cause: `config.ts` defaulted `DATABASE_URL` to the live database, and suites that build the app or run migrations used it whenever the variable was unset.
+- Prevention: `app/backend/test/config-database-guard.test.ts`; config refuses the booth database and storage under Vitest, and `test/setup/isolated-database.ts` gives each test file a temporary SQLite database.
+- Related change: `database/integration`, `database/remove-postgres-runtime`
+
+### 2026-10-16: Cutover Gate Accepted A Failing Parity Report
+
+- Symptom: `db:validate-cutover` would pass a candidate whose `db:validate-parity` report had `status: "fail"`.
+- Root cause: The cutover parser treated only `status: "failed"` as a failure and guessed at report shapes instead of reading the Phase 4 `ParityReport`.
+- Prevention: `app/backend/test/cutover-validate-candidate.test.ts` feeds reports produced by the real parity code into the validator.
+- Related change: `database/integration`
+
+### 2026-10-16: Raw Database Errors Returned To Clients
+
+- Symptom: Booth and admin error toasts could show SQL, constraint names, or filesystem paths.
+- Root cause: Session, template, and analytics routes and the global error handler returned `err.message`.
+- Prevention: `app/backend/test/error-responses.test.ts`; only `UserFacingError` messages reach clients.
+- Related change: `database/integration`
+
+
 ## Entries
 
 ### 2026-10-13: Flipbook Frame Artwork Hid Captured Media

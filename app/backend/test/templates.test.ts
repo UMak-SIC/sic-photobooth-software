@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { config } from '../src/config.js';
-import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
+import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/mapping.js';
 import { validateTemplateDraft, type Template } from '../src/templates/types.js';
 import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
 import { zip } from '../src/templates/zip.js';
@@ -100,7 +100,7 @@ describe('template persistence boundaries', () => {
     expect(files.get('assets/template/overlay.svg')?.toString()).toBe('<svg />');
   });
 
-  it('normalizes numeric PostgreSQL values when loading a template', () => {
+  it('normalizes numeric string values when loading a template', () => {
     const template = mapTemplate(
       {
         id: '22222222-2222-4222-8222-222222222222',

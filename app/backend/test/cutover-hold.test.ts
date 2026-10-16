@@ -6,13 +6,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isCutoverHoldActive } from '../src/db/cutover-hold.js';
 import { CUTOVER_HOLD_ERROR, cutoverHoldPlugin } from '../src/plugins/cutover-hold.js';
 
-// Never let this suite reach a real PostgreSQL server.
-vi.mock('../src/db/pool.js', () => ({
-  pool: { query: vi.fn().mockRejectedValue(new Error('offline')) },
-  checkDatabaseHealth: vi.fn().mockResolvedValue({ ok: true }),
-  closePool: vi.fn(),
-}));
-
 const apps: FastifyInstance[] = [];
 
 async function buildHeldApp(active: boolean): Promise<{ app: FastifyInstance; handled: string[] }> {

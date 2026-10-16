@@ -96,5 +96,5 @@ When adding a real boundary, record it as:
 
 - Location: `app/captive-website/`
 - Owns: Guest offline retrieval portal (mobile QR code camera scanner with jsQR, manual 7-character code input form, output retrieval and media preview, direct binary download, and Web Share API).
-- Does not own: Booth workflow or capture controls, PostgreSQL database queries, file writing, or cloud publishing.
+- Does not own: Booth workflow or capture controls, database queries, file writing, or cloud publishing.
 - Collaborators: `packages/public-output`, `packages/ui`, `app/backend/src/routes/photos.ts`.

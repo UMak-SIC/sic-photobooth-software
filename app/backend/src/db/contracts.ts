@@ -1,13 +1,12 @@
 /**
- * Engine-neutral persistence contracts. HTTP routes and workers depend only on
- * these shapes; PostgreSQL (legacy) and SQLite implement them behind the
- * provider in `provider.ts`, and exactly one engine is active per process.
+ * Persistence contracts. HTTP routes and workers depend only on these shapes;
+ * the SQLite repositories implement them behind the provider in `provider.ts`.
  */
 import type { SessionType } from '@photobooth/public-output';
 import type { SessionData, SessionState } from '../services/session-state-machine.js';
 import type { Template, TemplateDraft } from '../templates/types.js';
 
-export type DatabaseEngine = 'postgres' | 'sqlite';
+export type DatabaseEngine = 'sqlite';
 
 export interface EventData {
   id: string;

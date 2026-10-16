@@ -31,7 +31,7 @@ Flipbook sessions will allow users to select a frame, review instructions, captu
 
 All local systems will operate without user authentication. Access and workflow control will be based on temporary sessions managed by the backend.
 
-The FastifyJS backend will act as the central authority for session state, file generation, PostgreSQL persistence, validation, retake limits, media limits, and output generation.
+The FastifyJS backend will act as the central authority for session state, file generation, SQLite persistence, validation, retake limits, media limits, and output generation.
 
 The Captive Website will connect to the same local backend and allow guests on the event network to access session-specific content.
 
@@ -247,7 +247,7 @@ Finalized outputs intended for online access will be uploaded to Cloudinary and 
 
 90. As a developer, I want invalid state transitions rejected, so that clients cannot skip required steps.
 
-91. As a developer, I want the backend to persist session metadata in PostgreSQL, so that session state survives backend restarts and administrator recovery actions.
+91. As a developer, I want the backend to persist session metadata in its local SQLite database, so that session state survives backend restarts and administrator recovery actions.
 
 92. As a developer, I want generated media metadata persisted independently from actual media files, so that the system can locate and manage outputs reliably.
 
@@ -265,9 +265,9 @@ Finalized outputs intended for online access will be uploaded to Cloudinary and 
 
 99. As a developer, I want the backend to expose only the APIs required by the Photobooth Software and Captive Website, so that the attack surface remains small.
 
-100. As a developer, I want PostgreSQL credentials available only to the backend, so that clients cannot connect directly to the database.
+100. As a developer, I want the SQLite database file readable only by the backend, so that clients cannot access the database directly.
 
-101. As a developer, I want the PostgreSQL application role to use least-privilege permissions, so that backend compromise has limited database impact.
+101. As a developer, I want the SQLite database file and its backups owned by the backend service account with restrictive permissions, so that other local accounts cannot read or alter it.
 
 102. As a developer, I want cancelled sessions to reject further workflow actions, so that abandoned work cannot be resumed accidentally.
 
@@ -349,7 +349,7 @@ Finalized outputs intended for online access will be uploaded to Cloudinary and 
 
 135. As an operator, I want backend-controlled storage paths, so that clients cannot perform path traversal.
 
-136. As an operator, I want database access restricted to the backend, so that guest devices cannot query PostgreSQL directly.
+136. As an operator, I want database access restricted to the backend, so that guest devices cannot query the database directly.
 
 137. As an operator, I want cloud credentials isolated from client applications, so that guests cannot obtain Cloudinary management credentials.
 
@@ -376,7 +376,7 @@ This section resolves implementation details established after the original user
 * Local and public QR retrieval follows `docs/system-architecture.md`: every printed card contains the full public URL, the Captive Website extracts its public ID for local retrieval, and the public website resolves that same ID online. There is no split DNS.
 * The supported runtime is Linux. Camera setup, OBS, scrcpy, and iphone-streamer are external operating infrastructure; the application only requires an administrator-selected browser camera device.
 * The application does not detect black frames. If OBS has no usable source, it displays the feed it receives and the administrator handles recovery.
-* PostgreSQL is the current local production database. The approved SQLite migration is pending; until the documented cutover validation succeeds, PostgreSQL remains the sole production write authority. See `docs/decisions/local-sqlite-migration.md` and `docs/runbooks/postgres-to-sqlite-cutover.md`.
+* SQLite is the local production database, a single file at `SQLITE_DATABASE_PATH` owned by one Fastify process. PostgreSQL was retired after the verified cutover in `docs/runbooks/postgres-to-sqlite-cutover.md`; its migrations remain only as evidence in `app/backend/src/db/legacy-postgres/`. Backups and restores follow `docs/runbooks/sqlite-backup-and-restore.md`. See `docs/decisions/local-sqlite-migration.md`.
 * The administrator and assisted guest use the same Photobooth Software over physical/VNC access. There is no separate application authentication boundary for local administrator routes.
 
 #### Assisted Booth Workflow
@@ -424,7 +424,7 @@ This section resolves implementation details established after the original user
 #### Publishing And Retrieval Contract
 
 * Booth confirmation creates a local publication record with a `queued` status. A local worker polls `PUBLIC_APP_URL` every five seconds and only attempts upload while it resolves.
-* Uploads use bounded concurrency. Failures retry at most five times with exponential backoff and jitter; then the job moves to a local PostgreSQL dead-letter queue.
+* Uploads use bounded concurrency. Failures retry at most five times with exponential backoff and jitter; then the job moves to a local dead-letter state in the SQLite database.
 * An administrator dashboard displays `queued`, `in_progress`, `uploaded`, and `failed` publication states and can manually retry dead-letter jobs.
 * Cloudinary stores only cloud-finalized delivery assets. Supabase stores the public ID, Cloudinary asset reference/link, event metadata, publication state, cloud-finalized timestamp, and expiry metadata.
 * A final output is considered published only once Cloudinary upload succeeds and Supabase has a corresponding published record. The two-month retention period starts at that successful cloud finalization/upload time.
@@ -458,7 +458,7 @@ The platform will consist of three primary applications and one shared local bac
 * Runs on the primary photobooth computer.
 * Provides the complete Photo Strip and Flipbook capture workflow.
 * Communicates with the local FastifyJS backend.
-* Does not directly access PostgreSQL.
+* Does not directly access the database.
 * Does not directly write arbitrary files to the output directory.
 * Does not require user authentication.
 * Uses temporary backend-managed sessions.
@@ -478,14 +478,15 @@ The platform will consist of three primary applications and one shared local bac
 * Built using Next.js.
 * Deployed through Vercel.
 * Uses Cloudinary for finalized media delivery.
-* Does not directly connect to the local PostgreSQL instance.
+* Does not directly access the local database.
 * Does not directly connect to the local FastifyJS backend.
 * Uses non-sequential public output identifiers.
 
 #### FastifyJS Backend
 
 * Acts as the source of truth for the local system.
-* Connects to PostgreSQL.
+* Owns the local SQLite database.
+* Refuses to start when the database is unhealthy or its migrations fail; it runs under a supervisor that restarts it.
 * Manages local filesystem outputs.
 * Manages sessions.
 * Enforces workflow transitions.
@@ -628,9 +629,9 @@ Raw local captures will not automatically become public.
 
 ---
 
-### PostgreSQL
+### SQLite
 
-PostgreSQL will store system metadata rather than acting as primary media storage.
+SQLite stores system metadata rather than acting as primary media storage. The database runs in WAL mode with foreign keys enforced and full synchronous durability.
 
 Expected database entities include:
 
@@ -642,9 +643,9 @@ Expected database entities include:
 * Generated outputs
 * Publication records
 
-The FastifyJS backend will use a dedicated least-privilege PostgreSQL role.
+Only the FastifyJS backend opens the database file, and exactly one backend process runs against it.
 
-Frontend applications will never directly connect to PostgreSQL.
+Frontend applications will never directly access the database.
 
 ---
 
@@ -888,7 +889,7 @@ Where similar test patterns already exist in the codebase, new tests should foll
 * HTTP integration tests
 * React component interaction tests
 * Next.js page tests
-* PostgreSQL-backed integration tests
+* SQLite-backed integration tests (each test file uses its own temporary database)
 * Media upload tests
 * Session lifecycle tests
 
@@ -916,7 +917,7 @@ The following are outside the initial scope of this PRD:
 * Social media publishing
 * Native Android or iOS applications
 * Public access to the local FastifyJS backend
-* Direct browser access to PostgreSQL
+* Direct browser access to the database
 * Direct browser access to Cloudinary management credentials
 * General-purpose cloud file storage
 * Unlimited media retention

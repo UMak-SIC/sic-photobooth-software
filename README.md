@@ -39,7 +39,7 @@ Create `app/backend/.env`. Do not commit it.
 # Server and local persistence
 PORT=3000
 HOST=0.0.0.0
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/photobooth
+SQLITE_DATABASE_PATH=/absolute/path/to/photobooth-storage/database/photobooth.sqlite
 STORAGE_DIR=/absolute/path/to/photobooth-storage
 NODE_ENV=development
 
@@ -142,7 +142,7 @@ The Vercel public route is `https://umak-sic-photobooth.vercel.app/:id`; it vali
 
 1. Provision Cloudinary and copy its signed Upload API credentials to the backend and retention Edge Function.
 2. Provision Supabase, apply the migration, configure Vault and Edge Function secrets, and deploy `expire-public-outputs`.
-3. Configure the local booth backend environment and run its local PostgreSQL migration.
+3. Configure the local booth backend environment and run its SQLite migrations (`pnpm --filter @photobooth/backend db:migrate`). Run the backend under a supervisor that restarts it on failure; it exits if the database is unhealthy.
 4. Deploy the public Next.js app to Vercel with its two public variables and server-only service-role variable.
 5. Set `PUBLIC_APP_URL=https://umak-sic-photobooth.vercel.app` on the booth.
 6. Confirm a new output appears as `uploaded` in the booth dashboard and resolves at `https://umak-sic-photobooth.vercel.app/:id`.

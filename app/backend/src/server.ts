@@ -22,7 +22,6 @@ export function shouldStartWorkers(): boolean {
  */
 export async function startServer(): Promise<FastifyInstance> {
   const app = await buildApp();
-  const engine = config.localDatabaseEngine;
 
   // The selected engine is the only source of truth: refuse to serve without it.
   try {
@@ -30,9 +29,9 @@ export async function startServer(): Promise<FastifyInstance> {
     const dbHealth = await database.checkHealth();
     if (!dbHealth.ok) throw new Error(dbHealth.error ?? 'Database health check failed.');
     await database.migrate();
-    app.log.info(`Database (${engine}) schema migrations applied successfully.`);
+    app.log.info('Database (sqlite) schema migrations applied successfully.');
   } catch (err) {
-    app.log.error({ err }, `Database (${engine}) is unavailable; refusing to start.`);
+    app.log.error({ err }, 'Database (sqlite) is unavailable; refusing to start.');
     await app.close();
     await closeDatabaseProvider();
     throw err;

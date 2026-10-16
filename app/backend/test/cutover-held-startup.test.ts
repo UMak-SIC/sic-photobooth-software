@@ -55,7 +55,6 @@ describe('server startup with the cutover hold active', () => {
     workers.startPublishingWorker.mockClear();
     workers.startPrintWorker.mockClear();
 
-    process.env.LOCAL_DATABASE_ENGINE = 'sqlite';
     process.env.SQLITE_DATABASE_PATH = candidate;
     process.env.DATABASE_CUTOVER_HOLD = '1';
     process.env.HOST = '127.0.0.1';

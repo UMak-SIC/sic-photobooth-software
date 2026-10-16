@@ -1,5 +1,7 @@
 # PostgreSQL Backup And Restore Runbook
 
+> Legacy. The backend no longer runs on PostgreSQL. Use this runbook only to restore the retained pre-cutover dump for evidence or a re-import rehearsal. Current backups follow `docs/runbooks/sqlite-backup-and-restore.md`.
+
 ## Scope and safety
 
 Use this runbook only while PostgreSQL is the production local database. Run it from the recorded service-owner account. Do not print `DATABASE_URL`, passwords, or dump contents in a terminal transcript.

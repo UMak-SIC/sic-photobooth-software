@@ -1,22 +1,15 @@
 /**
- * Selects the single persistence engine for this process from
- * `config.localDatabaseEngine` (default `postgres` until cutover). Routes,
- * workers, health, migrations, and shutdown all go through this module; there
- * are never two write authorities.
+ * Owns the process's single SQLite database. Routes, workers, health,
+ * migrations, and shutdown all go through this module.
  */
 import { config } from '../config.js';
-import { TemplateRepository } from '../templates/repository.js';
 import { SqliteTemplateRepository } from '../templates/sqlite-repository.js';
 import type {
   CoreRepository,
-  DatabaseEngine,
   DatabaseHealth,
   DatabaseProvider,
   TemplateStore,
 } from './contracts.js';
-import { runMigrations } from './migrations.js';
-import { checkDatabaseHealth as checkPostgresHealth, closePool } from './pool.js';
-import { DatabaseRepository } from './repository.js';
 import {
   closeSqliteConnection,
   createSqliteConnection,
@@ -26,22 +19,6 @@ import { runSqliteMigrations } from './sqlite/migrations.js';
 import { SqliteDatabaseRepository } from './sqlite/repository.js';
 
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
-
-export function createPostgresProvider(): DatabaseProvider {
-  let closed = false;
-  return {
-    engine: 'postgres',
-    repository: new DatabaseRepository(),
-    templates: new TemplateRepository(),
-    checkHealth: checkPostgresHealth,
-    migrate: runMigrations,
-    async close() {
-      if (closed) return;
-      closed = true;
-      await closePool();
-    },
-  };
-}
 
 export function createSqliteProvider(
   filename: string = config.sqliteDatabasePath,
@@ -69,28 +46,22 @@ export function createSqliteProvider(
   };
 }
 
-export function createDatabaseProvider(
-  engine: DatabaseEngine = config.localDatabaseEngine,
-): DatabaseProvider {
-  return engine === 'sqlite' ? createSqliteProvider() : createPostgresProvider();
-}
-
 let activeProvider: DatabaseProvider | undefined;
 
-/** The process-wide provider, created on first use. */
+/** The process-wide provider, opened on first use. */
 export function getDatabaseProvider(): DatabaseProvider {
-  activeProvider ??= createDatabaseProvider();
+  activeProvider ??= createSqliteProvider();
   return activeProvider;
 }
 
-/** Closes the active engine (SQLite checkpoints its WAL) and forgets it. */
+/** Closes the database (checkpointing its WAL) and forgets it. */
 export async function closeDatabaseProvider(): Promise<void> {
   const provider = activeProvider;
   activeProvider = undefined;
   await provider?.close();
 }
 
-/** Test seam: installs a provider (or clears it so the next use reselects from config). */
+/** Test seam: installs a provider (or clears it so the next use reopens from config). */
 export function setDatabaseProvider(provider: DatabaseProvider | undefined): void {
   activeProvider = provider;
 }
@@ -99,7 +70,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealth> {
   try {
     return await getDatabaseProvider().checkHealth();
   } catch (error) {
-    // Opening the engine itself failed (e.g. unreadable SQLite file).
+    // Opening the database itself failed (e.g. unreadable SQLite file).
     return { ok: false, error: errorMessage(error) };
   }
 }
