@@ -85,6 +85,31 @@ export function assertFreshDestination(destinationPath: string, env: NodeJS.Proc
   return resolved;
 }
 
+/** The SQLite baseline enforces CHECK (length(public_id) = 7). */
+const PUBLIC_ID_LENGTH = 7;
+
+/**
+ * Names rows whose public ID the SQLite CHECK constraint would reject, so the
+ * operator sees which rows to investigate instead of a bare constraint error.
+ * Reports table and row ID only; public ID values are never printed.
+ */
+export function invalidPublicIdProblems(tables: ReadonlyMap<string, SqliteRow[]>): string[] {
+  const problems: string[] = [];
+  for (const table of LEGACY_TABLES) {
+    if (!table.columns.some((column) => column.name === 'public_id')) continue;
+    const invalid = (tables.get(table.name) ?? []).filter(
+      (row) => typeof row.public_id !== 'string' || row.public_id.length !== PUBLIC_ID_LENGTH,
+    );
+    if (invalid.length > 0) {
+      const ids = invalid.slice(0, 10).map((row) => String(row.id));
+      problems.push(
+        `${table.name} has ${invalid.length} row(s) whose public_id is not ${PUBLIC_ID_LENGTH} characters: ${ids.join(', ')}${invalid.length > ids.length ? ', ...' : ''}.`,
+      );
+    }
+  }
+  return problems;
+}
+
 /** Orders rows so a self-referenced parent is always inserted before its child. */
 export function orderSelfReferences(rows: SqliteRow[], column: string): SqliteRow[] {
   const byId = new Map(rows.map((row) => [row.id as string, row]));
@@ -121,6 +146,12 @@ async function readSource(reader: LegacyReader): Promise<{
     for (const table of LEGACY_TABLES) {
       const rows = (await reader.readTable(table)).map((row) => convertSourceRow(table, row));
       tables.set(table.name, rows);
+    }
+    const publicIdProblems = invalidPublicIdProblems(tables);
+    if (publicIdProblems.length > 0) {
+      throw new ImportRefusedError(
+        `Legacy source has public IDs SQLite would reject:\n- ${publicIdProblems.join('\n- ')}`,
+      );
     }
     const subMillisecond = await reader.subMillisecondTimestampCount(LEGACY_TABLES);
     return { tables, subMillisecond, retired: retiredMigrationsIn(ledger) };

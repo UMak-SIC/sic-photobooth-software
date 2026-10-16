@@ -39,6 +39,7 @@ What it does:
    - `NUMERIC` becomes `REAL`. Any value a double cannot hold exactly is refused.
    - `JSONB` is stored as compact JSON text.
    - IDs, paths, statuses, and retry and accounting fields are copied unchanged. Stored paths are not rewritten.
+   - Every `public_id` must be exactly seven characters, which the SQLite schema enforces. Otherwise the import is refused before any file is created, and the error names the table and row IDs (never the public ID value).
 3. **Create the file.** It is created with mode `0600` beside the destination, under a temporary name. The checksum-protected SQLite migrations run on it, and the SQLite schema is checked against the same column map.
 4. **Insert all rows in one transaction**, in foreign-key dependency order. Reprints are ordered after their original print job. Foreign keys stay enforced and are checked at `COMMIT`.
 5. **Check the result.** It runs `PRAGMA foreign_key_check` and `PRAGMA integrity_check` and compares row counts.

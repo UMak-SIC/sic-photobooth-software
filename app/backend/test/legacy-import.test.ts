@@ -202,6 +202,26 @@ describe('legacy PostgreSQL import', () => {
     expect(filesIn(path.dirname(wrongTarget))).toEqual([]);
   });
 
+  it('refuses a source with a public ID that is not seven characters, naming only the row', async () => {
+    const fixture = legacyFixture();
+    const output = fixture.generated_outputs[0];
+    output.public_id = 'TOOLONG8';
+    const target = destination();
+    const refusal = importLegacyPostgres({
+      reader: createFakeReader(fixture),
+      destinationPath: target,
+      env: NO_ENV,
+    });
+    await expect(refusal).rejects.toThrow(ImportRefusedError);
+    await expect(refusal).rejects.toThrow(
+      new RegExp(
+        `generated_outputs has 1 row\\(s\\) whose public_id is not 7 characters: ${output.id}\\.`,
+      ),
+    );
+    await expect(refusal).rejects.not.toThrow(/TOOLONG8/);
+    expect(filesIn(path.dirname(target))).toEqual([]);
+  });
+
   it('refuses a source whose migration ledger or catalog drifted before creating any file', async () => {
     const ledger = expectedLegacyLedger();
     ledger[3] = { ...ledger[3], checksum: '0'.repeat(64) };
