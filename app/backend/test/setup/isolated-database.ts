@@ -13,6 +13,8 @@ import { afterAll, beforeAll } from 'vitest';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'photobooth-test-'));
 process.env.SQLITE_DATABASE_PATH = path.join(root, 'database', 'photobooth.sqlite');
 process.env.STORAGE_DIR = path.join(root, 'storage');
+// The booth's .env may hold the cutover hold on; tests that need it set it themselves.
+process.env.DATABASE_CUTOVER_HOLD = '0';
 
 type ProviderModule = typeof import('../../src/db/provider.js');
 let provider: ProviderModule | undefined;
