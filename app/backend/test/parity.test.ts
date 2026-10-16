@@ -155,7 +155,9 @@ describe('PostgreSQL to SQLite parity gate', () => {
 
   it('reports retired migration 011 with the allowlisted checksum and rejects any other', async () => {
     const sqlitePath = await importedCandidate();
-    const [retired] = RETIRED_LEGACY_MIGRATIONS;
+    const retired = RETIRED_LEGACY_MIGRATIONS.find(
+      (m) => m.id === '011_storage_relative_paths.sql',
+    )!;
     const accepted = await validateParity({
       reader: createFakeReader(legacyFixture(), {
         ledger: [...expectedLegacyLedger(), retired],
@@ -226,5 +228,49 @@ describe('PostgreSQL to SQLite parity gate', () => {
       checksumMismatches: ['outputs/b.gif'],
     });
     expect(failing.status).toBe('fail');
+  });
+
+  it('excuses an operator-accepted dangling path only while the file is absent', async () => {
+    const sqlitePath = await importedCandidate();
+    const storageRoot = temporaryDirectory(created);
+    const referenced = [
+      'templates/bg.png',
+      'templates/logo.png',
+      'sessions/a/1.jpg',
+      'sessions/b/1.webm',
+      'outputs/a.png',
+      'outputs/b.gif',
+    ];
+    const manifest = path.join(storageRoot, 'storage-manifest.sha256');
+    fs.writeFileSync(
+      manifest,
+      referenced
+        .map(
+          (relative) =>
+            `${crypto.createHash('sha256').update(relative).digest('hex')}  ./${relative}`,
+        )
+        .join('\n'),
+    );
+    const run = () =>
+      validateParity({
+        reader: createFakeReader(legacyFixture()),
+        sqlitePath,
+        media: { manifestPath: manifest, storageRoot, acceptMissing: ['./prints/a.png'] },
+      });
+
+    const accepted = await run();
+    expect(accepted.status).toBe('pass');
+    expect(accepted.media).toMatchObject({ ok: true, acceptedMissing: ['prints/a.png'] });
+    expect(accepted.warnings).toContainEqual(expect.stringContaining('prints/a.png'));
+
+    // Once the file exists it is a real, unbacked file and must be in the manifest.
+    fs.mkdirSync(path.join(storageRoot, 'prints'), { recursive: true });
+    fs.writeFileSync(path.join(storageRoot, 'prints/a.png'), 'late');
+    const appeared = await run();
+    expect(appeared.status).toBe('fail');
+    expect(appeared.media).toMatchObject({
+      missingFromManifest: ['prints/a.png'],
+      acceptedMissing: [],
+    });
   });
 });

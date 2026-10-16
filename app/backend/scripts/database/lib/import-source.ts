@@ -1,5 +1,10 @@
 import pg from 'pg';
-import { quoteIdent, type TableSpec } from './import-schema.js';
+import {
+  derivedColumn,
+  LEGACY_DROPPED_COLUMNS,
+  quoteIdent,
+  type TableSpec,
+} from './import-schema.js';
 import type { SourceRow } from './import-values.js';
 
 /** The production booth database name; reading it requires an explicit override. */
@@ -140,14 +145,28 @@ export interface Queryable {
 
 const CANONICAL_TIMESTAMP_FORMAT = `'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'`;
 
-/** Builds the SELECT used to extract one table; exported for focused tests. */
-export function buildTableSelect(table: TableSpec, epochColumns = false): string {
+/**
+ * Builds the SELECT used to extract one table; exported for focused tests.
+ * `absentColumns` names drifted columns the source lacks; each is read from its
+ * {@link LEGACY_DERIVED_COLUMNS} expression instead.
+ */
+export function buildTableSelect(
+  table: TableSpec,
+  epochColumns = false,
+  absentColumns: ReadonlySet<string> = new Set(),
+): string {
   const expressions = table.columns.flatMap((column) => {
-    const name = quoteIdent(column.name);
+    let name = `src.${quoteIdent(column.name)}`;
+    if (absentColumns.has(column.name)) {
+      const derived = derivedColumn(table.name, column.name);
+      if (!derived) throw new Error(`Source column ${table.name}.${column.name} is missing.`);
+      name = derived.expression;
+    }
+    const alias = quoteIdent(column.name);
     switch (column.kind) {
       case 'timestamp': {
         const truncated = `date_trunc('milliseconds', ${name})`;
-        const text = `to_char(${truncated} AT TIME ZONE 'UTC', ${CANONICAL_TIMESTAMP_FORMAT}) AS ${name}`;
+        const text = `to_char(${truncated} AT TIME ZONE 'UTC', ${CANONICAL_TIMESTAMP_FORMAT}) AS ${alias}`;
         if (!epochColumns) return [text];
         return [
           text,
@@ -155,18 +174,27 @@ export function buildTableSelect(table: TableSpec, epochColumns = false): string
         ];
       }
       case 'date':
-        return [`to_char(${name}, 'YYYY-MM-DD') AS ${name}`];
+        return [`to_char(${name}, 'YYYY-MM-DD') AS ${alias}`];
       case 'numeric':
       case 'json':
-        return [`${name}::text AS ${name}`];
+        return [`${name}::text AS ${alias}`];
       default:
-        return [name];
+        return [`${name} AS ${alias}`];
     }
   });
-  return `SELECT ${expressions.join(', ')} FROM ${quoteIdent(table.name)} ORDER BY "id"`;
+  return `SELECT ${expressions.join(', ')} FROM ${quoteIdent(table.name)} AS src ORDER BY src."id"`;
 }
 
 export function createPgLegacyReader(client: Queryable): LegacyReader {
+  let catalog: Promise<CatalogColumn[]> | undefined;
+  const catalogColumns = () => (catalog ??= readCatalog(client));
+  const sourceColumns = async (table: string) =>
+    new Set((await catalogColumns()).filter((c) => c.table === table).map((c) => c.column));
+  const absentColumns = async (table: TableSpec) => {
+    const present = await sourceColumns(table.name);
+    return new Set(table.columns.map((c) => c.name).filter((name) => !present.has(name)));
+  };
+
   return {
     async begin() {
       await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -190,28 +218,34 @@ export function createPgLegacyReader(client: Queryable): LegacyReader {
       const result = await client.query('SELECT id, checksum FROM schema_migrations ORDER BY id');
       return result.rows.map((row) => ({ id: String(row.id), checksum: String(row.checksum) }));
     },
-    async catalogColumns() {
-      const result = await client.query(
-        `SELECT table_name, column_name, data_type, is_nullable
-           FROM information_schema.columns
-          WHERE table_schema = current_schema()
-          ORDER BY table_name, ordinal_position`,
-      );
-      return result.rows.map((row) => ({
-        table: String(row.table_name),
-        column: String(row.column_name),
-        dataType: String(row.data_type),
-        nullable: row.is_nullable === 'YES',
-      }));
-    },
+    catalogColumns,
     async readTable(table, options = {}) {
-      const result = await client.query(buildTableSelect(table, options.epochColumns ?? false));
+      const present = await sourceColumns(table.name);
+      for (const [dropTable, dropColumn] of LEGACY_DROPPED_COLUMNS) {
+        if (dropTable !== table.name || !present.has(dropColumn)) continue;
+        const held = await client.query(
+          `SELECT count(*)::text AS n FROM ${quoteIdent(dropTable)} WHERE ${quoteIdent(dropColumn)} IS NOT NULL`,
+        );
+        if (Number(held.rows[0]?.n ?? 0) > 0) {
+          throw new Error(
+            `Source column ${dropTable}.${dropColumn} holds data but has no SQLite column; refusing to drop it.`,
+          );
+        }
+      }
+      const result = await client.query(
+        buildTableSelect(table, options.epochColumns ?? false, await absentColumns(table)),
+      );
       return result.rows;
     },
     async subMillisecondTimestampCount(tables) {
+      const absent = new Map(
+        await Promise.all(tables.map(async (t) => [t.name, await absentColumns(t)] as const)),
+      );
       const checks = tables.flatMap((table) =>
         table.columns
-          .filter((column) => column.kind === 'timestamp')
+          .filter(
+            (column) => column.kind === 'timestamp' && !absent.get(table.name)?.has(column.name),
+          )
           .map(
             (column) =>
               `SELECT count(*) AS n FROM ${quoteIdent(table.name)} WHERE ${quoteIdent(column.name)} <> date_trunc('milliseconds', ${quoteIdent(column.name)})`,
@@ -224,6 +258,21 @@ export function createPgLegacyReader(client: Queryable): LegacyReader {
       return Number(result.rows[0]?.total ?? 0);
     },
   };
+}
+
+async function readCatalog(client: Queryable): Promise<CatalogColumn[]> {
+  const result = await client.query(
+    `SELECT table_name, column_name, data_type, is_nullable
+       FROM information_schema.columns
+      WHERE table_schema = current_schema()
+      ORDER BY table_name, ordinal_position`,
+  );
+  return result.rows.map((row) => ({
+    table: String(row.table_name),
+    column: String(row.column_name),
+    dataType: String(row.data_type),
+    nullable: row.is_nullable === 'YES',
+  }));
 }
 
 export interface OpenedLegacySource {

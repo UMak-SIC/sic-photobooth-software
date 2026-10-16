@@ -1,0 +1,12 @@
+# Storage paths referenced by legacy rows whose files never existed, confirmed on
+# 2026-10-16 against both the live storage and backup 20261016T083852Z. They are
+# passed to db:validate-parity as --accept-missing-media and are excused only while
+# still absent; anything else missing from the backup manifest fails parity.
+
+# Failed print job 611194a7-9166-4403-9939-2aa50762941e (2026-10-13) recorded the
+# wrong path; the PDF is at sessions/6d1b6c4b-15c5-4028-aa20-1139c6537cc1/outputs/yh2YqoH.pdf.
+outputs/yh2YqoH.pdf
+
+# Simulated print job 1907660c-ea58-4498-a5e6-68f35e06dfb6 from a 2026-10-13 test run
+# (67-byte placeholder captures, no generated output row).
+sessions/6100ea92-ab22-4f30-a95e-2315f9ea53d3/outputs/bVeWGjA.png
