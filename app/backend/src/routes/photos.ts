@@ -7,7 +7,7 @@ import {
   type PublicOutputResponse,
 } from '@photobooth/public-output';
 import { storageService } from '../services/storage.js';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository } from '../db/provider.js';
 
 export const photoRoutes: FastifyPluginAsync = async (fastify) => {
   /**

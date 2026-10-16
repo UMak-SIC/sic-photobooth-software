@@ -3,10 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository, templateRepository } from '../db/provider.js';
 import { storageService } from '../services/storage.js';
 import { deleteCloudPublication } from '../services/publishing-worker.js';
-import { templateRepository } from '../templates/repository.js';
 import { resolveFlipbookTemplate } from './sessions.js';
 
 const publicationIdSchema = z.object({ id: z.string().uuid() });

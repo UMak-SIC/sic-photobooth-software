@@ -1,4 +1,5 @@
-import { dbRepository, type PrintJobStatus } from '../db/repository.js';
+import type { PrintJobStatus } from '../db/contracts.js';
+import { dbRepository } from '../db/provider.js';
 import { printerConfig } from '../config.js';
 import { printerService, type CupsJobState } from './printer.js';
 import { updatePublicOutputPrintCount } from './supabase-publication.js';

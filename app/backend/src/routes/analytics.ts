@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
-import { dbRepository } from '../db/repository.js';
+import { dbRepository } from '../db/provider.js';
 
 const analyticsQuerySchema = z.object({
   eventId: z.string().uuid().optional(),

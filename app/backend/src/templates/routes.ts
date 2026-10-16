@@ -3,7 +3,8 @@ import { Readable } from 'node:stream';
 import path from 'node:path';
 import { validateTemplateDraft, type Template, type TemplateDraft, type TemplateDto } from './types.js';
 import { z } from 'zod';
-import { templateRepository } from './repository.js';
+import { isUniqueViolation } from '../db/contracts.js';
+import { templateRepository } from '../db/provider.js';
 import { templateStorage } from './storage.js';
 import { mediaValidator } from '../services/media-validator.js';
 import { zip, type ZipEntry } from './zip.js';
@@ -268,7 +269,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       const template = await templateRepository.create(validateTemplateDraft(request.body));
       return reply.status(201).send({ success: true, data: toTemplateDto(template) });
     } catch (error: unknown) {
-      if ((error as { code?: string }).code === '23505')
+      if (isUniqueViolation(error))
         return errorResponse(
           reply,
           'TEMPLATE_NAME_EXISTS',
@@ -306,7 +307,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         ? reply.send({ success: true, data: toTemplateDto(template) })
         : errorResponse(reply, 'TEMPLATE_NOT_FOUND', 'Template does not exist', 404);
     } catch (error: unknown) {
-      if ((error as { code?: string }).code === '23505')
+      if (isUniqueViolation(error))
         return errorResponse(
           reply,
           'TEMPLATE_NAME_EXISTS',
