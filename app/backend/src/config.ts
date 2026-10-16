@@ -38,9 +38,19 @@ export interface AppConfig {
   cloudinary: CloudinaryConfig;
   supabase: SupabaseConfig;
   publishing: PublishingConfig;
+  /** Phase 5 validation hold: rejects mutation routes and keeps workers stopped. */
+  databaseCutoverHold: boolean;
 }
 
 const defaultStorageDir = path.resolve(__dirname, '../../storage');
+
+function cutoverHoldFlag(value: string | undefined): boolean {
+  const normalized = (value ?? '').trim().toLowerCase();
+  if (normalized === '' || normalized === '0' || normalized === 'false') return false;
+  if (normalized === '1' || normalized === 'true') return true;
+  // Fail closed on typos so an operator never believes the hold is active when it is not.
+  throw new Error('DATABASE_CUTOVER_HOLD must be one of "1", "true", "0", or "false".');
+}
 
 function localDatabaseEngine(value: string | undefined): 'postgres' | 'sqlite' {
   const engine = value || 'postgres';
@@ -84,6 +94,7 @@ export const config: AppConfig = {
         'http://127.0.0.1:5173',
         'http://127.0.0.1:5174',
       ],
+  databaseCutoverHold: cutoverHoldFlag(process.env.DATABASE_CUTOVER_HOLD),
 };
 
 export interface FlipbookConfig {

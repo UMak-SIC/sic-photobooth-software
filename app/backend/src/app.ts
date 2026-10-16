@@ -12,6 +12,7 @@ import { templateRoutes } from './templates/routes.js';
 import { publicationRoutes } from './routes/publications.js';
 import { analyticsRoutes } from './routes/analytics.js';
 import { printingRoutes } from './routes/printing.js';
+import { cutoverHoldPlugin } from './plugins/cutover-hold.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -53,6 +54,9 @@ export async function buildApp(): Promise<FastifyInstance> {
       fileSize: 100 * 1024 * 1024, // 100MB
     },
   });
+
+  // Cutover hold precedes routes so mutations are rejected before any handler runs.
+  await app.register(cutoverHoldPlugin);
 
   // 5. Register Routes
   await app.register(healthRoutes);
