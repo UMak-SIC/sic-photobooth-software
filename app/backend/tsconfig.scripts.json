@@ -6,5 +6,5 @@
     "declarationMap": false,
     "sourceMap": false
   },
-  "include": ["scripts/**/*.ts", "src/**/*", "test/legacy-import*.ts", "test/parity*.ts"]
+  "include": ["src/**/*", "scripts/**/*.ts", "test/legacy-import*.ts", "test/parity*.ts"]
 }

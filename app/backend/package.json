@@ -14,6 +14,8 @@
     "db:import-legacy": "tsx scripts/database/import-legacy-postgres.ts",
     "db:validate-parity": "tsx scripts/database/validate-postgres-sqlite-parity.ts",
     "db:validate-cutover": "tsx scripts/database/validate-cutover-candidate.ts",
+    "db:backup": "tsx scripts/database/backup-sqlite.ts",
+    "db:verify-backup": "tsx scripts/database/verify-sqlite-backup.ts",
     "start": "node dist/server.js",
     "clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\""
   },
