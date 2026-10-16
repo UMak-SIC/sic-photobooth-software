@@ -10,6 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test:integration": "vitest run test/supabase-publication.integration.test.ts",
     "db:migrate": "tsx src/db/migrate-cli.ts",
+    "db:backup": "tsx scripts/database/backup-sqlite.ts",
+    "db:verify-backup": "tsx scripts/database/verify-sqlite-backup.ts",
+    "typecheck:scripts": "tsc -p tsconfig.scripts.json",
     "start": "node dist/server.js",
     "clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true })\""
   },
