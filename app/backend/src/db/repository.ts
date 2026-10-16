@@ -42,6 +42,7 @@ import {
   withDefaultFramePlacements,
   type AnalyticsSessionRow,
 } from './shared.js';
+import { UserFacingError } from '../errors.js';
 
 export type * from './contracts.js';
 
@@ -310,7 +311,7 @@ export class DatabaseRepository implements CoreRepository {
           [sessionId],
         );
         if (updateRes.rowCount === 0) {
-          throw new Error('Maximum retake limit of 4 reached for this session');
+          throw new UserFacingError(400, 'LIMIT_EXCEEDED', 'Maximum retake limit of 4 reached for this session');
         }
         retakeCount = updateRes.rows[0].retakeCount;
 

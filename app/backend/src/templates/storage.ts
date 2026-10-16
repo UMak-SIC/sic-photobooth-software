@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { config } from '../config.js';
+import { UserFacingError } from '../errors.js';
 
 const extensions = new Set(['png', 'jpg', 'svg']);
 
@@ -9,7 +10,7 @@ export class TemplateStorage {
   private readonly baseDir = path.resolve(config.storageDir);
 
   private templateDir(templateId: string, type: 'photo_strip' | 'flipbook' = 'photo_strip'): string {
-    if (!/^[0-9a-f-]{36}$/i.test(templateId)) throw new Error('Invalid template identifier');
+    if (!/^[0-9a-f-]{36}$/i.test(templateId)) throw new UserFacingError(400, 'INVALID_TEMPLATE', 'Invalid template identifier');
     return path.join(this.baseDir, type === 'flipbook' ? 'flipbook' : 'templates', templateId);
   }
 
@@ -18,7 +19,7 @@ export class TemplateStorage {
     const templateDir = path.join(this.baseDir, 'templates');
     const flipbookDir = path.join(this.baseDir, 'flipbook');
     if (!resolved.startsWith(`${templateDir}${path.sep}`) && !resolved.startsWith(`${flipbookDir}${path.sep}`))
-      throw new Error('Invalid template asset path');
+      throw new UserFacingError(400, 'INVALID_ASSET', 'Invalid template asset path');
     return resolved;
   }
 
@@ -30,7 +31,7 @@ export class TemplateStorage {
     type: 'photo_strip' | 'flipbook' = 'photo_strip',
   ): Promise<string> {
     const cleanExt = ext.toLowerCase().replace(/^\./, '');
-    if (!extensions.has(cleanExt)) throw new Error('Unsupported image extension');
+    if (!extensions.has(cleanExt)) throw new UserFacingError(400, 'INVALID_ASSET', 'Unsupported image extension');
     const dir = this.templateDir(templateId, type);
     await fs.promises.mkdir(dir, { recursive: true });
     const filename = `${kind}${kind === 'overlay' ? `_${randomUUID()}` : ''}.${cleanExt}`;
@@ -45,7 +46,7 @@ export class TemplateStorage {
       await fs.promises.rm(this.assetPath(filePath), { force: true });
     } catch (error) {
       // Asset paths persisted before the storage reorganization are no longer safe to delete.
-      if ((error as Error).message === 'Invalid template asset path') return;
+      if (error instanceof UserFacingError && error.code === 'INVALID_ASSET') return;
       throw error;
     }
   }
@@ -61,7 +62,7 @@ export class TemplateStorage {
       resolved = path.join(templateDir, path.basename(filePath));
     }
     if (!resolved.startsWith(`${templateDir}${path.sep}`))
-      throw new Error('Invalid template asset path');
+      throw new UserFacingError(400, 'INVALID_ASSET', 'Invalid template asset path');
     return fs.promises.readFile(resolved);
   }
 

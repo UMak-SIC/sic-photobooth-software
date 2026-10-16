@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { SessionType } from '@photobooth/public-output';
+import { UserFacingError } from '../errors.js';
 
 export type PhotoStripState =
   | 'created'
@@ -108,11 +109,17 @@ export class SessionStateMachine {
     nextState: SessionState,
   ): void {
     if (currentState === 'cancelled') {
-      throw new Error('This session has been cancelled. No further actions are permitted.');
+      throw new UserFacingError(
+        400,
+        'SESSION_CANCELLED',
+        'This session has been cancelled. No further actions are permitted.',
+      );
     }
 
     if (!this.isValidTransition(type, currentState, nextState)) {
-      throw new Error(
+      throw new UserFacingError(
+        400,
+        'INVALID_STATE_TRANSITION',
         `Invalid workflow transition from "${currentState}" to "${nextState}" for session type "${type}". This step is not available yet. Continue the current workflow.`,
       );
     }
@@ -133,7 +140,9 @@ export class SessionStateMachine {
    */
   public assertCanRetake(type: SessionType, currentRetakeCount: number): void {
     if (!this.canRetake(type, currentRetakeCount)) {
-      throw new Error(
+      throw new UserFacingError(
+        400,
+        'LIMIT_EXCEEDED',
         `Maximum retake limit reached (${MAX_RETAKES_ALLOWED} retakes allowed). Please proceed to confirm your photos.`,
       );
     }
@@ -149,16 +158,24 @@ export class SessionStateMachine {
     selectedVideoIndex: number | null,
   ): void {
     if (coversCount < 3) {
-      throw new Error(`Flipbook requires exactly 3 cover photos (received ${coversCount}).`);
+      throw new UserFacingError(
+        400,
+        'FLIPBOOK_NOT_READY',
+        `Flipbook requires exactly 3 cover photos (received ${coversCount}).`,
+      );
     }
     if (videosCount < 3) {
-      throw new Error(`Flipbook requires exactly 3 video clips (received ${videosCount}).`);
+      throw new UserFacingError(
+        400,
+        'FLIPBOOK_NOT_READY',
+        `Flipbook requires exactly 3 video clips (received ${videosCount}).`,
+      );
     }
     if (selectedCoverIndex === null || selectedCoverIndex < 1 || selectedCoverIndex > 3) {
-      throw new Error('A valid cover photo selection (1..3) is required.');
+      throw new UserFacingError(400, 'FLIPBOOK_NOT_READY', 'A valid cover photo selection (1..3) is required.');
     }
     if (selectedVideoIndex === null || selectedVideoIndex < 1 || selectedVideoIndex > 3) {
-      throw new Error('A valid video clip selection (1..3) is required.');
+      throw new UserFacingError(400, 'FLIPBOOK_NOT_READY', 'A valid video clip selection (1..3) is required.');
     }
   }
 }

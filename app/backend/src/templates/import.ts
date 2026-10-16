@@ -1,4 +1,5 @@
 import { validateTemplateDraft, type TemplateDraft } from './types.js';
+import { UserFacingError } from '../errors.js';
 
 export type ManifestEntry = {
   template: TemplateDraft;
@@ -31,24 +32,24 @@ export function parseManifest(
   defaultType?: 'photo_strip' | 'flipbook',
 ): ImportPackage {
   const manifest = entries.get('manifest.json');
-  if (!manifest) throw new Error('Missing manifest.json in archive');
+  if (!manifest) throw new UserFacingError(400, 'INVALID_ARCHIVE', 'Missing manifest.json in archive');
   let raw: unknown;
   try {
     raw = JSON.parse(manifest.toString('utf8'));
   } catch {
-    throw new Error('manifest.json is not valid JSON');
+    throw new UserFacingError(400, 'INVALID_ARCHIVE', 'manifest.json is not valid JSON');
   }
 
   if (typeof raw !== 'object' || raw === null || (raw as { version?: unknown }).version !== 1)
-    throw new Error('Unsupported template archive version');
+    throw new UserFacingError(400, 'INVALID_ARCHIVE', 'Unsupported template archive version');
 
   const manifestTemplates = (raw as { templates?: unknown }).templates;
   if (!Array.isArray(manifestTemplates) || manifestTemplates.length === 0)
-    throw new Error('Archive contains no templates');
+    throw new UserFacingError(400, 'INVALID_ARCHIVE', 'Archive contains no templates');
 
   const templates: ManifestEntry[] = [];
   for (const item of manifestTemplates) {
-    if (typeof item !== 'object' || item === null) throw new Error('Invalid template in archive');
+    if (typeof item !== 'object' || item === null) throw new UserFacingError(400, 'INVALID_ARCHIVE', 'Invalid template in archive');
     const record = item as Record<string, unknown>;
     const draft = validateTemplateDraft(stripPaths(record, defaultType));
     const backgroundPath = typeof record.backgroundPath === 'string' ? record.backgroundPath : null;
@@ -100,7 +101,7 @@ function assertAssetsExist(
 ): void {
   for (const assetPath of paths) {
     if (assetPath && !entries.has(assetPath))
-      throw new Error(`Archive is missing asset: ${assetPath}`);
+      throw new UserFacingError(400, 'INVALID_ARCHIVE', `Archive is missing asset: ${assetPath}`);
   }
 }
 

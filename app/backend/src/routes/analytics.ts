@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { dbRepository } from '../db/provider.js';
+import { sendError } from '../errors.js';
 
 const analyticsQuerySchema = z.object({
   eventId: z.string().uuid().optional(),
@@ -35,13 +36,9 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
         data,
       });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      return reply.status(500).send({
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: `Failed to load analytics: ${message}`,
-        },
+      return sendError(request, reply, err, 'Loading analytics failed', {}, {
+        code: 'ANALYTICS_UNAVAILABLE',
+        message: 'Analytics could not be loaded. Please try again.',
       });
     }
   });

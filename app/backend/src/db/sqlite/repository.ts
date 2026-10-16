@@ -55,6 +55,7 @@ import {
   toJson,
   toTimestamp,
 } from './mappers.js';
+import { UserFacingError } from '../../errors.js';
 
 type Row = Record<string, unknown>;
 
@@ -428,7 +429,7 @@ export class SqliteDatabaseRepository implements CoreRepository {
           now,
           sessionId,
         );
-        if (!updated) throw new Error('Maximum retake limit of 4 reached for this session');
+        if (!updated) throw new UserFacingError(400, 'LIMIT_EXCEEDED', 'Maximum retake limit of 4 reached for this session');
         retakeCount = updated.retake_count;
         const replaced = this.run(
           `UPDATE session_captures SET file_path = ?, created_at = ?

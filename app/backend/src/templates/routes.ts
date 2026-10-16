@@ -1,4 +1,4 @@
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { Readable } from 'node:stream';
 import path from 'node:path';
 import { validateTemplateDraft, type Template, type TemplateDraft, type TemplateDto } from './types.js';
@@ -9,6 +9,7 @@ import { templateStorage } from './storage.js';
 import { mediaValidator } from '../services/media-validator.js';
 import { zip, type ZipEntry } from './zip.js';
 import { parseZip, parseManifest, assetExtension } from './import.js';
+import { sendError, UserFacingError } from '../errors.js';
 
 const errorResponse = (
   reply: { status: (code: number) => { send: (body: unknown) => unknown } },
@@ -16,6 +17,39 @@ const errorResponse = (
   message: string,
   status = 400,
 ) => reply.status(status).send({ success: false, error: { code, message } });
+
+/**
+ * Maps template validation and name conflicts to authored 4xx messages; every
+ * other failure is logged and answered generically by sendError.
+ */
+function sendTemplateError(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  error: unknown,
+  context: string,
+  fields: Record<string, unknown> = {},
+) {
+  if (isUniqueViolation(error))
+    return sendError(
+      request,
+      reply,
+      new UserFacingError(409, 'TEMPLATE_NAME_EXISTS', 'A template with this name already exists'),
+      context,
+      { ...fields, cause: error },
+    );
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const where = issue?.path.length ? `${issue.path.join('.')}: ` : '';
+    return sendError(
+      request,
+      reply,
+      new UserFacingError(400, 'INVALID_TEMPLATE', `${where}${issue?.message ?? 'Invalid template'}`),
+      context,
+      { ...fields, cause: error },
+    );
+  }
+  return sendError(request, reply, error, context, fields);
+}
 
 export function toTemplateDto(template: Template): TemplateDto {
   return {
@@ -60,12 +94,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       const templates = await templateRepository.reorder(parsed.data);
       return reply.send({ success: true, data: templates.map(toTemplateDto) });
     } catch (error: unknown) {
-      return errorResponse(
-        reply,
-        'DATABASE_ERROR',
-        error instanceof Error ? error.message : String(error),
-        500,
-      );
+      return sendError(request, reply, error, 'Template reorder failed');
     }
   });
 
@@ -178,12 +207,9 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         await templateRepository.delete(duplicate.id);
         await templateStorage.removeTemplate(duplicate.id, duplicate.type);
       }
-      return errorResponse(
-        reply,
-        'DUPLICATE_FAILED',
-        error instanceof Error ? error.message : String(error),
-        500,
-      );
+      return sendTemplateError(request, reply, error, 'Template duplicate failed', {
+        templateId: request.params.id,
+      });
     }
   });
 
@@ -248,12 +274,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       }
       return reply.status(201).send({ success: true, data: imported.map(toTemplateDto) });
     } catch (error: unknown) {
-      return errorResponse(
-        reply,
-        'IMPORT_FAILED',
-        error instanceof Error ? error.message : String(error),
-        400,
-      );
+      return sendTemplateError(request, reply, error, 'Template import failed');
     }
   });
 
@@ -269,21 +290,7 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
       const template = await templateRepository.create(validateTemplateDraft(request.body));
       return reply.status(201).send({ success: true, data: toTemplateDto(template) });
     } catch (error: unknown) {
-      if (isUniqueViolation(error))
-        return errorResponse(
-          reply,
-          'TEMPLATE_NAME_EXISTS',
-          'A template with this name already exists',
-          409,
-        );
-      if (error instanceof Error && error.name === 'ZodError')
-        return errorResponse(reply, 'INVALID_TEMPLATE', error.message);
-      return errorResponse(
-        reply,
-        'DATABASE_ERROR',
-        error instanceof Error ? error.message : String(error),
-        500,
-      );
+      return sendTemplateError(request, reply, error, 'Template create failed');
     }
   });
 
@@ -307,21 +314,9 @@ export const templateRoutes: FastifyPluginAsync = async (fastify) => {
         ? reply.send({ success: true, data: toTemplateDto(template) })
         : errorResponse(reply, 'TEMPLATE_NOT_FOUND', 'Template does not exist', 404);
     } catch (error: unknown) {
-      if (isUniqueViolation(error))
-        return errorResponse(
-          reply,
-          'TEMPLATE_NAME_EXISTS',
-          'A template with this name already exists',
-          409,
-        );
-      if (error instanceof Error && error.name === 'ZodError')
-        return errorResponse(reply, 'INVALID_TEMPLATE', error.message);
-      return errorResponse(
-        reply,
-        'DATABASE_ERROR',
-        error instanceof Error ? error.message : String(error),
-        500,
-      );
+      return sendTemplateError(request, reply, error, 'Template update failed', {
+        templateId: request.params.id,
+      });
     }
   });
 

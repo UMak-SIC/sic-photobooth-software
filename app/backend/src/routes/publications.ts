@@ -163,7 +163,13 @@ export const publicationRoutes: FastifyPluginAsync = async (fastify) => {
             coverSheetUrl = templateAssetUrl(defaultTemplate.id, 'cover');
           }
         }
-      } catch {}
+      } catch (err: unknown) {
+        // The frame layout is optional for the flipbook viewer; serve what is known.
+        request.log.warn(
+          { err, publicationId: request.params.id, sessionId },
+          'Resolving the flipbook frame layout failed',
+        );
+      }
     }
 
     return reply.send({
