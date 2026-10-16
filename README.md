@@ -1,6 +1,6 @@
 # SIC Photobooth Software
 
-Local-first photobooth platform with a Fastify backend, a Vite booth UI, and two Next.js retrieval sites.
+Local-first photobooth platform with a Fastify backend, a Vite booth UI, and two Next.js retrieval sites. The backend keeps all booth data in a local SQLite database and media files under its storage directory.
 
 ## Prerequisites
 
@@ -43,6 +43,10 @@ SQLITE_DATABASE_PATH=/absolute/path/to/photobooth-storage/database/photobooth.sq
 STORAGE_DIR=/absolute/path/to/photobooth-storage
 NODE_ENV=development
 
+# Cutover hold: when 1, write requests return 503 and the publishing and print
+# workers do not start. Keep 0 for normal operation.
+DATABASE_CUTOVER_HOLD=0
+
 # Required in production. The worker resolves this host before attempting uploads.
 PUBLIC_APP_URL=https://umak-sic-photobooth.vercel.app
 
@@ -58,18 +62,32 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 `CLOUDINARY_API_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` must never be sent to a browser or placed in a `NEXT_PUBLIC_*` variable. In production, an absent `PUBLIC_APP_URL` pauses publishing instead of failing open.
 
-Apply local backend migrations before starting the booth:
+Without `SQLITE_DATABASE_PATH` and `STORAGE_DIR`, the backend uses `app/storage/database/photobooth.sqlite` and `app/storage/`. The backend reads `.env` from its working directory, so start it from `app/backend` (as `start.sh` and `pnpm --filter` do). Use an absolute `SQLITE_DATABASE_PATH` so the file never depends on where the process starts.
+
+The backend applies pending SQLite migrations at startup. To apply them without starting the server:
 
 ```bash
 pnpm --filter @photobooth/backend db:migrate
 ```
+
+## Running the Booth
+
+`./start.sh` is the booth launcher. It requires `kitty`, `npm`, `curl`, and `systemctl`, opens three Kitty windows, waits for each service, and prints a health summary:
+
+| Window | Runs |
+| --- | --- |
+| SIC Infrastructure | `sudo systemctl start` for CUPS, Caddy, and the installed `sic-photobooth*hotspot.service` (install it first with `config/captive-portal/install.sh`). Stops the hotspot and Caddy on exit. |
+| SIC API and Captive | The backend (`app/backend`, `dev`) and the captive website (production build and start). |
+| SIC Booth App | The booth interface (`app/photobooth-software`, `dev`). |
+
+Each mode can also run on its own: `./start.sh infrastructure`, `./start.sh services`, or `./start.sh booth`.
 
 ## Development
 
 Run each application from the repository root in a separate terminal:
 
 ```bash
-pnpm --filter backend dev
+pnpm --filter @photobooth/backend dev
 pnpm --filter photobooth-software dev
 pnpm --filter captive-website dev
 pnpm --filter public-website dev
@@ -80,9 +98,34 @@ pnpm --filter public-website dev
 | Fastify backend | `http://127.0.0.1:3000` | Local API. Health check: `/health`. |
 | Photobooth software | `http://127.0.0.1:5173` | Local booth interface. |
 | Captive website | `http://127.0.0.1:5174` | Local guest retrieval site. |
-| Public website | `http://127.0.0.1:3001` | Public retrieval site during local development. |
+| Public website | `http://127.0.0.1:3002` | Public retrieval site during local development. |
 
-The public Next.js app uses port `3001` so it can run alongside the backend on port `3000`.
+The public Next.js app uses port `3002` so it can run alongside the backend on port `3000`.
+
+## Local Database
+
+The backend owns one SQLite file, opened in WAL mode with foreign keys enforced. Only one backend process may use it at a time.
+
+- **Startup:** the backend runs migrations and a health check before listening, and exits with status 1 if either fails. Run it under a supervisor that restarts it on failure.
+- **Cutover hold:** with `DATABASE_CUTOVER_HOLD=1`, every request other than GET, HEAD, or OPTIONS returns `503 MAINTENANCE_HOLD` and neither worker starts, while health, reads, and local retrieval keep working. The value is read at startup, so changing it needs a restart.
+- **Never swap database files while the backend or a worker is running.**
+
+Database commands, run from the repository root:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm --filter @photobooth/backend db:backup -- --dest <dir>` | Online, WAL-safe backup with a `.sha256` file; every backup is verified. `--keep <n>` prunes older backups it created. |
+| `pnpm --filter @photobooth/backend db:verify-backup -- <file>` | Checks the checksum, integrity, foreign keys, and migration ledger, then test-restores to a temporary directory. |
+| `pnpm --filter @photobooth/backend db:port-legacy-backup -- <backup-dir> <dest-dir>` | Rebuilds a new versioned SQLite file from a legacy PostgreSQL backup set. The backup is only read, so this can be rerun at any time. |
+| `pnpm --filter @photobooth/backend db:validate-cutover -- --candidate <file> --parity-report <report.json>` | Read-only validation of a candidate SQLite file before the booth is pointed at it. |
+
+These commands run through `tsx`, so install development dependencies (a plain `pnpm install`, not `--prod`) wherever they are used. Pass absolute paths: `pnpm --filter` runs them from `app/backend`.
+
+### Legacy PostgreSQL Data
+
+The booth ran on PostgreSQL until October 2026. Its final backup set (`photobooth.dump`, `photobooth.dump.sha256`, `storage-manifest.sha256`, and a full `storage/` copy) is kept outside the repository. `db:port-legacy-backup` verifies the dump and every media checksum, restores the dump into a throwaway PostgreSQL cluster reachable only through a Unix socket, imports it, and runs the row-by-row and media parity gate. Restoring the dump requires the PostgreSQL client and server binaries (`initdb`, `pg_ctl`, `pg_restore`); the booth itself no longer runs PostgreSQL.
+
+See `app/backend/scripts/database/README.md` for the import and parity details, `docs/runbooks/postgres-to-sqlite-cutover.md` for the cutover procedure, and `docs/runbooks/sqlite-backup-and-restore.md` for scheduling, retention, and restore.
 
 ## Supabase Deployment
 
@@ -162,10 +205,17 @@ Verify the backend after starting it:
 curl http://127.0.0.1:3000/health
 ```
 
-Expected response:
+A healthy backend returns HTTP 200:
 
 ```json
-{"status":"ok"}
+{"status":"healthy","timestamp":"…","uptimeSeconds":12,"services":{"database":"connected","storage":"writable"}}
+```
+
+Run the backend tests. Each test file gets its own temporary SQLite database and storage directory, and the config refuses the booth's default database and storage under test:
+
+```bash
+pnpm --filter @photobooth/backend exec vitest run
+pnpm --filter @photobooth/backend typecheck:scripts
 ```
 
 Verify the full local implementation before deployment:
