@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { config } from '../src/config.js';
 import { isTemplateId, mapTemplate, mergeOverlayAssetPaths } from '../src/templates/repository.js';
 import { validateTemplateDraft, type Template } from '../src/templates/types.js';
 import { duplicateName, toTemplateDto } from '../src/templates/routes.js';
@@ -25,21 +28,42 @@ describe('template persistence boundaries', () => {
 
   it('accepts relative database asset paths when removing assets', async () => {
     const storage = new TemplateStorage();
-
     await expect(storage.removeAsset('templates/background.png')).resolves.toBeUndefined();
-    await expect(storage.removeAsset('../outside.png')).rejects.toThrow(
-      'Invalid template asset path',
-    );
+  });
+
+  // removeAsset deliberately ignores (rather than throws on) paths outside the template
+  // directories, because rows persisted before the storage move can hold such paths and
+  // template cleanup must not fail on them (699cd2a). What matters is that nothing outside
+  // is ever deleted, so assert that instead of an exception.
+  it('never deletes a file outside the template directories', async () => {
+    const storage = new TemplateStorage();
+    const outside = path.resolve(config.storageDir, '../outside.png');
+    fs.mkdirSync(path.dirname(outside), { recursive: true });
+    fs.writeFileSync(outside, 'keep');
+    try {
+      await expect(storage.removeAsset('../outside.png')).resolves.toBeUndefined();
+      await expect(storage.removeAsset(outside)).resolves.toBeUndefined();
+      expect(fs.readFileSync(outside, 'utf8')).toBe('keep');
+    } finally {
+      fs.rmSync(outside, { force: true });
+    }
   });
 
   it('reads a moved asset referenced by its legacy absolute path', async () => {
     const storage = new TemplateStorage();
     const templateId = '44444444-4444-4444-8444-444444444444';
-    const assetPath = await storage.saveAsset(templateId, 'background', 'png', Buffer.from('asset'));
+    const assetPath = await storage.saveAsset(
+      templateId,
+      'background',
+      'png',
+      Buffer.from('asset'),
+    );
 
     try {
       const legacyPath = `/previous/location/templates/${templateId}/${assetPath.split('/').pop()}`;
-      await expect(storage.readAsset(templateId, legacyPath)).resolves.toEqual(Buffer.from('asset'));
+      await expect(storage.readAsset(templateId, legacyPath)).resolves.toEqual(
+        Buffer.from('asset'),
+      );
       await expect(storage.removeAsset(legacyPath)).resolves.toBeUndefined();
     } finally {
       await storage.removeTemplate(templateId);
@@ -257,7 +281,18 @@ describe('template persistence boundaries', () => {
           backgroundPath: 'assets/formatted-template-id/background.png',
           sortOrder: null,
           background: { x: 0, y: 0, width: 1200, height: 1800 },
-          placements: [{ captureIndex: 1, x: 80, y: 120, width: 1040, height: 420, rotation: 0, borderRadius: 0, zIndex: 1 }],
+          placements: [
+            {
+              captureIndex: 1,
+              x: 80,
+              y: 120,
+              width: 1040,
+              height: 420,
+              rotation: 0,
+              borderRadius: 0,
+              zIndex: 1,
+            },
+          ],
           overlays: [
             {
               id: '22222222-2222-4222-8222-222222222222',

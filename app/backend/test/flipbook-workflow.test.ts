@@ -1,6 +1,10 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
+import { config } from '../src/config.js';
 import { sessionStateMachine } from '../src/services/session-state-machine.js';
 import { dbRepository } from '../src/db/provider.js';
 
@@ -302,8 +306,9 @@ describe('Flipbook Workflow & State Transitions', () => {
     expect(errorBody.error.message).toContain('Maximum retake limit of 4 reached');
   });
 
-  it('allows recording prints and additional copies on flipbook sessions in booth_confirmed and printed state', async () => {
-    // 1. Create flipbook session
+  // The direct /print endpoint was retired in 9e73f77 in favour of the persistent
+  // print queue, so prints and additional copies now go through /print-jobs and reprint.
+  it('queues flipbook prints and additional copies through the persistent print queue', async () => {
     const createRes = await app.inject({
       method: 'POST',
       url: '/api/sessions',
@@ -315,36 +320,77 @@ describe('Flipbook Workflow & State Transitions', () => {
       },
     });
     const { sessionId, token } = JSON.parse(createRes.body).data;
-
-    // Simulate session moving to booth_confirmed
     await dbRepository.updateSessionState(sessionId, 'booth_confirmed');
 
-    // 2. Initial print (1 copy) -> state becomes printed, copiesPrinted = 1
-    const print1Res = await app.inject({
+    const retired = await app.inject({
       method: 'POST',
       url: `/api/sessions/${sessionId}/print`,
       headers: { 'x-session-token': token },
       payload: { copies: 1, recordOnly: true },
     });
-    expect(print1Res.statusCode).toBe(200);
-    const print1Body = JSON.parse(print1Res.body);
-    expect(print1Body.success).toBe(true);
-    expect(print1Body.data.state).toBe('printed');
-    expect(print1Body.data.isPrinted).toBe(true);
-    expect(print1Body.data.copiesPrinted).toBe(1);
+    expect(retired.statusCode).toBe(410);
+    expect(JSON.parse(retired.body).error.code).toBe('PRINT_QUEUE_REQUIRED');
 
-    // 3. Confirm additional copies in modal (e.g. 2 copies) -> state stays printed, copiesPrinted = 3
-    const print2Res = await app.inject({
+    // A flipbook prints its finalized PDF booklet.
+    const publicId = 'Fl1pBk7';
+    const outputs = path.join(config.storageDir, 'outputs');
+    fs.mkdirSync(outputs, { recursive: true });
+    fs.writeFileSync(path.join(outputs, `${publicId}.pdf`), '%PDF-1.4 test booklet');
+    await dbRepository.saveGeneratedOutput(
+      sessionId,
+      publicId,
+      'image/gif',
+      path.join(outputs, `${publicId}.gif`),
+      482,
+      264,
+    );
+
+    const queued = await app.inject({
       method: 'POST',
-      url: `/api/sessions/${sessionId}/print`,
+      url: `/api/sessions/${sessionId}/print-jobs`,
       headers: { 'x-session-token': token },
-      payload: { copies: 2, recordOnly: true },
+      payload: { copies: 1, requestKey: crypto.randomUUID() },
     });
-    expect(print2Res.statusCode).toBe(200);
-    const print2Body = JSON.parse(print2Res.body);
-    expect(print2Body.success).toBe(true);
-    expect(print2Body.data.state).toBe('printed');
-    expect(print2Body.data.isPrinted).toBe(true);
-    expect(print2Body.data.copiesPrinted).toBe(3);
+    expect(queued.statusCode).toBe(202);
+    const job = JSON.parse(queued.body).data;
+    expect(job).toMatchObject({
+      status: 'queued',
+      artifactType: 'application/pdf',
+      copiesRequested: 1,
+    });
+    expect(await dbRepository.getSessionById(sessionId)).toMatchObject({
+      state: 'booth_confirmed',
+      copiesPrinted: 0,
+    });
+
+    // Completion (normally reported by the print worker) marks the session printed exactly once.
+    await dbRepository.claimQueuedPrintJobs(10);
+    const attempt = await dbRepository.createPrintAttempt(job.id);
+    await dbRepository.completePrintJob(job.id, attempt.id);
+    expect(await dbRepository.getSessionById(sessionId)).toMatchObject({
+      state: 'printed',
+      isPrinted: true,
+      copiesPrinted: 1,
+    });
+
+    // Additional copies after the initial print must use Reprint, not a second initial job.
+    const second = await app.inject({
+      method: 'POST',
+      url: `/api/sessions/${sessionId}/print-jobs`,
+      headers: { 'x-session-token': token },
+      payload: { copies: 2, requestKey: crypto.randomUUID() },
+    });
+    expect(second.statusCode).toBe(409);
+    expect(JSON.parse(second.body).error.code).toBe('PRINT_REPRINT_REQUIRED');
+
+    const reprint = await app.inject({
+      method: 'POST',
+      url: `/api/print-jobs/${job.id}/reprint`,
+      payload: { requestKey: crypto.randomUUID() },
+    });
+    expect(reprint.statusCode).toBe(202);
+    const reprinted = JSON.parse(reprint.body).data;
+    expect(reprinted).toMatchObject({ status: 'queued', sessionId, publicId });
+    expect(reprinted.id).not.toBe(job.id);
   });
 });
