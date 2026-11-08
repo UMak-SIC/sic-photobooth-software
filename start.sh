@@ -70,7 +70,18 @@ wait_for_http() {
 }
 
 run_infrastructure() {
-  local hotspot_service
+  local launch_captive="${1:-yes}"
+  local hotspot_service=''
+
+  if [[ "$launch_captive" != 'yes' ]]; then
+    printf 'Starting CUPS only (captive website skipped, so no Caddy or hotspot). sudo may ask for your password.\n'
+    sudo systemctl start cups.socket cups.service
+    printf 'CUPS socket: %s\n' "$(service_status cups.socket)"
+    printf 'CUPS service: %s\n' "$(service_status cups.service)"
+    printf 'Infrastructure is running. Press Ctrl+C here to stop it.\n'
+    while :; do sleep 3600; done
+  fi
+
   hotspot_service="$(find_hotspot_service)" || {
     printf 'Could not find an installed SIC Photobooth hotspot systemd service. Run config/captive-portal/install.sh first.\n' >&2
     exit 1
@@ -88,22 +99,45 @@ run_infrastructure() {
 }
 
 run_services() {
-  local api_pid captive_pid
+  local launch_captive="${1:-yes}"
+  local -a pids=()
 
   cd "$ROOT_DIR"
-  trap 'kill "$api_pid" "$captive_pid" 2>/dev/null || true' EXIT INT TERM
+  trap 'kill "${pids[@]}" 2>/dev/null || true' EXIT INT TERM
 
   npm --prefix "$ROOT_DIR/app/backend" run dev &
-  api_pid=$!
+  pids+=("$!")
 
-  # The captive portal runs in production mode because Caddy exposes it to guests.
-  (
-    npm --prefix "$ROOT_DIR/app/captive-website" run build
-    npm --prefix "$ROOT_DIR/app/captive-website" run start
-  ) &
-  captive_pid=$!
+  if [[ "$launch_captive" == 'yes' ]]; then
+    # The captive portal runs in production mode because Caddy exposes it to guests.
+    (
+      npm --prefix "$ROOT_DIR/app/captive-website" run build
+      npm --prefix "$ROOT_DIR/app/captive-website" run start
+    ) &
+    pids+=("$!")
+  else
+    printf 'Skipping the captive website.\n'
+  fi
 
-  wait "$api_pid" "$captive_pid"
+  wait "${pids[@]}"
+}
+
+ask_launch_captive() {
+  local answer=''
+
+  # Non-interactive runs keep the default.
+  if [[ -t 0 ]]; then
+    read -r -p 'Launch captive website? [Y/n] ' answer || true
+  fi
+
+  case "${answer,,}" in
+    '' | y | yes) printf 'yes' ;;
+    n | no) printf 'no' ;;
+    *)
+      printf 'Unrecognized answer "%s"; launching the captive website.\n' "$answer" >&2
+      printf 'yes'
+      ;;
+  esac
 }
 
 run_booth() {
@@ -112,46 +146,62 @@ run_booth() {
 }
 
 print_summary() {
+  local launch_captive="${1:-yes}"
   local hotspot_service
   hotspot_service="$(find_hotspot_service 2>/dev/null || true)"
 
   printf '\nSIC Photobooth URLs\n'
   printf '  Booth app:       %s\n' "$BOOTH_URL"
   printf '  API health:      %s\n' "$API_URL"
-  printf '  Captive local:   %s\n' "$CAPTIVE_LOCAL_URL"
-  printf '  Guest portal:    %s\n' "$CAPTIVE_PORTAL_URL"
+  if [[ "$launch_captive" == 'yes' ]]; then
+    printf '  Captive local:   %s\n' "$CAPTIVE_LOCAL_URL"
+    printf '  Guest portal:    %s\n' "$CAPTIVE_PORTAL_URL"
+  fi
 
   printf '\nHealth check\n'
   printf '  CUPS socket:     %s\n' "$(service_status cups.socket)"
   printf '  CUPS service:    %s\n' "$(service_status cups.service)"
-  printf '  Caddy:           %s\n' "$(service_status caddy)"
-  if [[ -n "$hotspot_service" ]]; then
+  if [[ "$launch_captive" != 'yes' ]]; then
+    printf '  Caddy:           skipped\n'
+    printf '  Hotspot:         skipped\n'
+  elif [[ -n "$hotspot_service" ]]; then
+    printf '  Caddy:           %s\n' "$(service_status caddy)"
     printf '  Hotspot (%s): %s\n' "$hotspot_service" "$(service_status "$hotspot_service")"
   else
+    printf '  Caddy:           %s\n' "$(service_status caddy)"
     printf '  Hotspot:         service not installed\n'
   fi
   printf '  API:             HTTP %s\n' "$(http_status "$API_URL")"
   printf '  Booth app:       HTTP %s\n' "$(http_status "$BOOTH_URL")"
-  printf '  Captive website: HTTP %s\n' "$(http_status "$CAPTIVE_LOCAL_URL")"
+  if [[ "$launch_captive" == 'yes' ]]; then
+    printf '  Captive website: HTTP %s\n' "$(http_status "$CAPTIVE_LOCAL_URL")"
+  else
+    printf '  Captive website: skipped\n'
+  fi
 }
 
 start() {
   local failed=0
+  local launch_captive
 
   require_command kitty
   require_command npm
   require_command curl
   require_command systemctl
 
-  kitty --title 'SIC Infrastructure' "$ROOT_DIR/start.sh" infrastructure &
-  kitty --title 'SIC API and Captive' "$ROOT_DIR/start.sh" services &
+  launch_captive="$(ask_launch_captive)"
+
+  kitty --title 'SIC Infrastructure' "$ROOT_DIR/start.sh" infrastructure "$launch_captive" &
+  kitty --title 'SIC API and Captive' "$ROOT_DIR/start.sh" services "$launch_captive" &
   kitty --title 'SIC Booth App' "$ROOT_DIR/start.sh" booth &
 
   printf 'Opened three Kitty windows. Waiting for the local services...\n'
   wait_for_http "$API_URL" 'API' || failed=1
   wait_for_http "$BOOTH_URL" 'Booth app' || failed=1
-  wait_for_http "$CAPTIVE_LOCAL_URL" 'Captive website' || failed=1
-  print_summary
+  if [[ "$launch_captive" == 'yes' ]]; then
+    wait_for_http "$CAPTIVE_LOCAL_URL" 'Captive website' || failed=1
+  fi
+  print_summary "$launch_captive"
 
   if ((failed == 0)); then
     printf '\nAll local services are ready. You can proceed.\n'
@@ -163,8 +213,8 @@ start() {
 
 case "${1:-start}" in
   start) start ;;
-  infrastructure) run_infrastructure ;;
-  services) run_services ;;
+  infrastructure) run_infrastructure "${2:-yes}" ;;
+  services) run_services "${2:-yes}" ;;
   booth) run_booth ;;
   *)
     printf 'Usage: %s [start|infrastructure|services|booth]\n' "$0" >&2
