@@ -26,6 +26,8 @@ fi
 
 if command -v pacman >/dev/null; then
   sudo pacman -S --needed caddy dnsmasq fish hostapd ufw
+elif command -v apt-get >/dev/null; then
+  sudo apt-get install -y caddy dnsmasq fish hostapd ufw
 elif command -v dnf >/dev/null; then
   sudo dnf install -y caddy dnsmasq fish hostapd ufw
 else

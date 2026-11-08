@@ -8,7 +8,7 @@
 ./config/captive-portal/install.sh
 ```
 
-The installer supports Arch Linux, CachyOS, and Fedora. It prompts for the Wi-Fi password, installs Caddy, dnsmasq, Fish, hostapd, and UFW, renders the system configuration, validates it, and installs the hotspot service. On SELinux-enforcing Fedora systems, it also permits Caddy to proxy to the local captive website. Rendered files are written to `config/captive-portal/generated/`, which is ignored by Git because it includes the Wi-Fi password.
+The installer supports Arch Linux, CachyOS, Linux Mint (and other apt-based distros), and Fedora. It prompts for the Wi-Fi password, installs Caddy, dnsmasq, Fish, hostapd, and UFW, renders the system configuration, validates it, and installs the hotspot service. On SELinux-enforcing Fedora systems, it also permits Caddy to proxy to the local captive website. Rendered files are written to `config/captive-portal/generated/`, which is ignored by Git because it includes the Wi-Fi password.
 
 It permits only guest portal traffic (`80`) and WayVNC (`5900`) from the configured hotspot subnet by default. To additionally expose development services (`3000`, `5173`, and `5174`) to connected guests, opt in explicitly:
 
