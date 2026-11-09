@@ -39,12 +39,15 @@ parse_args() {
 }
 
 # check_system <os-release ID> <display name>
+# Accepts the ID itself or a derivative that lists it in ID_LIKE (CachyOS: ID_LIKE=arch).
 check_system() {
   step 'Checking the system'
   ((EUID != 0)) || die 'Run this as your normal user, not root. It uses sudo where needed.'
-  local os_id
+  local os_id os_like
   os_id="$(. /etc/os-release 2>/dev/null && printf '%s' "${ID:-}")"
-  [[ "$os_id" == "$1" ]] || die "This is the $2 installer, but this system reports ID=${os_id:-unknown}. Rerun ./install.sh and pick the right distro."
+  os_like="$(. /etc/os-release 2>/dev/null && printf '%s' "${ID_LIKE:-}")"
+  [[ "$os_id" == "$1" || " $os_like " == *" $1 "* ]] ||
+    die "This is the $2 installer, but this system reports ID=${os_id:-unknown}. Rerun ./install.sh and pick the right distro."
   command -v sudo >/dev/null || die 'sudo is required.'
   sudo -v
 }
